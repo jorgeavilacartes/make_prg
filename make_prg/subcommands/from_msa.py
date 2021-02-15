@@ -4,24 +4,42 @@ from pathlib import Path
 
 from make_prg.from_msa import prg_builder, NESTING_LVL, MIN_MATCH_LEN
 from make_prg import io_utils
+from multiprocessing import Pool
 
+options = None
 
 def register_parser(subparsers):
     subparser_msa = subparsers.add_parser(
         "from_msa",
-        usage="make_prg from_msa [options] <MSA input file>",
-        help="Make PRG from multiple sequence alignment",
+        usage="make_prg from_msa [options] <MSA input dir>",
+        help="Make PRG from multiple sequence alignment dir",
     )
-
     subparser_msa.add_argument(
-        "MSA",
+        "-i", "--input",
         action="store",
         type=str,
+        required=True,
         help=(
-            "Input file: a multiple sequence alignment in supported alignment_format. "
-            "If not in aligned fasta alignment_format, use -f to input the "
+            "Input dir: all files in this will try to be read as the supported alignment_format. "
+            "If not aligned in fasta alignment_format, use -f to input the "
             "alignment_format type"
         ),
+    )
+    subparser_msa.add_argument(
+        "-o", "--output",
+        action="store",
+        type=str,
+        required=True,
+        help=(
+            "Output dir: where all output will be stored"
+        ),
+    )
+    subparser_msa.add_argument(
+        "-t", "--threads",
+        action="store",
+        type=int,
+        default=1,
+        help="Number of threads",
     )
     subparser_msa.add_argument(
         "-f",
@@ -55,28 +73,21 @@ def register_parser(subparsers):
             "match. Default: {}".format(MIN_MATCH_LEN)
         ),
     )
-    subparser_msa.add_argument(
-        "-p", "--prefix", dest="output_prefix", action="store", help="Output prefix"
-    )
-    subparser_msa.add_argument(
-        "--no_overwrite",
-        dest="no_overwrite",
-        action="store_true",
-        help="Do not overwrite pre-existing prg file with same name",
-    )
     subparser_msa.set_defaults(func=run)
 
     return subparser_msa
 
 
-def run(options):
-    if options.output_prefix is None:
-        prefix = options.MSA
-    else:
-        if os.path.isdir(options.output_prefix):
-            prefix = os.path.join(options.output_prefix, os.path.basename(options.MSA))
-        else:
-            prefix = options.output_prefix
+def get_all_input_files(input_dir):
+    input_dir = Path(input_dir)
+    all_files = [Path(path).absolute() for path in input_dir.iterdir() if path.is_file()]
+    return all_files
+
+
+def process_MSA(msa_filepath: Path):
+    msa_name = msa_filepath.name
+    output = Path(options.output)
+    prefix = str(output / msa_name)
     prefix += ".max_nest%d.min_match%d" % (
         options.max_nesting,
         options.min_match_length,
@@ -99,28 +110,29 @@ def run(options):
         options.min_match_length,
     )
 
-    if os.path.isfile("%s.prg" % prefix) and options.no_overwrite:
-        # TODO: remove this?
-        prg_file = "%s.prg" % prefix
-        logging.info(f"Re-using existing prg file {prg_file}")
-        aseq = prg_builder.PrgBuilder(
-            options.MSA,
-            alignment_format=options.alignment_format,
-            max_nesting=options.max_nesting,
-            min_match_length=options.min_match_length,
-        )
-    else:
-        aseq = prg_builder.PrgBuilder(
-            options.MSA,
-            alignment_format=options.alignment_format,
-            max_nesting=options.max_nesting,
-            min_match_length=options.min_match_length,
-        )
-        aseq.build_prg()
-        logging.info(f"Write PRG file to {prefix}.prg")
-        io_utils.write_prg(prefix, aseq.prg)
-        # m = aseq.max_nesting_level_reached
-        # logging.info(f"Max_nesting_reached\t{m}")
+    builder = prg_builder.PrgBuilder(
+        locus_name=msa_name,
+        msa_file=msa_filepath,
+        alignment_format=options.alignment_format,
+        max_nesting=options.max_nesting,
+        min_match_length=options.min_match_length,
+    )
+    builder.build_prg()
+    logging.info(f"Write PRG file to {prefix}.prg")
+    io_utils.write_prg(prefix, builder.prg)
+    builder.serialize(f"{prefix}.pickle")
+    # m = aseq.max_nesting_level_reached
+    # logging.info(f"Max_nesting_reached\t{m}")
 
     # logging.info(f"Write GFA file to {prefix}.gfa")
     # io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
+
+
+
+def run(cl_options):
+    global options
+    options = cl_options
+    input_files = get_all_input_files(options.input)
+    os.makedirs(options.output, exist_ok=True)
+    with Pool(options.threads) as pool:
+        pool.map(process_MSA, input_files, chunksize=1)
