@@ -11,42 +11,157 @@ from make_prg.seq_utils import (
     NONMATCH,
 )
 from make_prg.from_msa.interval_partition import IntervalPartitioner, Interval, IntervalType
+import pickle
+from pathlib import Path
+import uuid
+import shutil
+import os
+import shlex
+import subprocess
+import time
+from Bio.Seq import Seq
+from Bio import SeqIO
 
+
+# TODO: change to spoa
+class MSAAligner:
+    @classmethod
+    def get_updated_alignment(cls, locus_name: str, previous_alignment: Path, new_sequences: Path, prefix: str) -> Path:
+        logging.info(f"Updating MSA for {locus_name}...")
+
+        # make paths shell-safe
+        new_msa = shlex.quote(f"{prefix}.updated_msa.fa")
+        previous_alignment = shlex.quote(str(previous_alignment))
+        new_sequences = shlex.quote(str(new_sequences))
+        mafft_tmpdir = Path(f"{prefix}.mafft.{uuid.uuid4()}")
+        if mafft_tmpdir.exists():
+            shutil.rmtree(mafft_tmpdir)
+        mafft_tmpdir.mkdir()
+        env = os.environ
+        env["TMPDIR"] = str(mafft_tmpdir)
+
+        args = " ".join(
+            [
+                "mafft",
+                "--auto",
+                "--quiet",
+                "--thread",
+                "1",
+                "--add",
+                new_sequences,
+                previous_alignment,
+                ">",
+                new_msa,
+            ]
+        )
+
+        start = time.time()
+        process = subprocess.Popen(
+            args, stderr=subprocess.PIPE, encoding="utf-8", shell=True, env=env,
+        )
+        exit_code = process.wait()
+        shutil.rmtree(mafft_tmpdir)
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Failed to execute mafft for {locus_name} due to the following error:\n"
+                f"{process.stderr.read()}"
+            )
+        stop = time.time()
+        runtime = stop-start
+        logging.info(f"Finished updating MSA for {locus_name}")
+        logging.info(f"MAFFT update runtime for {locus_name} in seconds: {runtime:.3f}")
+
+        return Path(new_msa)
 
 
 class PrgBuilderMultiClusterNode(object):
     def __init__(self,
                  nesting_level,
-                 alignments,
+                 alignment,
                  interval,
+                 parent,
                  prg_builder):
         self.nesting_level = nesting_level
-        self.alignments = alignments
+        self.alignment = alignment
         self.interval = interval
+        self.parent = parent
         self.prg_builder = prg_builder
+
+        # cluster
+        self.cluster_subalignments = self.get_subalignments_by_clustering()
         self._children = self._get_children()
 
     def _get_children(self):
         children = []
-        for alignment in self.alignments:
+        for alignment in self.cluster_subalignments:
             child = PrgBuilderSingleClusterNode(
                 nesting_level=self.nesting_level,
                 alignment=alignment,
                 interval=self.interval,
+                parent=self,
                 prg_builder=self.prg_builder
             )
             children.append(child)
         return children
 
-    def _preorder_traversal_to_build_prg(self, delim_char) -> str:
+    def _preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
         site_num = self.prg_builder.get_next_site_num()
-        prg = f"{delim_char}{site_num}{delim_char}"
-        
+        prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
+
         for child_index, child in enumerate(self._children):
             site_num_to_separate_alleles = (site_num + 1) if (child_index < len(self._children) - 1) else site_num
-            prg += child._preorder_traversal_to_build_prg(delim_char)
-            prg += f"{delim_char}{site_num_to_separate_alleles}{delim_char}"
-        return prg
+            child._preorder_traversal_to_build_prg(prg_as_list, delim_char)
+            prg_as_list.extend(f"{delim_char}{site_num_to_separate_alleles}{delim_char}")
+
+    def get_subalignments_by_clustering(self):
+        id_lists = kmeans_cluster_seqs_in_interval(
+            [self.interval.start, self.interval.stop],
+            self.alignment,
+            self.prg_builder.min_match_length,
+        )
+        list_sub_alignments = [
+            self.get_sub_alignment_by_list_id(
+                id_list, self.alignment, [self.interval.start, self.interval.stop]
+            )
+            for id_list in id_lists
+        ]
+        return list_sub_alignments
+
+    @classmethod
+    def get_sub_alignment_by_list_id(
+        self, id_list: List[str], alignment: MSA, interval=None
+    ):
+        list_records = [record for record in alignment if record.id in id_list]
+        sub_alignment = MSA(list_records)
+        if interval is not None:
+            sub_alignment = sub_alignment[:, interval[0] : interval[1] + 1]
+        return sub_alignment
+
+    def update(self, new_sequences: List[Seq]):
+        # TODO: add all sequences and then update in a single go
+
+        # update the MSA
+        previous_msa_filename = f"{self.prg_builder.prefix}.previous_msa.fa"
+        with open(previous_msa_filename, "w") as previous_msa_handler:
+            SeqIO.write(self.alignment, previous_msa_handler, "fasta")
+        new_sequences_filename = f"{self.prg_builder.prefix}.new_sequences.fa"
+        with open(new_sequences_filename, "w") as new_sequences_handler:
+            SeqIO.write(new_sequences, new_sequences_handler, "fasta")
+        MSAAligner.get_updated_alignment(locus_name=self.prg_builder.locus_name,
+                                         previous_alignment=Path(previous_msa_filename),
+                                         new_sequences=Path(new_sequences_filename),
+                                         prefix=self.prg_builder.prefix)
+
+        # update the alignment
+        self.alignment = load_alignment_file(new_sequences_filename, "fasta")
+
+        # update the cluster
+        self.cluster_subalignments = self.get_subalignments_by_clustering()
+
+        # update the children
+        self._children = self._get_children()
+
+
 
 
 class PrgBuilderSingleClusterNode(object):
@@ -54,10 +169,12 @@ class PrgBuilderSingleClusterNode(object):
                  nesting_level,
                  alignment,
                  interval,
+                 parent,
                  prg_builder):
         self.nesting_level = nesting_level
         self.alignment = alignment
         self.interval = interval
+        self.parent = parent
         self.prg_builder = prg_builder
 
         self.consensus = self.get_consensus(self.alignment)
@@ -78,16 +195,13 @@ class PrgBuilderSingleClusterNode(object):
         # generate recursion tree
         self._children = self._get_children()
 
-    def _preorder_traversal_to_build_prg(self, delim_char) -> str:
+    def _preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
         is_leaf_node = len(self._children) == 0
         if is_leaf_node:
-            return self._get_prg(delim_char)
+            self._get_prg(prg_as_list, delim_char)
         else:
-            prg = ""
             for child in self._children:
-                child_prg = child._preorder_traversal_to_build_prg(delim_char)
-                prg += child_prg
-            return prg
+                child._preorder_traversal_to_build_prg(prg_as_list, delim_char)
 
     @classmethod
     def get_consensus(cls, alignment: MSA):
@@ -109,16 +223,6 @@ class PrgBuilderSingleClusterNode(object):
                 consensus_string += column.pop()
 
         return consensus_string
-
-    @classmethod
-    def get_sub_alignment_by_list_id(
-        self, id_list: List[str], alignment: MSA, interval=None
-    ):
-        list_records = [record for record in alignment if record.id in id_list]
-        sub_alignment = MSA(list_records)
-        if interval is not None:
-            sub_alignment = sub_alignment[:, interval[0] : interval[1] + 1]
-        return sub_alignment
 
     def _get_children(self):
         """
@@ -144,52 +248,38 @@ class PrgBuilderSingleClusterNode(object):
                     nesting_level=self.nesting_level + 1,
                     alignment=sub_alignment,
                     interval=interval,
+                    parent=self,
                     prg_builder=self.prg_builder
                 )
                 children.append(child)
 
             else:
-                # cluster
-                id_lists = kmeans_cluster_seqs_in_interval(
-                    [interval.start, interval.stop],
-                    self.alignment,
-                    self.prg_builder.min_match_length,
-                )
-                list_sub_alignments = [
-                    self.get_sub_alignment_by_list_id(
-                        id_list, self.alignment, [interval.start, interval.stop]
-                    )
-                    for id_list in id_lists
-                ]
-
                 child = PrgBuilderMultiClusterNode(
                     nesting_level=self.nesting_level + 1,
-                    alignments=list_sub_alignments,
+                    alignment=self.alignment,
                     interval=interval,
+                    parent=self,
                     prg_builder=self.prg_builder
                 )
                 children.append(child)
 
         return children
 
-    def _get_prg(self, delim_char):
-        prg = ""
+    def _get_prg(self, prg_as_list, delim_char):
         for interval in self.all_intervals:
             sub_alignment = self.alignment[:, interval.start : interval.stop + 1]
             seqs = get_interval_seqs(sub_alignment)
 
             single_seq = len(seqs) == 1
             if single_seq:
-                prg = seqs[0]
+                prg_as_list.extend(seqs[0])
             else:
                 # Add the variant seqs to the prg.
                 site_num = self.prg_builder.get_next_site_num()
-                prg += f"{delim_char}{site_num}{delim_char}"
+                prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
                 for seq_index, seq in enumerate(seqs):
                     site_num_for_this_seq = (site_num + 1) if (seq_index < len(seqs) - 1) else site_num
-                    prg += seq
-                    prg += f"{delim_char}{site_num_for_this_seq}{delim_char}"
-        return prg
+                    prg_as_list.extend(f"{seq}{delim_char}{site_num_for_this_seq}{delim_char}")
 
     @property
     def max_nesting_level_reached(self):
@@ -238,10 +328,6 @@ class PrgBuilderSingleClusterNode(object):
         return len(self.alignment)
 
 
-
-
-
-
 class PrgBuilder(object):
     """
     Prg builder based from a multiple sequence alignment.
@@ -250,11 +336,15 @@ class PrgBuilder(object):
 
     def __init__(
         self,
+        locus_name,
+        prefix,
         msa_file,
-        alignment_format="fasta",
-        max_nesting=2,
-        min_match_length=3
+        alignment_format,
+        max_nesting,
+        min_match_length
     ):
+        self.locus_name = locus_name
+        self.prefix = prefix
         self.msa_file = msa_file
         self.alignment_format = alignment_format
         self.max_nesting = max_nesting
@@ -262,15 +352,28 @@ class PrgBuilder(object):
 
         alignment = load_alignment_file(msa_file, alignment_format)
         root_interval = Interval(IntervalType.Root, 0, alignment.get_alignment_length() - 1)
-        self._root = PrgBuilderSingleClusterNode(nesting_level=1, alignment=alignment, interval=root_interval,
+        self._root = PrgBuilderSingleClusterNode(nesting_level=1,
+                                                 alignment=alignment,
+                                                 interval=root_interval,
+                                                 parent=None,
                                                  prg_builder=self)
-
 
     def build_prg(self):
         self._site_num = 5
-        self.prg = self._root._preorder_traversal_to_build_prg(delim_char=" ")
+        prg_as_list = []
+        self._root._preorder_traversal_to_build_prg(prg_as_list, delim_char=" ")
+        self.prg = "".join(prg_as_list)
 
     def get_next_site_num(self):
         previous_site_num = self._site_num
         self._site_num+=2
         return previous_site_num
+
+    def serialize(self, filename):
+        with open(filename, "wb") as filehandler:
+            pickle.dump(self, filehandler)
+
+    @classmethod
+    def deserialize(self, filename) -> "PrgBuilder":
+        with open(filename, "rb") as filehandler:
+            return pickle.load(filehandler)

@@ -112,6 +112,7 @@ def process_MSA(msa_filepath: Path):
 
     builder = prg_builder.PrgBuilder(
         locus_name=msa_name,
+        prefix=prefix,
         msa_file=msa_filepath,
         alignment_format=options.alignment_format,
         max_nesting=options.max_nesting,
