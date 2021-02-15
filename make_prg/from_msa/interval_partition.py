@@ -17,6 +17,7 @@ class PartitioningError(Exception):
 class IntervalType(Enum):
     Match = auto()
     NonMatch = auto()
+    Root = auto()
 
     @classmethod
     def from_char(cls, letter: str) -> "IntervalType":

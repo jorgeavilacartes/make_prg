@@ -100,6 +100,7 @@ def run(options):
     )
 
     if os.path.isfile("%s.prg" % prefix) and options.no_overwrite:
+        # TODO: remove this?
         prg_file = "%s.prg" % prefix
         logging.info(f"Re-using existing prg file {prg_file}")
         aseq = prg_builder.PrgBuilder(
@@ -107,7 +108,6 @@ def run(options):
             alignment_format=options.alignment_format,
             max_nesting=options.max_nesting,
             min_match_length=options.min_match_length,
-            prg_file=prg_file,
         )
     else:
         aseq = prg_builder.PrgBuilder(
@@ -116,6 +116,7 @@ def run(options):
             max_nesting=options.max_nesting,
             min_match_length=options.min_match_length,
         )
+        aseq.build_prg()
         logging.info(f"Write PRG file to {prefix}.prg")
         io_utils.write_prg(prefix, aseq.prg)
         m = aseq.max_nesting_level_reached
@@ -123,10 +124,3 @@ def run(options):
 
     logging.info(f"Write GFA file to {prefix}.gfa")
     io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
-
-    summary_file = Path(prefix).parent / "summary.tsv"
-    with summary_file.open("a") as s:
-        s.write(
-            f"{options.MSA}\t{aseq.site - 2}\t"
-            f"{aseq.max_nesting_level_reached}\t{aseq.prop_in_match_intervals}\n"
-        )
