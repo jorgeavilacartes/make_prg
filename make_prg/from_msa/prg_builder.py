@@ -13,38 +13,52 @@ from make_prg.seq_utils import (
 from make_prg.from_msa.interval_partition import IntervalPartitioner, Interval, IntervalType
 
 
-# class PrgBuilderRecursionTreeNode(object):
-#     """
-#     A node in the recursion tree used by the PRG Builder class
-#     """
-#     def __init__(self,
-#                  nesting_level,
-#
 
-class PrgBuilder(object):
-    """
-    Prg builder based from a multiple sequence alignment.
-    Note min_match_length must be strictly greater than max_nesting + 1.
-    """
-
-    def __init__(
-        self,
-        msa_file,
-        alignment_format="fasta",
-        max_nesting=2,
-        nesting_level=1,
-        min_match_length=3,
-        alignment=None,
-        interval=None
-    ):
-        self.msa_file = msa_file
-        self.alignment_format = alignment_format
-        self.max_nesting = max_nesting
+class PrgBuilderMultiClusterNode(object):
+    def __init__(self,
+                 nesting_level,
+                 alignments,
+                 interval,
+                 prg_builder):
         self.nesting_level = nesting_level
-        self.min_match_length = min_match_length
-        self.alignment: MSA = alignment
-        if self.alignment is None:
-            self.alignment = load_alignment_file(msa_file, alignment_format)
+        self.alignments = alignments
+        self.interval = interval
+        self.prg_builder = prg_builder
+        self._children = self._get_children()
+
+    def _get_children(self):
+        children = []
+        for alignment in self.alignments:
+            child = PrgBuilderSingleClusterNode(
+                nesting_level=self.nesting_level,
+                alignment=alignment,
+                interval=self.interval,
+                prg_builder=self.prg_builder
+            )
+            children.append(child)
+        return children
+
+    def _preorder_traversal_to_build_prg(self, delim_char) -> str:
+        site_num = self.prg_builder.get_next_site_num()
+        prg = f"{delim_char}{site_num}{delim_char}"
+        
+        for child_index, child in enumerate(self._children):
+            site_num_to_separate_alleles = (site_num + 1) if (child_index < len(self._children) - 1) else site_num
+            prg += child._preorder_traversal_to_build_prg(delim_char)
+            prg += f"{delim_char}{site_num_to_separate_alleles}{delim_char}"
+        return prg
+
+
+class PrgBuilderSingleClusterNode(object):
+    def __init__(self,
+                 nesting_level,
+                 alignment,
+                 interval,
+                 prg_builder):
+        self.nesting_level = nesting_level
+        self.alignment = alignment
+        self.interval = interval
+        self.prg_builder = prg_builder
 
         self.consensus = self.get_consensus(self.alignment)
         self.length = len(self.consensus)
@@ -53,7 +67,7 @@ class PrgBuilder(object):
             self.non_match_intervals,
             self.all_intervals,
         ) = IntervalPartitioner(
-            self.consensus, self.min_match_length, self.alignment
+            self.consensus, self.prg_builder.min_match_length, self.alignment
         ).get_intervals()
         logging.info(
             "match intervals: %s; non_match intervals: %s",
@@ -61,30 +75,18 @@ class PrgBuilder(object):
             self.non_match_intervals,
         )
 
-        self.interval = interval
-        if self.interval is None:
-            self.interval = Interval(IntervalType.Root, 0, self.length-1)
-
-
-        # properties for stats
-        self.subAlignedSeqs = {}
-
         # generate recursion tree
         self._children = self._get_children()
 
-    def build_prg(self):
-        self.prg = self._preorder_traversal_to_build_prg(5, " ")
-
-    def _preorder_traversal_to_build_prg(self, site_num, delim_char) -> str:
+    def _preorder_traversal_to_build_prg(self, delim_char) -> str:
         is_leaf_node = len(self._children) == 0
         if is_leaf_node:
-            return self._get_prg(site_num, delim_char)
+            return self._get_prg(delim_char)
         else:
-            prg = f"{delim_char}{site_num}{delim_char}"
-            for child_index, child in enumerate(self._children):
-                site_num_for_this_child = (site_num + 1) if (child_index < len(self._children) - 1) else site_num
-                prg += child._preorder_traversal_to_build_prg(site_num, delim_char)
-                prg += f"{delim_char}{site_num_for_this_child}{delim_char}"
+            prg = ""
+            for child in self._children:
+                child_prg = child._preorder_traversal_to_build_prg(delim_char)
+                prg += child_prg
             return prg
 
     @classmethod
@@ -118,15 +120,15 @@ class PrgBuilder(object):
             sub_alignment = sub_alignment[:, interval[0] : interval[1] + 1]
         return sub_alignment
 
-    def _get_children(self) -> List["PrgBuilder"]:
+    def _get_children(self):
         """
         Get and add the children of this node in the recursion tree
         """
 
         # stop conditions
         single_match_interval = (len(self.all_intervals)==1) and (self.all_intervals[0] in self.match_intervals)
-        max_nesting_level_reached = self.nesting_level == self.max_nesting
-        small_variant_site = self.interval.stop - self.interval.start <= self.min_match_length
+        max_nesting_level_reached = self.nesting_level == self.prg_builder.max_nesting
+        small_variant_site = self.interval.stop - self.interval.start <= self.prg_builder.min_match_length
         if single_match_interval or max_nesting_level_reached or small_variant_site:
             return list()
 
@@ -138,14 +140,11 @@ class PrgBuilder(object):
                 sub_alignment = self.alignment[:, interval.start : interval.stop + 1]
                 seqs = get_interval_seqs(sub_alignment)
                 assert len(seqs) == 1, "Got >1 filtered sequences in match interval"
-                child = PrgBuilder(
-                    msa_file=self.msa_file,
-                    alignment_format=self.alignment_format,
-                    max_nesting=self.max_nesting,
+                child = PrgBuilderSingleClusterNode(
                     nesting_level=self.nesting_level + 1,
-                    min_match_length=self.min_match_length,
                     alignment=sub_alignment,
                     interval=interval,
+                    prg_builder=self.prg_builder
                 )
                 children.append(child)
 
@@ -154,7 +153,7 @@ class PrgBuilder(object):
                 id_lists = kmeans_cluster_seqs_in_interval(
                     [interval.start, interval.stop],
                     self.alignment,
-                    self.min_match_length,
+                    self.prg_builder.min_match_length,
                 )
                 list_sub_alignments = [
                     self.get_sub_alignment_by_list_id(
@@ -163,21 +162,17 @@ class PrgBuilder(object):
                     for id_list in id_lists
                 ]
 
-                for sub_alignment in list_sub_alignments:
-                    child = PrgBuilder(
-                        msa_file=self.msa_file,
-                        alignment_format=self.alignment_format,
-                        max_nesting=self.max_nesting,
-                        nesting_level=self.nesting_level + 1,
-                        min_match_length=self.min_match_length,
-                        alignment=sub_alignment,
-                        interval=interval,
-                    )
-                    children.append(child)
+                child = PrgBuilderMultiClusterNode(
+                    nesting_level=self.nesting_level + 1,
+                    alignments=list_sub_alignments,
+                    interval=interval,
+                    prg_builder=self.prg_builder
+                )
+                children.append(child)
 
         return children
 
-    def _get_prg(self, site_num, delim_char):
+    def _get_prg(self, delim_char):
         prg = ""
         for interval in self.all_intervals:
             sub_alignment = self.alignment[:, interval.start : interval.stop + 1]
@@ -188,6 +183,7 @@ class PrgBuilder(object):
                 prg = seqs[0]
             else:
                 # Add the variant seqs to the prg.
+                site_num = self.prg_builder.get_next_site_num()
                 prg += f"{delim_char}{site_num}{delim_char}"
                 for seq_index, seq in enumerate(seqs):
                     site_num_for_this_seq = (site_num + 1) if (seq_index < len(seqs) - 1) else site_num
@@ -240,3 +236,41 @@ class PrgBuilder(object):
     @property
     def num_seqs(self):
         return len(self.alignment)
+
+
+
+
+
+
+class PrgBuilder(object):
+    """
+    Prg builder based from a multiple sequence alignment.
+    Note min_match_length must be strictly greater than max_nesting + 1.
+    """
+
+    def __init__(
+        self,
+        msa_file,
+        alignment_format="fasta",
+        max_nesting=2,
+        min_match_length=3
+    ):
+        self.msa_file = msa_file
+        self.alignment_format = alignment_format
+        self.max_nesting = max_nesting
+        self.min_match_length = min_match_length
+
+        alignment = load_alignment_file(msa_file, alignment_format)
+        root_interval = Interval(IntervalType.Root, 0, alignment.get_alignment_length() - 1)
+        self._root = PrgBuilderSingleClusterNode(nesting_level=1, alignment=alignment, interval=root_interval,
+                                                 prg_builder=self)
+
+
+    def build_prg(self):
+        self._site_num = 5
+        self.prg = self._root._preorder_traversal_to_build_prg(delim_char=" ")
+
+    def get_next_site_num(self):
+        previous_site_num = self._site_num
+        self._site_num+=2
+        return previous_site_num

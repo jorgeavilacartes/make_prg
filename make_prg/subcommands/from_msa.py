@@ -119,8 +119,8 @@ def run(options):
         aseq.build_prg()
         logging.info(f"Write PRG file to {prefix}.prg")
         io_utils.write_prg(prefix, aseq.prg)
-        m = aseq.max_nesting_level_reached
-        logging.info(f"Max_nesting_reached\t{m}")
+        # m = aseq.max_nesting_level_reached
+        # logging.info(f"Max_nesting_reached\t{m}")
 
-    logging.info(f"Write GFA file to {prefix}.gfa")
-    io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
+    # logging.info(f"Write GFA file to {prefix}.gfa")
+    # io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
