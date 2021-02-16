@@ -86,6 +86,7 @@ class PrgBuilderMultiClusterNode(object):
         self.interval = interval
         self.parent = parent
         self.prg_builder = prg_builder
+        self.new_sequences = None
 
         # cluster
         self.cluster_subalignments = self.get_subalignments_by_clustering()
@@ -137,8 +138,16 @@ class PrgBuilderMultiClusterNode(object):
             sub_alignment = sub_alignment[:, interval[0] : interval[1] + 1]
         return sub_alignment
 
-    def update(self, new_sequences: List[Seq]):
-        # TODO: add all sequences and then update in a single go
+    def add_seqs_to_batch_update(self, new_sequences: List[Seq]):
+        if self.new_sequences is None:
+            self.new_sequences = []
+        self.new_sequences.extend(new_sequences)
+        self.new_sequences = list(set(self.new_sequences)) # dedup
+
+    def batch_update(self):
+        no_update_to_be_done = self.new_sequences is None or len(self.new_sequences) == 0
+        if no_update_to_be_done:
+            return
 
         # update the MSA
         previous_msa_filename = f"{self.prg_builder.prefix}.previous_msa.fa"
@@ -146,7 +155,7 @@ class PrgBuilderMultiClusterNode(object):
             SeqIO.write(self.alignment, previous_msa_handler, "fasta")
         new_sequences_filename = f"{self.prg_builder.prefix}.new_sequences.fa"
         with open(new_sequences_filename, "w") as new_sequences_handler:
-            SeqIO.write(new_sequences, new_sequences_handler, "fasta")
+            SeqIO.write(self.new_sequences, new_sequences_handler, "fasta")
         MSAAligner.get_updated_alignment(locus_name=self.prg_builder.locus_name,
                                          previous_alignment=Path(previous_msa_filename),
                                          new_sequences=Path(new_sequences_filename),
@@ -160,6 +169,9 @@ class PrgBuilderMultiClusterNode(object):
 
         # update the children
         self._children = self._get_children()
+
+        # reset the new sequences
+        self.new_sequences = None
 
 
 
@@ -176,7 +188,10 @@ class PrgBuilderSingleClusterNode(object):
         self.interval = interval
         self.parent = parent
         self.prg_builder = prg_builder
+        self.new_sequences = None
+        self._set_complex_fields_after_basic_ones()
 
+    def _set_complex_fields_after_basic_ones(self):
         self.consensus = self.get_consensus(self.alignment)
         self.length = len(self.consensus)
         (
@@ -272,8 +287,12 @@ class PrgBuilderSingleClusterNode(object):
 
             single_seq = len(seqs) == 1
             if single_seq:
+                start_index = len(prg_as_list)
                 prg_as_list.extend(seqs[0])
+                end_index = len(prg_as_list)+1
+                self.prg_builder.update_leaves_index(interval=(start_index, end_index), node=self)
             else:
+                # TODO: disallow this for now?
                 # Add the variant seqs to the prg.
                 site_num = self.prg_builder.get_next_site_num()
                 prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
@@ -327,6 +346,66 @@ class PrgBuilderSingleClusterNode(object):
     def num_seqs(self):
         return len(self.alignment)
 
+    def get_first_multi_cluster_node(self):
+        node = self
+        while True:
+            no_multicluster_node_found = node is None
+            if no_multicluster_node_found:
+                return None
+            is_a_multi_cluster_node = isinstance(node, PrgBuilderMultiClusterNode)
+            if is_a_multi_cluster_node:
+                return node
+            node = node.parent
+
+
+    def add_seqs_to_batch_update(self, new_sequences: List[Seq]):
+        first_multi_cluster_node = self.get_first_multi_cluster_node()
+        no_multicluster_node_found = first_multi_cluster_node is None
+        if no_multicluster_node_found:
+            # update is either on leaf or root, let's avoid update on root, and update this leaf
+            if self.new_sequences is None:
+                self.new_sequences = []
+            self.new_sequences.extend(new_sequences)
+            self.new_sequences = list(set(self.new_sequences))  # dedup
+        else:
+            first_multi_cluster_node.add_seqs_to_batch_update(new_sequences)
+
+    def batch_update(self):
+        no_update_to_be_done = self.new_sequences is None or len(self.new_sequences) == 0
+        if no_update_to_be_done:
+            return
+
+        first_multi_cluster_node = self.get_first_multi_cluster_node()
+        no_multicluster_node_found = first_multi_cluster_node is None
+        if no_multicluster_node_found:
+            # update is either on leaf or root, let's avoid update on root, and update this leaf
+            self._update_leaf()
+        else:
+            first_multi_cluster_node.batch_update()
+
+
+    def _update_leaf(self):
+        # update the MSA
+        previous_msa_filename = f"{self.prg_builder.prefix}.previous_msa.fa"
+        with open(previous_msa_filename, "w") as previous_msa_handler:
+            SeqIO.write(self.alignment, previous_msa_handler, "fasta")
+        new_sequences_filename = f"{self.prg_builder.prefix}.new_sequences.fa"
+        with open(new_sequences_filename, "w") as new_sequences_handler:
+            SeqIO.write(self.new_sequences, new_sequences_handler, "fasta")
+        MSAAligner.get_updated_alignment(locus_name=self.prg_builder.locus_name,
+                                         previous_alignment=Path(previous_msa_filename),
+                                         new_sequences=Path(new_sequences_filename),
+                                         prefix=self.prg_builder.prefix)
+
+        # update the alignment
+        self.alignment = load_alignment_file(new_sequences_filename, "fasta")
+
+        # update the other fields
+        self._set_complex_fields_after_basic_ones()
+
+        # reset the new sequences
+        self.new_sequences = None
+
 
 class PrgBuilder(object):
     """
@@ -349,6 +428,7 @@ class PrgBuilder(object):
         self.alignment_format = alignment_format
         self.max_nesting = max_nesting
         self.min_match_length = min_match_length
+        self.leaves_index = {}
 
         alignment = load_alignment_file(msa_file, alignment_format)
         root_interval = Interval(IntervalType.Root, 0, alignment.get_alignment_length() - 1)
@@ -368,6 +448,9 @@ class PrgBuilder(object):
         previous_site_num = self._site_num
         self._site_num+=2
         return previous_site_num
+
+    def update_leaves_index(self, interval, node):
+        self.leaves_index[interval] = node
 
     def serialize(self, filename):
         with open(filename, "wb") as filehandler:
