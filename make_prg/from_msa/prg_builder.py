@@ -156,6 +156,7 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
 
     ##################################################################################
     # update methods
+    # TODO: ignore for now
     def add_seqs_to_batch_update(self, new_sequences: List[Seq]):
         if self.new_sequences is None:
             self.new_sequences = []
@@ -347,23 +348,13 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
     @property
     def num_seqs(self):
         return len(self.alignment)
-
-    def get_first_multi_cluster_parent(self):
-        node = self
-        while True:
-            no_multi_cluster_parent_found = node is None
-            if no_multi_cluster_parent_found:
-                return None
-            is_a_multi_cluster_parent = isinstance(node, PrgBuilderMultiClusterNode)
-            if is_a_multi_cluster_parent:
-                return node
-            node = node.parent
     ##################################################################################
 
     ##################################################################################
     # update methods
+    # TODO: ignore for now
     def add_seqs_to_batch_update(self, new_sequences: List[Seq]):
-        first_multi_cluster_parent = self.get_first_multi_cluster_parent()
+        first_multi_cluster_parent = self._get_first_multi_cluster_parent()
         no_multi_cluster_parent_found = first_multi_cluster_parent is None
         if no_multi_cluster_parent_found:
             # update is either on leaf or root, let's avoid update on root, and update this leaf
@@ -379,7 +370,7 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         if no_update_to_be_done:
             return
 
-        first_multi_cluster_parent = self.get_first_multi_cluster_parent()
+        first_multi_cluster_parent = self._get_first_multi_cluster_parent()
         no_multi_cluster_parent_found = first_multi_cluster_parent is None
         if no_multi_cluster_parent_found:
             # update is either on leaf or root, let's avoid update on root, and update this leaf
@@ -409,6 +400,17 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
 
         # reset the new sequences
         self.new_sequences = None
+
+    def _get_first_multi_cluster_parent(self):
+        node = self
+        while True:
+            no_multi_cluster_parent_found = node is None
+            if no_multi_cluster_parent_found:
+                return None
+            is_a_multi_cluster_parent = isinstance(node, PrgBuilderMultiClusterNode)
+            if is_a_multi_cluster_parent:
+                return node
+            node = node.parent
     ##################################################################################
 
 class PrgBuilder(object):
