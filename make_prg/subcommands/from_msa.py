@@ -118,9 +118,9 @@ def process_MSA(msa_filepath: Path):
         max_nesting=options.max_nesting,
         min_match_length=options.min_match_length,
     )
-    builder.build_prg()
+    prg = builder.build_prg()
     logging.info(f"Write PRG file to {prefix}.prg")
-    io_utils.write_prg(prefix, builder.prg)
+    io_utils.write_prg(prefix, prg)
     builder.serialize(f"{prefix}.pickle")
     # m = aseq.max_nesting_level_reached
     # logging.info(f"Max_nesting_reached\t{m}")
@@ -135,5 +135,10 @@ def run(cl_options):
     options = cl_options
     input_files = get_all_input_files(options.input)
     os.makedirs(options.output, exist_ok=True)
-    with Pool(options.threads) as pool:
-        pool.map(process_MSA, input_files, chunksize=1)
+
+    # TODO: add this back for multithreading
+    # with Pool(options.threads) as pool:
+    #     pool.map(process_MSA, input_files, chunksize=1)
+
+    for file in input_files:
+        process_MSA(file)

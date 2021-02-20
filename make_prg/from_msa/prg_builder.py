@@ -21,6 +21,7 @@ import subprocess
 import time
 from Bio.Seq import Seq
 from Bio import SeqIO
+from abc import ABC, abstractmethod
 
 
 # TODO: change to spoa
@@ -74,13 +75,14 @@ class MSAAligner:
         return Path(new_msa)
 
 
-class PrgBuilderMultiClusterNode(object):
+class PrgBuilderRecursiveTreeNode(ABC):
     def __init__(self,
                  nesting_level,
                  alignment,
                  interval,
                  parent,
                  prg_builder):
+        # set the basic attributes
         self.nesting_level = nesting_level
         self.alignment = alignment
         self.interval = interval
@@ -88,13 +90,47 @@ class PrgBuilderMultiClusterNode(object):
         self.prg_builder = prg_builder
         self.new_sequences = None
 
-        # cluster
-        self.cluster_subalignments = self.get_subalignments_by_clustering()
+        self._set_derived_helper_attributes()
+
+        # generate recursion tree
         self._children = self._get_children()
 
+    @abstractmethod
+    def _set_derived_helper_attributes(self):
+        pass
+
+    @abstractmethod
     def _get_children(self):
+        pass
+
+    @abstractmethod
+    def preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
+        pass
+
+
+class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
+    def __init__(self,
+                 nesting_level,
+                 alignment,
+                 interval,
+                 parent,
+                 prg_builder):
+        super().__init__(
+            nesting_level,
+            alignment,
+            interval,
+            parent,
+            prg_builder
+        )
+
+    def _set_derived_helper_attributes(self):
+        pass  # nothing to set here
+
+    def _get_children(self):
+        # each child is a PrgBuilderSingleClusterNode for each cluster subalignment
+        cluster_subalignments = self._get_subalignments_by_clustering()
         children = []
-        for alignment in self.cluster_subalignments:
+        for alignment in cluster_subalignments:
             child = PrgBuilderSingleClusterNode(
                 nesting_level=self.nesting_level,
                 alignment=alignment,
@@ -105,39 +141,21 @@ class PrgBuilderMultiClusterNode(object):
             children.append(child)
         return children
 
-    def _preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
+    ##################################################################################
+    # traversal methods
+    # TODO memoize this?
+    def preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
         site_num = self.prg_builder.get_next_site_num()
         prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
 
         for child_index, child in enumerate(self._children):
             site_num_to_separate_alleles = (site_num + 1) if (child_index < len(self._children) - 1) else site_num
-            child._preorder_traversal_to_build_prg(prg_as_list, delim_char)
+            child.preorder_traversal_to_build_prg(prg_as_list, delim_char)
             prg_as_list.extend(f"{delim_char}{site_num_to_separate_alleles}{delim_char}")
+    ##################################################################################
 
-    def get_subalignments_by_clustering(self):
-        id_lists = kmeans_cluster_seqs_in_interval(
-            [self.interval.start, self.interval.stop],
-            self.alignment,
-            self.prg_builder.min_match_length,
-        )
-        list_sub_alignments = [
-            self.get_sub_alignment_by_list_id(
-                id_list, self.alignment, [self.interval.start, self.interval.stop]
-            )
-            for id_list in id_lists
-        ]
-        return list_sub_alignments
-
-    @classmethod
-    def get_sub_alignment_by_list_id(
-        self, id_list: List[str], alignment: MSA, interval=None
-    ):
-        list_records = [record for record in alignment if record.id in id_list]
-        sub_alignment = MSA(list_records)
-        if interval is not None:
-            sub_alignment = sub_alignment[:, interval[0] : interval[1] + 1]
-        return sub_alignment
-
+    ##################################################################################
+    # update methods
     def add_seqs_to_batch_update(self, new_sequences: List[Seq]):
         if self.new_sequences is None:
             self.new_sequences = []
@@ -164,35 +182,57 @@ class PrgBuilderMultiClusterNode(object):
         # update the alignment
         self.alignment = load_alignment_file(new_sequences_filename, "fasta")
 
-        # update the cluster
-        self.cluster_subalignments = self.get_subalignments_by_clustering()
+        # update the derived attributes
+        self._set_derived_helper_attributes()
 
-        # update the children
+        # update the recursion tree
         self._children = self._get_children()
 
         # reset the new sequences
         self.new_sequences = None
+    ##################################################################################
+
+    #####################################################################################################
+    #  Clustering methods
+    def _get_subalignments_by_clustering(self):
+        id_lists = kmeans_cluster_seqs_in_interval(
+            [self.interval.start, self.interval.stop],
+            self.alignment,
+            self.prg_builder.min_match_length,
+        )
+        list_sub_alignments = [self._get_sub_alignment_by_list_id(id_list) for id_list in id_lists]
+        return list_sub_alignments
+
+    def _get_sub_alignment_by_list_id(
+        self, id_list: List[str]
+    ):
+        list_records = [record for record in self.alignment if record.id in id_list]
+        sub_alignment = MSA(list_records)
+        if self.interval is not None:
+            sub_alignment = sub_alignment[:, self.interval.start : self.interval.stop + 1]
+        return sub_alignment
+    #####################################################################################################
 
 
 
 
-class PrgBuilderSingleClusterNode(object):
+class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
     def __init__(self,
                  nesting_level,
                  alignment,
                  interval,
                  parent,
                  prg_builder):
-        self.nesting_level = nesting_level
-        self.alignment = alignment
-        self.interval = interval
-        self.parent = parent
-        self.prg_builder = prg_builder
-        self.new_sequences = None
-        self._set_complex_fields_after_basic_ones()
+        super().__init__(
+            nesting_level,
+            alignment,
+            interval,
+            parent,
+            prg_builder
+        )
 
-    def _set_complex_fields_after_basic_ones(self):
-        self.consensus = self.get_consensus(self.alignment)
+    def _set_derived_helper_attributes(self):
+        self.consensus = self._get_consensus()
         self.length = len(self.consensus)
         (
             self.match_intervals,
@@ -207,45 +247,9 @@ class PrgBuilderSingleClusterNode(object):
             self.non_match_intervals,
         )
 
-        # generate recursion tree
-        self._children = self._get_children()
-
-    def _preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
-        is_leaf_node = len(self._children) == 0
-        if is_leaf_node:
-            self._get_prg(prg_as_list, delim_char)
-        else:
-            for child in self._children:
-                child._preorder_traversal_to_build_prg(prg_as_list, delim_char)
-
-    @classmethod
-    def get_consensus(cls, alignment: MSA):
-        """ Produces a 'consensus string' from an MSA: at each position of the
-        MSA, the string has a base if all aligned sequences agree, and a "*" if not.
-        IUPAC ambiguous bases result in non-consensus and are later expanded in the prg.
-        N results in consensus at that position unless they are all N."""
-        consensus_string = ""
-        for i in range(alignment.get_alignment_length()):
-            column = set([record.seq[i] for record in alignment])
-            column = column.difference({"N"})
-            if (
-                len(ambiguous_bases.intersection(column)) > 0
-                or len(column) != 1
-                or column == {"-"}
-            ):
-                consensus_string += NONMATCH
-            else:
-                consensus_string += column.pop()
-
-        return consensus_string
-
     def _get_children(self):
-        """
-        Get and add the children of this node in the recursion tree
-        """
-
         # stop conditions
-        single_match_interval = (len(self.all_intervals)==1) and (self.all_intervals[0] in self.match_intervals)
+        single_match_interval = (len(self.all_intervals) == 1) and (self.all_intervals[0] in self.match_intervals)
         max_nesting_level_reached = self.nesting_level == self.prg_builder.max_nesting
         small_variant_site = self.interval.stop - self.interval.start <= self.prg_builder.min_match_length
         if single_match_interval or max_nesting_level_reached or small_variant_site:
@@ -267,7 +271,6 @@ class PrgBuilderSingleClusterNode(object):
                     prg_builder=self.prg_builder
                 )
                 children.append(child)
-
             else:
                 child = PrgBuilderMultiClusterNode(
                     nesting_level=self.nesting_level + 1,
@@ -279,6 +282,39 @@ class PrgBuilderSingleClusterNode(object):
                 children.append(child)
 
         return children
+
+    ##################################################################################
+    # traversal methods
+    # TODO memoize this?
+    def preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
+        is_leaf_node = len(self._children) == 0
+        if is_leaf_node:
+            self._get_prg(prg_as_list, delim_char)
+        else:
+            for child in self._children:
+                child.preorder_traversal_to_build_prg(prg_as_list, delim_char)
+    ##################################################################################
+
+    ##################################################################################
+    # helpers
+    def _get_consensus(self):
+        """ Produces a 'consensus string' from an MSA: at each position of the
+        MSA, the string has a base if all aligned sequences agree, and a "*" if not.
+        IUPAC ambiguous bases result in non-consensus and are later expanded in the prg.
+        N results in consensus at that position unless they are all N."""
+        consensus_string = ""
+        for i in range(self.alignment.get_alignment_length()):
+            column = set([record.seq[i] for record in self.alignment])
+            column = column.difference({"N"})
+            if (
+                len(ambiguous_bases.intersection(column)) > 0
+                or len(column) != 1
+                or column == {"-"}
+            ):
+                consensus_string += NONMATCH
+            else:
+                consensus_string += column.pop()
+        return consensus_string
 
     def _get_prg(self, prg_as_list, delim_char):
         for interval in self.all_intervals:
@@ -293,47 +329,13 @@ class PrgBuilderSingleClusterNode(object):
                 self.prg_builder.update_leaves_index(interval=(start_index, end_index), node=self)
             else:
                 # TODO: disallow this for now?
+                # TODO: can't it works for small variant site and nested variants
                 # Add the variant seqs to the prg.
                 site_num = self.prg_builder.get_next_site_num()
                 prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
                 for seq_index, seq in enumerate(seqs):
                     site_num_for_this_seq = (site_num + 1) if (seq_index < len(seqs) - 1) else site_num
                     prg_as_list.extend(f"{seq}{delim_char}{site_num_for_this_seq}{delim_char}")
-
-    @property
-    def max_nesting_level_reached(self):
-        max_nesting = []
-        if self.subAlignedSeqs == {}:
-            logging.debug(
-                "self.subAlignedSeqs == {} at nesting level %d for interval %s",
-                self.nesting_level,
-                self.interval,
-            )
-            max_nesting.append(self.nesting_level)
-        else:
-            logging.debug(
-                "self.subAlignedSeqs.keys(): %s", list(self.subAlignedSeqs.keys())
-            )
-            logging.debug(
-                "self.subAlignedSeqs[self.subAlignedSeqs.keys()[0]]: %s",
-                self.subAlignedSeqs[list(self.subAlignedSeqs.keys())[0]],
-            )
-            for interval_start in list(self.subAlignedSeqs.keys()):
-                logging.debug("interval start: %d", interval_start)
-                for subaseq in self.subAlignedSeqs[interval_start]:
-                    logging.debug(
-                        "type of subAlignedSeqs object in list: %s", type(subaseq)
-                    )
-                    recur = subaseq.max_nesting_level_reached
-                    logging.debug(
-                        "recur max level nesting returned: %d, which has type %s",
-                        recur,
-                        type(recur),
-                    )
-                    max_nesting.append(recur)
-        m = max(max_nesting)
-        logging.debug("found the max of %s is %d", max_nesting, m)
-        return m
 
     @property
     def prop_in_match_intervals(self):
@@ -346,42 +348,44 @@ class PrgBuilderSingleClusterNode(object):
     def num_seqs(self):
         return len(self.alignment)
 
-    def get_first_multi_cluster_node(self):
+    def get_first_multi_cluster_parent(self):
         node = self
         while True:
-            no_multicluster_node_found = node is None
-            if no_multicluster_node_found:
+            no_multi_cluster_parent_found = node is None
+            if no_multi_cluster_parent_found:
                 return None
-            is_a_multi_cluster_node = isinstance(node, PrgBuilderMultiClusterNode)
-            if is_a_multi_cluster_node:
+            is_a_multi_cluster_parent = isinstance(node, PrgBuilderMultiClusterNode)
+            if is_a_multi_cluster_parent:
                 return node
             node = node.parent
+    ##################################################################################
 
-
+    ##################################################################################
+    # update methods
     def add_seqs_to_batch_update(self, new_sequences: List[Seq]):
-        first_multi_cluster_node = self.get_first_multi_cluster_node()
-        no_multicluster_node_found = first_multi_cluster_node is None
-        if no_multicluster_node_found:
+        first_multi_cluster_parent = self.get_first_multi_cluster_parent()
+        no_multi_cluster_parent_found = first_multi_cluster_parent is None
+        if no_multi_cluster_parent_found:
             # update is either on leaf or root, let's avoid update on root, and update this leaf
             if self.new_sequences is None:
                 self.new_sequences = []
             self.new_sequences.extend(new_sequences)
             self.new_sequences = list(set(self.new_sequences))  # dedup
         else:
-            first_multi_cluster_node.add_seqs_to_batch_update(new_sequences)
+            first_multi_cluster_parent.add_seqs_to_batch_update(new_sequences)
 
     def batch_update(self):
         no_update_to_be_done = self.new_sequences is None or len(self.new_sequences) == 0
         if no_update_to_be_done:
             return
 
-        first_multi_cluster_node = self.get_first_multi_cluster_node()
-        no_multicluster_node_found = first_multi_cluster_node is None
-        if no_multicluster_node_found:
+        first_multi_cluster_parent = self.get_first_multi_cluster_parent()
+        no_multi_cluster_parent_found = first_multi_cluster_parent is None
+        if no_multi_cluster_parent_found:
             # update is either on leaf or root, let's avoid update on root, and update this leaf
             self._update_leaf()
         else:
-            first_multi_cluster_node.batch_update()
+            first_multi_cluster_parent.batch_update()
 
 
     def _update_leaf(self):
@@ -401,11 +405,11 @@ class PrgBuilderSingleClusterNode(object):
         self.alignment = load_alignment_file(new_sequences_filename, "fasta")
 
         # update the other fields
-        self._set_complex_fields_after_basic_ones()
+        self._set_derived_helper_attributes()
 
         # reset the new sequences
         self.new_sequences = None
-
+    ##################################################################################
 
 class PrgBuilder(object):
     """
@@ -441,8 +445,9 @@ class PrgBuilder(object):
     def build_prg(self):
         self._site_num = 5
         prg_as_list = []
-        self._root._preorder_traversal_to_build_prg(prg_as_list, delim_char=" ")
-        self.prg = "".join(prg_as_list)
+        self._root.preorder_traversal_to_build_prg(prg_as_list, delim_char=" ")
+        prg = "".join(prg_as_list)
+        return prg
 
     def get_next_site_num(self):
         previous_site_num = self._site_num
