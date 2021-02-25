@@ -1,10 +1,12 @@
 import logging
 import os
 from pathlib import Path
+from glob import glob
 
-from make_prg.from_msa import prg_builder, NESTING_LVL, MIN_MATCH_LEN
-from make_prg import io_utils
-from multiprocessing import Pool
+from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
+from make_prg import io_utils, prg_builder
+import multiprocessing
+import shutil
 
 options = None
 
@@ -26,12 +28,12 @@ def register_parser(subparsers):
         ),
     )
     subparser_msa.add_argument(
-        "-o", "--output",
+        "-o", "--output_prefix",
         action="store",
         type=str,
         required=True,
         help=(
-            "Output dir: where all output will be stored"
+            "Output prefix: prefix for the output files"
         ),
     )
     subparser_msa.add_argument(
@@ -86,12 +88,11 @@ def get_all_input_files(input_dir):
 
 def process_MSA(msa_filepath: Path):
     msa_name = msa_filepath.name
-    output = Path(options.output)
-    prefix = str(output / msa_name)
-    prefix += ".max_nest%d.min_match%d" % (
-        options.max_nesting,
-        options.min_match_length,
-    )
+    current_process = multiprocessing.current_process()
+
+    temp_dir = Path(options.output_prefix + "_tmp") / current_process.name
+    os.makedirs(temp_dir, exist_ok=True)
+    prefix = str(temp_dir / msa_name)
 
     # Set up file logging
     log_file = f"{prefix}.log"
@@ -112,14 +113,13 @@ def process_MSA(msa_filepath: Path):
 
     builder = prg_builder.PrgBuilder(
         locus_name=msa_name,
-        prefix=prefix,
         msa_file=msa_filepath,
         alignment_format=options.alignment_format,
         max_nesting=options.max_nesting,
         min_match_length=options.min_match_length,
     )
     prg = builder.build_prg()
-    logging.info(f"Write PRG file to {prefix}.prg")
+    logging.info(f"Write PRG file to {prefix}.prg.fa")
     io_utils.write_prg(prefix, prg)
     builder.serialize(f"{prefix}.pickle")
     # m = aseq.max_nesting_level_reached
@@ -129,16 +129,36 @@ def process_MSA(msa_filepath: Path):
     # io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
 
 
+def output_files_already_exist(output_prefix):
+    return Path(output_prefix + "_tmp").exists() or \
+           Path(output_prefix + ".prg.fa").exists() or \
+           Path(output_prefix + ".log").exists() or \
+           Path(output_prefix + ".pickle").exists()
+
 
 def run(cl_options):
     global options
     options = cl_options
     input_files = get_all_input_files(options.input)
-    os.makedirs(options.output, exist_ok=True)
+    if output_files_already_exist(options.output_prefix):
+        raise RuntimeError("One or more output files already exists, aborting run...")
 
-    # TODO: add this back for multithreading
-    # with Pool(options.threads) as pool:
-    #     pool.map(process_MSA, input_files, chunksize=1)
+    with multiprocessing.Pool(options.threads) as pool:
+        pool.map(process_MSA, input_files, chunksize=1)
 
-    for file in input_files:
-        process_MSA(file)
+    # single threaded version
+    # for file in input_files:
+    #     process_MSA(file)
+
+    # concatenate the output files
+    temp_path = Path(options.output_prefix + "_tmp")
+    log_files = glob(str(temp_path)+"/*/*.log")
+    io_utils.concatenate_text_files(log_files, options.output_prefix+".log")
+    prg_files = glob(str(temp_path)+"/*/*.prg.fa")
+    io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
+    pickle_files = glob(str(temp_path)+"/*/*.pickle")
+    prg_builder.PrgBuilder.concatenate_pickle_files(pickle_files, options.output_prefix + ".pickle")
+
+    # remove temp files
+    if temp_path.exists():
+        shutil.rmtree(temp_path)

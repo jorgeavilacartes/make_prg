@@ -107,6 +107,10 @@ class PrgBuilderRecursiveTreeNode(ABC):
     def preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
         pass
 
+    @abstractmethod
+    def batch_update(self):
+        pass
+
 
 class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
     def __init__(self,
@@ -154,44 +158,6 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
             prg_as_list.extend(f"{delim_char}{site_num_to_separate_alleles}{delim_char}")
     ##################################################################################
 
-    ##################################################################################
-    # update methods
-    # TODO: ignore for now
-    def add_seqs_to_batch_update(self, new_sequences: List[Seq]):
-        if self.new_sequences is None:
-            self.new_sequences = []
-        self.new_sequences.extend(new_sequences)
-        self.new_sequences = list(set(self.new_sequences)) # dedup
-
-    def batch_update(self):
-        no_update_to_be_done = self.new_sequences is None or len(self.new_sequences) == 0
-        if no_update_to_be_done:
-            return
-
-        # update the MSA
-        previous_msa_filename = f"{self.prg_builder.prefix}.previous_msa.fa"
-        with open(previous_msa_filename, "w") as previous_msa_handler:
-            SeqIO.write(self.alignment, previous_msa_handler, "fasta")
-        new_sequences_filename = f"{self.prg_builder.prefix}.new_sequences.fa"
-        with open(new_sequences_filename, "w") as new_sequences_handler:
-            SeqIO.write(self.new_sequences, new_sequences_handler, "fasta")
-        MSAAligner.get_updated_alignment(locus_name=self.prg_builder.locus_name,
-                                         previous_alignment=Path(previous_msa_filename),
-                                         new_sequences=Path(new_sequences_filename),
-                                         prefix=self.prg_builder.prefix)
-
-        # update the alignment
-        self.alignment = load_alignment_file(new_sequences_filename, "fasta")
-
-        # update the derived attributes
-        self._set_derived_helper_attributes()
-
-        # update the recursion tree
-        self._children = self._get_children()
-
-        # reset the new sequences
-        self.new_sequences = None
-    ##################################################################################
 
     #####################################################################################################
     #  Clustering methods
@@ -214,7 +180,8 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
         return sub_alignment
     #####################################################################################################
 
-
+    def batch_update(self):
+        pass  # update is only on the leaves
 
 
 class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
@@ -284,6 +251,22 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
 
         return children
 
+
+    ##################################################################################
+    # properties
+    @property
+    def prop_in_match_intervals(self):
+        length_match_intervals = 0
+        for interval in self.match_intervals:
+            length_match_intervals += interval.stop - interval.start + 1
+        return length_match_intervals / float(self.length)
+
+    @property
+    def num_seqs(self):
+        return len(self.alignment)
+    ##################################################################################
+
+
     ##################################################################################
     # traversal methods
     # TODO memoize this?
@@ -327,56 +310,34 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                 start_index = len(prg_as_list)
                 prg_as_list.extend(seqs[0])
                 end_index = len(prg_as_list)+1
-                self.prg_builder.update_leaves_index(interval=(start_index, end_index), node=self)
+                self.prg_builder.update_leaves_index(start_index, end_index, node=self)
             else:
-                # TODO: disallow this for now?
-                # TODO: can't it works for small variant site and nested variants
                 # Add the variant seqs to the prg.
                 site_num = self.prg_builder.get_next_site_num()
                 prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
                 for seq_index, seq in enumerate(seqs):
+                    # TODO: recheck this
                     site_num_for_this_seq = (site_num + 1) if (seq_index < len(seqs) - 1) else site_num
-                    prg_as_list.extend(f"{seq}{delim_char}{site_num_for_this_seq}{delim_char}")
-
-    @property
-    def prop_in_match_intervals(self):
-        length_match_intervals = 0
-        for interval in self.match_intervals:
-            length_match_intervals += interval.stop - interval.start + 1
-        return length_match_intervals / float(self.length)
-
-    @property
-    def num_seqs(self):
-        return len(self.alignment)
+                    start_index = len(prg_as_list)
+                    prg_as_list.extend(seq)
+                    end_index = len(prg_as_list) + 1
+                    self.prg_builder.update_leaves_index(start_index, end_index, node=self)
+                    prg_as_list.extend(f"{delim_char}{site_num_for_this_seq}{delim_char}")
     ##################################################################################
 
     ##################################################################################
     # update methods
-    # TODO: ignore for now
     def add_seqs_to_batch_update(self, new_sequences: List[Seq]):
-        first_multi_cluster_parent = self._get_first_multi_cluster_parent()
-        no_multi_cluster_parent_found = first_multi_cluster_parent is None
-        if no_multi_cluster_parent_found:
-            # update is either on leaf or root, let's avoid update on root, and update this leaf
-            if self.new_sequences is None:
-                self.new_sequences = []
-            self.new_sequences.extend(new_sequences)
-            self.new_sequences = list(set(self.new_sequences))  # dedup
-        else:
-            first_multi_cluster_parent.add_seqs_to_batch_update(new_sequences)
+        if self.new_sequences is None:
+            self.new_sequences = []
+        self.new_sequences.extend(new_sequences)
+        self.new_sequences = list(set(self.new_sequences))  # dedup
 
     def batch_update(self):
         no_update_to_be_done = self.new_sequences is None or len(self.new_sequences) == 0
         if no_update_to_be_done:
             return
-
-        first_multi_cluster_parent = self._get_first_multi_cluster_parent()
-        no_multi_cluster_parent_found = first_multi_cluster_parent is None
-        if no_multi_cluster_parent_found:
-            # update is either on leaf or root, let's avoid update on root, and update this leaf
-            self._update_leaf()
-        else:
-            first_multi_cluster_parent.batch_update()
+        self._update_leaf()
 
 
     def _update_leaf(self):
@@ -400,18 +361,8 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
 
         # reset the new sequences
         self.new_sequences = None
-
-    def _get_first_multi_cluster_parent(self):
-        node = self
-        while True:
-            no_multi_cluster_parent_found = node is None
-            if no_multi_cluster_parent_found:
-                return None
-            is_a_multi_cluster_parent = isinstance(node, PrgBuilderMultiClusterNode)
-            if is_a_multi_cluster_parent:
-                return node
-            node = node.parent
     ##################################################################################
+
 
 class PrgBuilder(object):
     """
@@ -422,14 +373,12 @@ class PrgBuilder(object):
     def __init__(
         self,
         locus_name,
-        prefix,
         msa_file,
         alignment_format,
         max_nesting,
         min_match_length
     ):
         self.locus_name = locus_name
-        self.prefix = prefix
         self.msa_file = msa_file
         self.alignment_format = alignment_format
         self.max_nesting = max_nesting
@@ -456,14 +405,37 @@ class PrgBuilder(object):
         self._site_num+=2
         return previous_site_num
 
-    def update_leaves_index(self, interval, node):
+    def update_leaves_index(self, start_index: int, end_index: int, node):
+        interval = (start_index, end_index)
         self.leaves_index[interval] = node
+
+    def get_node_given_interval(self, start_index: int, end_index: int):
+        interval = (start_index, end_index)
+        assert interval in self.leaves_index, \
+            f"Fatal error: queried interval {interval} does not exist in leaves index"
+        return self.leaves_index[interval]
 
     def serialize(self, filename):
         with open(filename, "wb") as filehandler:
             pickle.dump(self, filehandler)
 
-    @classmethod
-    def deserialize(self, filename) -> "PrgBuilder":
+        # # text serialise, just for debug
+        # with open(f"{filename}.txt", "w") as filehandler:
+        #     print("self.leaves_index", file=filehandler)
+        #     print(self.leaves_index, file=filehandler)
+
+    @staticmethod
+    def deserialize(filename) -> "PrgBuilder":
         with open(filename, "rb") as filehandler:
             return pickle.load(filehandler)
+
+    @staticmethod
+    def concatenate_pickle_files(pickle_filepaths, output_filepath):
+        locus_name_to_prg_builder = {}
+        for pickle_filepath in pickle_filepaths:
+            prg_builder = PrgBuilder.deserialize(pickle_filepath)
+            locus_name_to_prg_builder[prg_builder.locus_name] = prg_builder
+
+        with open(output_filepath, "wb") as output_filehandler:
+            pickle.dump(locus_name_to_prg_builder, output_filehandler)
+

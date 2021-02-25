@@ -4,7 +4,7 @@ from unittest import TestCase
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from make_prg.from_msa.prg_builder import PrgBuilder
+from make_prg.prg_builder import PrgBuilder
 from tests.from_msa import make_alignment, MSA
 
 this_dir = Path(__file__).resolve().parent

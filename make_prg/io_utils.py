@@ -2,6 +2,7 @@ import logging
 import re
 import gzip
 from pathlib import Path
+import fileinput
 
 from Bio import AlignIO
 
@@ -151,29 +152,21 @@ def write_prg(output_prefix: str, prg_string: str):
     Writes the prg to outfile.
     Writes it as a human readable string, and also as an integer vector
     """
-    prg_filename = Path(output_prefix + ".prg")
+    sample = Path(output_prefix).with_suffix("").name
+    prg_filename = Path(output_prefix + ".prg.fa")
     with prg_filename.open("w") as prg:
-        regex = re.compile(
-            r"^(?P<sample>.+)\.max_nest(?P<max_nest>\d+)\.min_match(?P<min_match>\d+)"
-        )
-        match = regex.search(prg_filename.stem)
-        try:
-            sample = match.group("sample")
-        except IndexError:
-            logging.warning(
-                "A sample name couldn't be parsed from the prefix. "
-                "Using 'sample' as sample name."
-            )
-            sample = "sample"
+        print(f">{sample}\n{prg_string}", file=prg)
 
-        max_nest = int(match.group("max_nest"))
-        min_match = int(match.group("min_match"))
-        header = f"{sample} max_nest={max_nest} min_match={min_match}"
-        print(f">{header}\n{prg_string}", file=prg)
+    # prg_ints_fpath = Path(output_prefix + ".bin")
+    # prg_encoder = PrgEncoder()
+    # prg_ints: PRG_Ints = prg_encoder.encode(prg_string)
+    #
+    # with prg_ints_fpath.open("wb") as ostream:
+    #     prg_encoder.write(prg_ints, ostream)
 
-    prg_ints_fpath = Path(output_prefix + ".bin")
-    prg_encoder = PrgEncoder()
-    prg_ints: PRG_Ints = prg_encoder.encode(prg_string)
 
-    with prg_ints_fpath.open("wb") as ostream:
-        prg_encoder.write(prg_ints, ostream)
+
+def concatenate_text_files(input_filepaths, output_filepath):
+    with open(output_filepath, 'w') as fout, fileinput.input(input_filepaths) as fin:
+        for line in fin:
+            fout.write(line)
