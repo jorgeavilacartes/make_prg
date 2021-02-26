@@ -105,3 +105,4 @@ ENV/
 *.swp
 
 .idea
+/sample_example/msas_output/
