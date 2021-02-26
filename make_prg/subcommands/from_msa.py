@@ -8,12 +8,14 @@ from make_prg import io_utils, prg_builder
 import multiprocessing
 import shutil
 
+from make_prg.utils import output_files_already_exist
+
 options = None
 
 def register_parser(subparsers):
     subparser_msa = subparsers.add_parser(
         "from_msa",
-        usage="make_prg from_msa [options] <MSA input dir>",
+        usage="make_prg from_msa",
         help="Make PRG from multiple sequence alignment dir",
     )
     subparser_msa.add_argument(
@@ -111,29 +113,28 @@ def process_MSA(msa_filepath: Path):
         options.min_match_length,
     )
 
-    builder = prg_builder.PrgBuilder(
-        locus_name=msa_name,
-        msa_file=msa_filepath,
-        alignment_format=options.alignment_format,
-        max_nesting=options.max_nesting,
-        min_match_length=options.min_match_length,
-    )
-    prg = builder.build_prg()
-    logging.info(f"Write PRG file to {prefix}.prg.fa")
-    io_utils.write_prg(prefix, prg)
-    builder.serialize(f"{prefix}.pickle")
-    # m = aseq.max_nesting_level_reached
-    # logging.info(f"Max_nesting_reached\t{m}")
+    try:
+        builder = prg_builder.PrgBuilder(
+            locus_name=msa_name,
+            msa_file=msa_filepath,
+            alignment_format=options.alignment_format,
+            max_nesting=options.max_nesting,
+            min_match_length=options.min_match_length,
+        )
+        prg = builder.build_prg()
+        logging.info(f"Write PRG file to {prefix}.prg.fa")
+        io_utils.write_prg(prefix, prg)
+        builder.serialize(f"{prefix}.pickle")
+        # m = aseq.max_nesting_level_reached
+        # logging.info(f"Max_nesting_reached\t{m}")
 
-    # logging.info(f"Write GFA file to {prefix}.gfa")
-    # io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
-
-
-def output_files_already_exist(output_prefix):
-    return Path(output_prefix + "_tmp").exists() or \
-           Path(output_prefix + ".prg.fa").exists() or \
-           Path(output_prefix + ".log").exists() or \
-           Path(output_prefix + ".pickle").exists()
+        # logging.info(f"Write GFA file to {prefix}.gfa")
+        # io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
+    except ValueError as value_error:
+        if "No records found in handle" in value_error.args[0]:
+            logging.warning(f"No records found in MSA {msa_filepath}, skipping...")
+        else:
+            raise value_error
 
 
 def run(cl_options):
