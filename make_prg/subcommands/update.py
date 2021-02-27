@@ -2,10 +2,10 @@ import logging
 import os
 from pathlib import Path
 
-from make_prg import io_utils, prg_builder
+from make_prg import io_utils
+from make_prg.prg_builder import PrgBuilder
 from make_prg.utils import output_files_already_exist
-
-options = None
+from make_prg.denovo_paths_reader import DenovoPathsDB
 
 def register_parser(subparsers):
     subparser_update_prg = subparsers.add_parser(
@@ -52,16 +52,17 @@ def register_parser(subparsers):
     return subparser_update_prg
 
 
-def update():
+def update(locus_name_to_prg_builder, denovo_paths_db, output_prefix, threads):
     # dummy entrypoint for now
     print("Update feature called")
 
 
-def run(cl_options):
-    global options
-    options = cl_options
-
+def run(options):
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
-    update()
+    locus_name_to_prg_builder = PrgBuilder.deserialize(options.pickle)
+    denovo_paths_db = DenovoPathsDB(options.denovo_paths)
+    output_dir = Path(options.output_prefix).parent
+    os.makedirs(output_dir, exist_ok=True)
+    update(locus_name_to_prg_builder, denovo_paths_db, options.output_prefix, options.threads)

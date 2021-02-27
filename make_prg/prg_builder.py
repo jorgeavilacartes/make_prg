@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Union, Dict
 
 from make_prg.from_msa import MSA
 from make_prg.io_utils import load_alignment_file
@@ -425,11 +425,6 @@ class PrgBuilder(object):
         #     print(self.leaves_index, file=filehandler)
 
     @staticmethod
-    def deserialize(filename) -> "PrgBuilder":
-        with open(filename, "rb") as filehandler:
-            return pickle.load(filehandler)
-
-    @staticmethod
     def concatenate_pickle_files(pickle_filepaths, output_filepath):
         locus_name_to_prg_builder = {}
         for pickle_filepath in pickle_filepaths:
@@ -439,3 +434,7 @@ class PrgBuilder(object):
         with open(output_filepath, "wb") as output_filehandler:
             pickle.dump(locus_name_to_prg_builder, output_filehandler)
 
+    @staticmethod
+    def deserialize(filename) -> Union["PrgBuilder", Dict[str, "PrgBuilder"]]:
+        with open(filename, "rb") as filehandler:
+            return pickle.load(filehandler)
