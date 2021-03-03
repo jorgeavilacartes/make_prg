@@ -8,7 +8,7 @@ from make_prg import io_utils, prg_builder
 import multiprocessing
 import shutil
 
-from make_prg.utils import output_files_already_exist
+from make_prg.utils import output_files_already_exist, setup_file_logging, setup_stderr_logging
 
 options = None
 
@@ -77,6 +77,12 @@ def register_parser(subparsers):
             "match. Default: {}".format(MIN_MATCH_LEN)
         ),
     )
+    subparser_msa.add_argument(
+        "--keep_temp",
+        action="store_true",
+        default=False,
+        help="Keep temp files."
+    )
     subparser_msa.set_defaults(func=run)
 
     return subparser_msa
@@ -89,7 +95,9 @@ def get_all_input_files(input_dir):
 
 
 def process_MSA(msa_filepath: Path):
+    logging.info(f"Generating PRG for {msa_filepath}...")
     msa_name = msa_filepath.name
+    locus_name = msa_filepath.with_suffix("").name
     current_process = multiprocessing.current_process()
 
     temp_dir = Path(options.output_prefix + "_tmp") / current_process.name
@@ -97,25 +105,11 @@ def process_MSA(msa_filepath: Path):
     prefix = str(temp_dir / msa_name)
 
     # Set up file logging
-    log_file = f"{prefix}.log"
-    if os.path.exists(log_file):
-        os.unlink(log_file)
-    formatter = logging.Formatter(
-        fmt="%(levelname)s %(asctime)s %(message)s", datefmt="%d/%m/%Y %I:%M:%S"
-    )
-    handler = logging.FileHandler(log_file)
-    handler.setFormatter(formatter)
-    logging.getLogger().addHandler(handler)
-
-    logging.info(
-        "Input parameters max_nesting: %d, min_match_length: %d",
-        options.max_nesting,
-        options.min_match_length,
-    )
+    # logging_handler = setup_file_logging(prefix)
 
     try:
         builder = prg_builder.PrgBuilder(
-            locus_name=msa_name,
+            locus_name=locus_name,
             msa_file=msa_filepath,
             alignment_format=options.alignment_format,
             max_nesting=options.max_nesting,
@@ -144,22 +138,23 @@ def run(cl_options):
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
+    setup_stderr_logging()
+    logging.info(f"Using {options.threads} threads to generate PRGs...")
     with multiprocessing.Pool(options.threads) as pool:
         pool.map(process_MSA, input_files, chunksize=1)
-
-    # single threaded version
-    # for file in input_files:
-    #     process_MSA(file)
+    logging.info(f"All PRGs generated!")
 
     # concatenate the output files
+    logging.info("Concatenating files from several threads into single final files...")
     temp_path = Path(options.output_prefix + "_tmp")
-    log_files = glob(str(temp_path)+"/*/*.log")
-    io_utils.concatenate_text_files(log_files, options.output_prefix+".log")
     prg_files = glob(str(temp_path)+"/*/*.prg.fa")
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
     pickle_files = glob(str(temp_path)+"/*/*.pickle")
     prg_builder.PrgBuilder.concatenate_pickle_files(pickle_files, options.output_prefix + ".pickle")
 
-    # remove temp files
-    if temp_path.exists():
+    # remove temp files if needed
+    if not options.keep_temp and temp_path.exists():
+        logging.info("Removing temp files...")
         shutil.rmtree(temp_path)
+
+    logging.info("All done!")

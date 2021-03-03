@@ -1,5 +1,5 @@
 import logging
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Tuple
 
 from make_prg.from_msa import MSA
 from make_prg.io_utils import load_alignment_file
@@ -26,15 +26,15 @@ from abc import ABC, abstractmethod
 
 # TODO: change to spoa
 class MSAAligner:
-    @classmethod
-    def get_updated_alignment(cls, locus_name: str, previous_alignment: Path, new_sequences: Path, prefix: str) -> Path:
-        logging.info(f"Updating MSA for {locus_name}...")
+    mafft_exec = "MAFFT_BINARIES=\"/home/leandro/Downloads/unchanged_mafft/mafft-7.475-with-extensions-src/mafft-7.475-with-extensions/binaries\" /home/leandro/Downloads/unchanged_mafft/mafft-7.475-with-extensions-src/mafft-7.475-with-extensions/core/mafft"
 
+    @classmethod
+    def get_updated_alignment(cls, leaf_name: str, previous_alignment: Path, new_sequences: Path, prefix: Path) -> Path:
         # make paths shell-safe
-        new_msa = shlex.quote(f"{prefix}.updated_msa.fa")
+        new_msa = prefix / "updated_msa.fa"
         previous_alignment = shlex.quote(str(previous_alignment))
-        new_sequences = shlex.quote(str(new_sequences))
-        mafft_tmpdir = Path(f"{prefix}.mafft.{uuid.uuid4()}")
+        new_sequences = new_sequences
+        mafft_tmpdir = Path(prefix / f"temp.mafft.{uuid.uuid4()}")
         if mafft_tmpdir.exists():
             shutil.rmtree(mafft_tmpdir)
         mafft_tmpdir.mkdir()
@@ -43,16 +43,16 @@ class MSAAligner:
 
         args = " ".join(
             [
-                "mafft",
+                f"{MSAAligner.mafft_exec}",
                 "--auto",
                 "--quiet",
                 "--thread",
                 "1",
                 "--add",
-                new_sequences,
-                previous_alignment,
+                str(new_sequences),
+                str(previous_alignment),
                 ">",
-                new_msa,
+                str(new_msa),
             ]
         )
 
@@ -64,15 +64,15 @@ class MSAAligner:
         shutil.rmtree(mafft_tmpdir)
         if exit_code != 0:
             raise RuntimeError(
-                f"Failed to execute mafft for {locus_name} due to the following error:\n"
+                f"Failed to execute mafft for {leaf_name} due to the following error:\n"
                 f"{process.stderr.read()}"
             )
         stop = time.time()
         runtime = stop-start
-        logging.info(f"Finished updating MSA for {locus_name}")
-        logging.info(f"MAFFT update runtime for {locus_name} in seconds: {runtime:.3f}")
+        logging.info(f"Finished updating MSA for {leaf_name}")
+        logging.info(f"MAFFT update runtime for {leaf_name} in seconds: {runtime:.3f}")
 
-        return Path(new_msa)
+        return new_msa
 
 
 class PrgBuilderRecursiveTreeNode(ABC):
@@ -83,6 +83,7 @@ class PrgBuilderRecursiveTreeNode(ABC):
                  parent,
                  prg_builder):
         # set the basic attributes
+        self.id = prg_builder.get_next_node_id()
         self.nesting_level = nesting_level
         self.alignment = alignment
         self.interval = interval
@@ -108,7 +109,7 @@ class PrgBuilderRecursiveTreeNode(ABC):
         pass
 
     @abstractmethod
-    def batch_update(self):
+    def batch_update(self, temp_prefix):
         pass
 
 
@@ -209,11 +210,6 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         ) = IntervalPartitioner(
             self.consensus, self.prg_builder.min_match_length, self.alignment
         ).get_intervals()
-        logging.info(
-            "match intervals: %s; non_match intervals: %s",
-            self.match_intervals,
-            self.non_match_intervals,
-        )
 
     def _get_children(self):
         # stop conditions
@@ -327,34 +323,41 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
 
     ##################################################################################
     # update methods
-    def add_seqs_to_batch_update(self, new_sequences: List[Seq]):
+    def add_seq_to_batch_update(self, new_sequence: str):
         if self.new_sequences is None:
-            self.new_sequences = []
-        self.new_sequences.extend(new_sequences)
-        self.new_sequences = list(set(self.new_sequences))  # dedup
+            self.new_sequences = set()
+        self.new_sequences.add(new_sequence)
 
-    def batch_update(self):
+
+    def batch_update(self, temp_prefix):
         no_update_to_be_done = self.new_sequences is None or len(self.new_sequences) == 0
         if no_update_to_be_done:
             return
-        self._update_leaf()
+        self._update_leaf(temp_prefix)
 
 
-    def _update_leaf(self):
+    def _update_leaf(self, temp_prefix):
         # update the MSA
-        previous_msa_filename = f"{self.prg_builder.prefix}.previous_msa.fa"
+        temp_prefix = temp_prefix / self.prg_builder.locus_name / f"node_{self.id}"
+        os.makedirs(temp_prefix, exist_ok=True)
+
+        previous_msa_filename = temp_prefix / "previous_msa.fa"
         with open(previous_msa_filename, "w") as previous_msa_handler:
             SeqIO.write(self.alignment, previous_msa_handler, "fasta")
-        new_sequences_filename = f"{self.prg_builder.prefix}.new_sequences.fa"
+        new_sequences_filename = temp_prefix / "new_sequences.fa"
         with open(new_sequences_filename, "w") as new_sequences_handler:
-            SeqIO.write(self.new_sequences, new_sequences_handler, "fasta")
-        MSAAligner.get_updated_alignment(locus_name=self.prg_builder.locus_name,
-                                         previous_alignment=Path(previous_msa_filename),
-                                         new_sequences=Path(new_sequences_filename),
-                                         prefix=self.prg_builder.prefix)
+            for index_new_seq, new_seq in enumerate(self.new_sequences):
+                print(f">Denovo_path_{index_new_seq}_random_id_{uuid.uuid4()}", file=new_sequences_handler)
+                print(new_seq, file=new_sequences_handler)
+
+        logging.info(f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}...")
+        new_msa = MSAAligner.get_updated_alignment(leaf_name=f"{self.prg_builder.locus_name}, node {self.id}",
+                                                   previous_alignment=previous_msa_filename,
+                                                   new_sequences=new_sequences_filename,
+                                                   prefix=temp_prefix)
 
         # update the alignment
-        self.alignment = load_alignment_file(new_sequences_filename, "fasta")
+        self.alignment = load_alignment_file(new_msa, "fasta")
 
         # update the other fields
         self._set_derived_helper_attributes()
@@ -384,6 +387,7 @@ class PrgBuilder(object):
         self.max_nesting = max_nesting
         self.min_match_length = min_match_length
         self.leaves_index = {}
+        self.node_id = 0
 
         alignment = load_alignment_file(msa_file, alignment_format)
         root_interval = Interval(IntervalType.Root, 0, alignment.get_alignment_length() - 1)
@@ -405,12 +409,15 @@ class PrgBuilder(object):
         self._site_num+=2
         return previous_site_num
 
+    def get_next_node_id(self):
+        self.node_id += 1
+        return self.node_id - 1
+
     def update_leaves_index(self, start_index: int, end_index: int, node):
         interval = (start_index, end_index)
         self.leaves_index[interval] = node
 
-    def get_node_given_interval(self, start_index: int, end_index: int):
-        interval = (start_index, end_index)
+    def get_node_given_interval(self, interval: Tuple[int, int]):
         assert interval in self.leaves_index, \
             f"Fatal error: queried interval {interval} does not exist in leaves index"
         return self.leaves_index[interval]
