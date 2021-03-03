@@ -6,7 +6,7 @@ from make_prg.io_utils import load_alignment_file
 from make_prg.from_msa.cluster_sequences import kmeans_cluster_seqs_in_interval
 from make_prg.seq_utils import (
     ambiguous_bases,
-    remove_duplicates,
+    remove_duplicates,  # TODO: quantify and remove dups
     get_interval_seqs,
     NONMATCH,
 )
@@ -24,13 +24,12 @@ from Bio import SeqIO
 from abc import ABC, abstractmethod
 
 
-# TODO: change to spoa
+# TODO: change to spoa or sth else
 class MSAAligner:
     mafft_exec = "MAFFT_BINARIES=\"/home/leandro/Downloads/unchanged_mafft/mafft-7.475-with-extensions-src/mafft-7.475-with-extensions/binaries\" /home/leandro/Downloads/unchanged_mafft/mafft-7.475-with-extensions-src/mafft-7.475-with-extensions/core/mafft"
 
     @classmethod
     def get_updated_alignment(cls, leaf_name: str, previous_alignment: Path, new_sequences: Path, prefix: Path) -> Path:
-        # make paths shell-safe
         new_msa = prefix / "updated_msa.fa"
         previous_alignment = shlex.quote(str(previous_alignment))
         new_sequences = new_sequences
@@ -181,8 +180,8 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
         return sub_alignment
     #####################################################################################################
 
-    def batch_update(self):
-        pass  # update is only on the leaves
+    def batch_update(self, temp_prefix):
+        assert False, "Update was called on a non-leaf node"
 
 
 class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
@@ -428,11 +427,6 @@ class PrgBuilder(object):
     def serialize(self, filename):
         with open(filename, "wb") as filehandler:
             pickle.dump(self, filehandler)
-
-        # # text serialise, just for debug
-        # with open(f"{filename}.txt", "w") as filehandler:
-        #     print("self.leaves_index", file=filehandler)
-        #     print(self.leaves_index, file=filehandler)
 
     @staticmethod
     def concatenate_pickle_files(pickle_filepaths, output_filepath):

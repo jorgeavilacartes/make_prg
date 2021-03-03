@@ -7,14 +7,23 @@ import logging
 
 class MLPathNode:
     def __init__(self, key, sequence):
+        assert len(sequence) > 0, "Error: pandora produced a Local Node with empty sequence"
         self.key = key
         self.sequence = sequence
         self.start_index_in_linear_path = None  # this is set by class MLPath if needed
         self.end_index_in_linear_path = None    # this is set by class MLPath if needed
 
+    def __str__(self):
+        return f"{self.key} {self.sequence} {self.start_index_in_linear_path} {self.end_index_in_linear_path}"
+
+    def __repr__(self):
+        return str(self)
+
 
 class DenovoVariant:
     def __init__(self, start_index_in_linear_path, ref, alt):
+        assert ref != alt, "Error: pandora produced a ref == alt"
+        assert start_index_in_linear_path >= 0, "Error: Pandora produced a negative index for variant pos"
         self.start_index_in_linear_path = start_index_in_linear_path
         self.end_index_in_linear_path = start_index_in_linear_path + len(ref)
         self.ref = ref
@@ -23,12 +32,23 @@ class DenovoVariant:
     def get_mutated_sequence(self, node: MLPathNode):
         start_index_inside_node_sequence = self.start_index_in_linear_path-node.start_index_in_linear_path
         end_index_inside_node_sequence = start_index_inside_node_sequence + len(self.ref)
+
+        ref_wrt_indexes = node.sequence[start_index_inside_node_sequence:end_index_inside_node_sequence]
+        ref_is_consistent = self.ref == ref_wrt_indexes
+        assert ref_is_consistent, f"Ref is not consistent for {self}. Node = {node}. ref_wrt_indexes = {ref_wrt_indexes}"
+
         mutated_sequence = node.sequence[:start_index_inside_node_sequence] + \
                            self.alt + node.sequence[end_index_inside_node_sequence:]
         return mutated_sequence
 
     def is_insertion_event(self):
         return len(self.ref) == 0
+
+    def __str__(self):
+        return f"{self.start_index_in_linear_path} {self.ref} {self.alt}"
+
+    def __repr__(self):
+        return str(self)
 
 
 class MLPath:
@@ -47,14 +67,15 @@ class MLPath:
 
     def get_node_at_index(self, index):
         nodes = self.__ml_path_index[index]
-        only_one_node_is_overlaps = len(nodes) == 1
-        assert only_one_node_is_overlaps
+        only_one_node_is_overlapped = len(nodes) == 1
+        assert only_one_node_is_overlapped
         node = list(nodes)[0].data
         return node
 
 
 class MLPathNodeWithVariantApplied:
     def __init__(self, ml_path_node, variant, mutated_node_sequence):
+        assert ml_path_node.sequence != mutated_node_sequence
         self.key = ml_path_node.key
         self.ml_path_node = ml_path_node
         self.variant = variant
@@ -85,11 +106,10 @@ class DenovoLocusInfo:
                 node_of_last_base = node_of_first_base
             variant_in_a_single_node = node_of_first_base == node_of_last_base
             if variant_in_a_single_node:
-                mutated_sequence = variant.get_mutated_sequence(node_of_first_base)
                 node_with_mutated_variant = MLPathNodeWithVariantApplied(
                     ml_path_node=node_of_first_base,
                     variant=variant,
-                    mutated_node_sequence=mutated_sequence
+                    mutated_node_sequence=variant.get_mutated_sequence(node_of_first_base)
                 )
                 nodes_with_variant_applied_in_a_single_node.append(node_with_mutated_variant)
             else:
@@ -108,6 +128,7 @@ class DenovoPathsDB:
             matches = self.__ml_path_regex.search(line)
             start_index = int(matches.group(1))
             end_index = int(matches.group(2)) + 1  # TODO: fix pandora to give us non-inclusive end intervals instead
+            assert start_index < end_index
             ml_path.append(MLPathNode(
                 key=(start_index, end_index),
                 sequence=matches.group(3)))
@@ -127,13 +148,13 @@ class DenovoPathsDB:
             ))
         return variants
 
-    def __populate__locus_name_to_denovo_loci(self, filename):
+    def __populate__locus_name_to_denovo_loci(self):
         # Example:
         # (0 [0, 110) ATGCAGATACGTGAACAGGGCCGCAAAATTCAGTGCATCCGCACCGTGTACGACAAGGCCATTGGCCGGGGTCGGCAGACGGTCATTGCCACACTGGCCCGCTATACGAC)
         self.__ml_path_regex = re.compile("\(\d+ \[(\d+), (\d+)\) ([ACGT]+)\)")
 
         self.__locus_name_to_denovo_loci = defaultdict(list)
-        with open(filename) as filehandler:
+        with open(self.filename) as filehandler:
             # read nb_of_samples
             line = filehandler.readline().strip()
             nb_of_samples = int(line.split()[0])
@@ -154,6 +175,7 @@ class DenovoPathsDB:
 
     def __populate__locus_name_to_variant_nodes_with_mutation(self):
         self.__locus_name_to_variant_nodes_with_mutation = defaultdict(list)
+        number_of_valid_variants = 0
         self.__ignored_variants_due_to_spanning_multiple_nodes = []
         for locus_name, denovo_loci in self.__locus_name_to_denovo_loci.items():
             for denovo_locus in denovo_loci:
@@ -161,14 +183,19 @@ class DenovoPathsDB:
                         denovo_locus.get_nodes_with_variant_applied()
                 self.__locus_name_to_variant_nodes_with_mutation[locus_name].extend(
                     nodes_with_variant_applied_in_a_single_node)
+                number_of_valid_variants += len(nodes_with_variant_applied_in_a_single_node)
                 self.__ignored_variants_due_to_spanning_multiple_nodes.extend(variants_in_two_or_more_nodes)
+        logging.warning(f"Number of valid variants (spanning a single node): {number_of_valid_variants}")
         logging.warning(f"Number of variants ignored due to spanning multiple nodes: "
                      f"{len(self.__ignored_variants_due_to_spanning_multiple_nodes)}")
+        ignored_variants_as_str = "\n".join([str(x) for x in self.__ignored_variants_due_to_spanning_multiple_nodes])
+        logging.warning(f"Variants spanning multiple nodes: {ignored_variants_as_str}")
 
     @property
     def locus_name_to_variant_nodes_with_mutation(self):
         return self.__locus_name_to_variant_nodes_with_mutation
 
     def __init__(self, filename):
-        self.__populate__locus_name_to_denovo_loci(filename)
+        self.filename = filename
+        self.__populate__locus_name_to_denovo_loci()
         self.__populate__locus_name_to_variant_nodes_with_mutation()

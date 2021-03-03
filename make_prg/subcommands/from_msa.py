@@ -8,7 +8,7 @@ from make_prg import io_utils, prg_builder
 import multiprocessing
 import shutil
 
-from make_prg.utils import output_files_already_exist, setup_file_logging, setup_stderr_logging
+from make_prg.utils import output_files_already_exist, setup_stderr_logging
 
 options = None
 
