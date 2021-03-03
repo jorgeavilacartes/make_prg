@@ -357,13 +357,16 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                                                    prefix=temp_prefix)
 
         # update the alignment
-        self.alignment = load_alignment_file(new_msa, "fasta")
+        self.alignment = load_alignment_file(str(new_msa), "fasta")
 
         # update the other fields
         self._set_derived_helper_attributes()
 
         # reset the new sequences
         self.new_sequences = None
+
+        # regenerate recursion tree
+        self._children = self._get_children()
     ##################################################################################
 
 
