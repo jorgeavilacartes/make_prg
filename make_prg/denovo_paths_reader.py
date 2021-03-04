@@ -132,17 +132,15 @@ class DenovoPathsDB:
                 matches = self.__ml_path_regex.search(line)
                 start_index = int(matches.group(1))
                 end_index = int(matches.group(2)) + 1  # TODO: fix pandora to give us non-inclusive end intervals instead
+                sequence = matches.group(3)
             except Exception as exc:
                 print(f"Failed matching ML path regex to line: {line}")
                 print(f"Exception: {str(exc)}")
                 sys.exit(1)
 
             assert start_index < end_index
-
-            try:
-                sequence = matches.group(3)
-            except:  #  Actual exception type is NoneType, but it seems we will be able to capture only on python 3.10: https://stackoverflow.com/questions/21706609/where-is-the-nonetype-located-in-python-3-x
-                # no-sequence node, do not process
+            no_sequence_node = len(sequence) == 0
+            if no_sequence_node:
                 continue
 
             ml_path.append(MLPathNode(
@@ -167,7 +165,7 @@ class DenovoPathsDB:
     def __populate__locus_name_to_denovo_loci(self):
         # Example:
         # (0 [0, 110) ATGCAGATACGTGAACAGGGCCGCAAAATTCAGTGCATCCGCACCGTGTACGACAAGGCCATTGGCCGGGGTCGGCAGACGGTCATTGCCACACTGGCCCGCTATACGAC)
-        self.__ml_path_regex = re.compile("\(\d+ \[(\d+), (\d+)\) ([ACGT]+)\)")
+        self.__ml_path_regex = re.compile("\(\d+ \[(\d+), (\d+)\) ([ACGT]*)\)")
 
         self.__locus_name_to_denovo_loci = defaultdict(list)
         with open(self.filename) as filehandler:
