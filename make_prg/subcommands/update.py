@@ -6,9 +6,11 @@ import shutil
 import multiprocessing
 
 from make_prg import io_utils
-from make_prg.prg_builder import PrgBuilder, PrgBuilderCollection
+from make_prg.prg_builder import PrgBuilderCollection
 from make_prg.utils import output_files_already_exist, setup_stderr_logging
 from make_prg.denovo_paths_reader import DenovoPathsDB
+
+multiprocessing.set_start_method("spawn")  # avoids multiprocessing Pool deadlocks (see https://pythonspeed.com/articles/python-multiprocessing/)
 
 def register_parser(subparsers):
     subparser_update_prg = subparsers.add_parser(
