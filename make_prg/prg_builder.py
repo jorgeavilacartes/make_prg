@@ -68,8 +68,8 @@ class MSAAligner:
             )
         stop = time.time()
         runtime = stop-start
-        logging.info(f"Finished updating MSA for {leaf_name}")
-        logging.info(f"MAFFT update runtime for {leaf_name} in seconds: {runtime:.3f}")
+        print(f"Finished updating MSA for {leaf_name}")
+        print(f"MAFFT update runtime for {leaf_name} in seconds: {runtime:.3f}")
 
         return new_msa
 
@@ -349,7 +349,7 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                 print(f">Denovo_path_{index_new_seq}_random_id_{uuid.uuid4()}", file=new_sequences_handler)
                 print(new_seq, file=new_sequences_handler)
 
-        logging.info(f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}...")
+        print(f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}...")
         new_msa = MSAAligner.get_updated_alignment(leaf_name=f"{self.prg_builder.locus_name}, node {self.id}",
                                                    previous_alignment=previous_msa_filename,
                                                    new_sequences=new_sequences_filename,

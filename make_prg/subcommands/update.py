@@ -61,7 +61,7 @@ def register_parser(subparsers):
     return subparser_update_prg
 
 def update(locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_dir):
-    logging.info(f"Updating {locus_name} ...")
+    print(f"Updating {locus_name} ...")
 
     nb_of_variants_sucessfully_updated = 0
     nb_of_variants_with_failed_update = 0
@@ -78,7 +78,7 @@ def update(locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_
     # update the changed leaves
     for leaf in leaves_to_update:
         leaf.batch_update(temp_dir)
-    logging.info(f"Updated {locus_name}: {len(variant_nodes_with_mutation)} denovo sequences added!")
+    print(f"Updated {locus_name}: {len(variant_nodes_with_mutation)} denovo sequences added!")
 
     # regenerate PRG
     locus_prefix = temp_dir / locus_name / locus_name
