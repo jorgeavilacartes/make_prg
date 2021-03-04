@@ -4,6 +4,7 @@ import re
 from intervaltree.intervaltree import IntervalTree
 import logging
 import sys
+import types
 
 
 class MLPathNode:
@@ -126,19 +127,17 @@ class DenovoPathsDB:
         ml_path = []
         for _ in range(nb_of_nodes_in_ml_path):
             line = filehandler.readline().strip()
+            matches = self.__ml_path_regex.search(line)
+            start_index = int(matches.group(1))
+            end_index = int(matches.group(2)) + 1  # TODO: fix pandora to give us non-inclusive end intervals instead
+            assert start_index < end_index
 
             try:
-                matches = self.__ml_path_regex.search(line)
-                start_index = int(matches.group(1))
-                end_index = int(matches.group(2)) + 1  # TODO: fix pandora to give us non-inclusive end intervals instead
                 sequence = matches.group(3)
-            except Exception as exc:
-                print(f"Failed matching ML path regex to line: {line}")
-                print(f"Exception: {str(exc)}")
-                sys.exit(1)
+            except:  #  Actual exception type is NoneType, but it seems we will be able to capture only on python 3.10: https://stackoverflow.com/questions/21706609/where-is-the-nonetype-located-in-python-3-x
+                # no-sequence node, do not process
+                continue
 
-
-            assert start_index < end_index
             ml_path.append(MLPathNode(
                 key=(start_index, end_index),
                 sequence=sequence))
