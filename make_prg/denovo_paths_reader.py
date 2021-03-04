@@ -155,6 +155,13 @@ class DenovoPathsDB:
         for _ in range(nb_of_variants):
             line = filehandler.readline().strip()
             line_split = line.split()
+
+            #  if we don't have three words, then we ignore... this will ignore full indel events
+            #  TODO: fix this in the file format by splitting by `\t`
+            have_three_words = len(line_split) == 3
+            if not have_three_words:
+                continue
+
             variants.append(DenovoVariant(
                 start_index_in_linear_path=int(line_split[0]),
                 ref=line_split[1],
