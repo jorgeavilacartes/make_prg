@@ -3,6 +3,7 @@ from collections import defaultdict
 import re
 from intervaltree.intervaltree import IntervalTree
 import logging
+import sys
 
 
 class MLPathNode:
@@ -125,13 +126,22 @@ class DenovoPathsDB:
         ml_path = []
         for _ in range(nb_of_nodes_in_ml_path):
             line = filehandler.readline().strip()
-            matches = self.__ml_path_regex.search(line)
-            start_index = int(matches.group(1))
-            end_index = int(matches.group(2)) + 1  # TODO: fix pandora to give us non-inclusive end intervals instead
+
+            try:
+                matches = self.__ml_path_regex.search(line)
+                start_index = int(matches.group(1))
+                end_index = int(matches.group(2)) + 1  # TODO: fix pandora to give us non-inclusive end intervals instead
+                sequence = matches.group(3)
+            except Exception as exc:
+                print(f"Failed matching ML path regex to line: {line}")
+                print(f"Exception: {str(exc)}")
+                sys.exit(1)
+
+
             assert start_index < end_index
             ml_path.append(MLPathNode(
                 key=(start_index, end_index),
-                sequence=matches.group(3)))
+                sequence=sequence))
         return MLPath(ml_path)
 
     def __read_variants(self, filehandler):
