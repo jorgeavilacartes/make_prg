@@ -420,8 +420,14 @@ class PrgBuilder(object):
         self.leaves_index[interval] = node
 
     def get_node_given_interval(self, interval: Tuple[int, int]):
-        assert interval in self.leaves_index, \
-            f"Fatal error: queried interval {interval} does not exist in leaves index"
+        # TODO: move this back to assert
+        interval_is_indexed = interval in self.leaves_index
+        if not interval_is_indexed:
+            raise RuntimeError(f"Queried interval {interval} does not exist in leaves index")
+
+        # assert interval in self.leaves_index, \
+        #     f"Fatal error: queried interval {interval} does not exist in leaves index"
+
         return self.leaves_index[interval]
 
     def serialize(self, filename):

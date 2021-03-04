@@ -1,7 +1,6 @@
 import logging
 import os
 from pathlib import Path
-from glob import glob
 import shutil
 import multiprocessing
 
@@ -63,11 +62,18 @@ def register_parser(subparsers):
 
 def update(locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_dir):
     logging.info(f"Updating {locus_name} ...")
+
+    nb_of_variants_sucessfully_updated = 0
+    nb_of_variants_with_failed_update = 0
     leaves_to_update = set()
     for variant_node_with_mutation in variant_nodes_with_mutation:
-        prg_builder_tree_node = prg_builder_for_locus.get_node_given_interval(variant_node_with_mutation.key)
-        prg_builder_tree_node.add_seq_to_batch_update(variant_node_with_mutation.mutated_node_sequence)
-        leaves_to_update.add(prg_builder_tree_node)
+        try:
+            prg_builder_tree_node = prg_builder_for_locus.get_node_given_interval(variant_node_with_mutation.key)
+            prg_builder_tree_node.add_seq_to_batch_update(variant_node_with_mutation.mutated_node_sequence)
+            leaves_to_update.add(prg_builder_tree_node)
+            nb_of_variants_sucessfully_updated += 1
+        except RuntimeError:
+            nb_of_variants_with_failed_update += 1
 
     # update the changed leaves
     for leaf in leaves_to_update:
@@ -79,6 +85,9 @@ def update(locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_
     prg = prg_builder_for_locus.build_prg()
     logging.info(f"Write PRG file to {locus_prefix}.prg.fa")
     io_utils.write_prg(str(locus_prefix), prg)
+
+    with open(f"{locus_prefix}.stats", "w") as stats_filehandler:
+        print(f"{locus_name} {nb_of_variants_sucessfully_updated} {nb_of_variants_with_failed_update}", file=stats_filehandler)
 
     # Note: we intentionally do not regenerate updateable data structure here because we don't want to update
     # PRGs on top of already updated PRGs
@@ -104,8 +113,8 @@ def run(options):
     # update all PRGs with denovo sequences
     logging.info(f"Using {options.threads} threads to update PRGs...")
     multithreaded_input = []
-    for locus_name, variant_nodes_with_mutation in denovo_paths_db.locus_name_to_variant_nodes_with_mutation.items():
-        prg_builder_for_locus = prg_builder_collection.locus_name_to_prg_builder[locus_name]
+    for locus_name, prg_builder_for_locus in prg_builder_collection.locus_name_to_prg_builder.items():  # we do for all PRGs as those that don't have denovo variants will be generated also
+        variant_nodes_with_mutation = denovo_paths_db.locus_name_to_variant_nodes_with_mutation.get(locus_name, [])
         multithreaded_input.append((locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_path))
 
     # avoids multiprocessing Pool deadlocks (see https://pythonspeed.com/articles/python-multiprocessing/)
@@ -116,8 +125,13 @@ def run(options):
 
     # concatenate output PRGs
     logging.info("Concatenating files from several threads into single final files...")
-    prg_files = glob(str(temp_path)+"/*/*.prg.fa")
+    # TODO: do this glob optimisation also in from msa
+    prg_files = [f"{temp_path}/{locus_name}/{locus_name}.prg.fa" for locus_name in prg_builder_collection.locus_name_to_prg_builder.keys()]
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
+
+    stats_files = [f"{temp_path}/{locus_name}/{locus_name}.stats" for locus_name in
+                 prg_builder_collection.locus_name_to_prg_builder.keys()]
+    io_utils.concatenate_text_files(stats_files, options.output_prefix + ".stats")
 
     # remove temp files if needed
     if not options.keep_temp and temp_path.exists():
