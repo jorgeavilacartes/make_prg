@@ -127,9 +127,16 @@ class DenovoPathsDB:
         ml_path = []
         for _ in range(nb_of_nodes_in_ml_path):
             line = filehandler.readline().strip()
-            matches = self.__ml_path_regex.search(line)
-            start_index = int(matches.group(1))
-            end_index = int(matches.group(2)) + 1  # TODO: fix pandora to give us non-inclusive end intervals instead
+
+            try:
+                matches = self.__ml_path_regex.search(line)
+                start_index = int(matches.group(1))
+                end_index = int(matches.group(2)) + 1  # TODO: fix pandora to give us non-inclusive end intervals instead
+            except Exception as exc:
+                print(f"Failed matching ML path regex to line: {line}")
+                print(f"Exception: {str(exc)}")
+                sys.exit(1)
+
             assert start_index < end_index
 
             try:
