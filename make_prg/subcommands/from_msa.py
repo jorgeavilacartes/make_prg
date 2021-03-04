@@ -144,13 +144,16 @@ def run(cl_options):
         pool.map(process_MSA, input_files, chunksize=1)
     logging.info(f"All PRGs generated!")
 
-    # concatenate the output files
+    # concatenate the prg.fa output files
     logging.info("Concatenating files from several threads into single final files...")
     temp_path = Path(options.output_prefix + "_tmp")
     prg_files = glob(str(temp_path)+"/*/*.prg.fa")
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
+
+    # create and serialise the PRG Builder collection
     pickle_files = glob(str(temp_path)+"/*/*.pickle")
-    prg_builder.PrgBuilder.concatenate_pickle_files(pickle_files, options.output_prefix + ".pickle")
+    prg_builder_collection = prg_builder.PrgBuilderCollection(pickle_files, options)
+    prg_builder_collection.serialize()
 
     # remove temp files if needed
     if not options.keep_temp and temp_path.exists():

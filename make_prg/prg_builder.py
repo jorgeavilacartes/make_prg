@@ -429,16 +429,27 @@ class PrgBuilder(object):
             pickle.dump(self, filehandler)
 
     @staticmethod
-    def concatenate_pickle_files(pickle_filepaths, output_filepath):
-        locus_name_to_prg_builder = {}
-        for pickle_filepath in pickle_filepaths:
-            prg_builder = PrgBuilder.deserialize(pickle_filepath)
-            locus_name_to_prg_builder[prg_builder.locus_name] = prg_builder
+    def deserialize(filename):
+        with open(filename, "rb") as filehandler:
+            return pickle.load(filehandler)
 
-        with open(output_filepath, "wb") as output_filehandler:
-            pickle.dump(locus_name_to_prg_builder, output_filehandler)
+
+class PrgBuilderCollection:
+    """
+    Represent a collection of PrgBuilder and some other info, to be serialised and deserialised
+    """
+    def __init__(self, PrgBuilder_pickle_filepaths, build_options):
+        self.locus_name_to_prg_builder = {}
+        for pickle_filepath in PrgBuilder_pickle_filepaths:
+            prg_builder = PrgBuilder.deserialize(pickle_filepath)
+            self.locus_name_to_prg_builder[prg_builder.locus_name] = prg_builder
+        self.build_options = build_options
+
+    def serialize(self):
+        with open(self.build_options.output_prefix + ".pickle", "wb") as output_filehandler:
+            pickle.dump(self, output_filehandler)
 
     @staticmethod
-    def deserialize(filename) -> Union["PrgBuilder", Dict[str, "PrgBuilder"]]:
+    def deserialize(filename):
         with open(filename, "rb") as filehandler:
             return pickle.load(filehandler)

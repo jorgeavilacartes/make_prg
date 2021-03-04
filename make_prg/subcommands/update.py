@@ -6,7 +6,7 @@ import shutil
 import multiprocessing
 
 from make_prg import io_utils
-from make_prg.prg_builder import PrgBuilder
+from make_prg.prg_builder import PrgBuilder, PrgBuilderCollection
 from make_prg.utils import output_files_already_exist, setup_stderr_logging
 from make_prg.denovo_paths_reader import DenovoPathsDB
 
@@ -92,7 +92,7 @@ def run(options):
     setup_stderr_logging()
 
     logging.info(f"Reading {options.pickle}...")
-    locus_name_to_prg_builder = PrgBuilder.deserialize(options.pickle)
+    prg_builder_collection = PrgBuilderCollection.deserialize(options.pickle)
     logging.info(f"Reading {options.denovo_paths}...")
     denovo_paths_db = DenovoPathsDB(options.denovo_paths)
 
@@ -105,7 +105,7 @@ def run(options):
     logging.info(f"Using {options.threads} threads to update PRGs...")
     multithreaded_input = []
     for locus_name, variant_nodes_with_mutation in denovo_paths_db.locus_name_to_variant_nodes_with_mutation.items():
-        prg_builder_for_locus = locus_name_to_prg_builder[locus_name]
+        prg_builder_for_locus = prg_builder_collection.locus_name_to_prg_builder[locus_name]
         multithreaded_input.append((locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_path))
 
     with multiprocessing.Pool(options.threads) as pool:
