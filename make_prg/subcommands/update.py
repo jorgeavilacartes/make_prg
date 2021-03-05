@@ -61,29 +61,36 @@ def register_parser(subparsers):
     return subparser_update_prg
 
 def update(locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_dir):
-    print(f"Updating {locus_name} ...")
-
     nb_of_variants_sucessfully_updated = 0
     nb_of_variants_with_failed_update = 0
-    leaves_to_update = set()
-    for variant_node_with_mutation in variant_nodes_with_mutation:
-        try:
-            prg_builder_tree_node = prg_builder_for_locus.get_node_given_interval(variant_node_with_mutation.key)
-            prg_builder_tree_node.add_seq_to_batch_update(variant_node_with_mutation.mutated_node_sequence)
-            leaves_to_update.add(prg_builder_tree_node)
-            nb_of_variants_sucessfully_updated += 1
-        except RuntimeError:
-            nb_of_variants_with_failed_update += 1
 
-    # update the changed leaves
-    for leaf in leaves_to_update:
-        leaf.batch_update(temp_dir)
-    print(f"Updated {locus_name}: {len(variant_nodes_with_mutation)} denovo sequences added!")
+    we_have_variants = len(variant_nodes_with_mutation) > 0
+    if we_have_variants:
+        print(f"Updating {locus_name} ...")
+
+        leaves_to_update = set()
+        for variant_node_with_mutation in variant_nodes_with_mutation:
+            try:
+                prg_builder_tree_node = prg_builder_for_locus.get_node_given_interval(variant_node_with_mutation.key)
+                prg_builder_tree_node.add_seq_to_batch_update(variant_node_with_mutation.mutated_node_sequence)
+                leaves_to_update.add(prg_builder_tree_node)
+                nb_of_variants_sucessfully_updated += 1
+            except RuntimeError:
+                nb_of_variants_with_failed_update += 1
+
+        # update the changed leaves
+        for leaf in leaves_to_update:
+            leaf.batch_update(temp_dir)
+        print(f"Updated {locus_name}: {len(variant_nodes_with_mutation)} denovo sequences added!")
+    else:
+        print(f"{locus_name} has no new variants, no update needed")
 
     # regenerate PRG
     locus_prefix = temp_dir / locus_name / locus_name
+    locus_prefix_parent = locus_prefix.parent
+    os.makedirs(locus_prefix_parent, exist_ok=True)
     prg = prg_builder_for_locus.build_prg()
-    logging.info(f"Write PRG file to {locus_prefix}.prg.fa")
+    print(f"Write PRG file to {locus_prefix}.prg.fa")
     io_utils.write_prg(str(locus_prefix), prg)
 
     with open(f"{locus_prefix}.stats", "w") as stats_filehandler:
