@@ -26,8 +26,6 @@ from abc import ABC, abstractmethod
 
 # TODO: change to spoa or sth else
 class MSAAligner:
-    mafft_exec = "MAFFT_BINARIES=\"/home/leandro/Downloads/unchanged_mafft/mafft-7.475-with-extensions-src/mafft-7.475-with-extensions/binaries\" /home/leandro/Downloads/unchanged_mafft/mafft-7.475-with-extensions-src/mafft-7.475-with-extensions/core/mafft"
-
     @classmethod
     def get_updated_alignment(cls, leaf_name: str, previous_alignment: Path, new_sequences: Path, prefix: Path) -> Path:
         new_msa = prefix / "updated_msa.fa"
@@ -42,7 +40,7 @@ class MSAAligner:
 
         args = " ".join(
             [
-                f"{MSAAligner.mafft_exec}",
+                "mafft",
                 "--auto",
                 "--quiet",
                 "--thread",
