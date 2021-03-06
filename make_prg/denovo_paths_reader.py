@@ -154,19 +154,12 @@ class DenovoPathsDB:
         variants = []
         for _ in range(nb_of_variants):
             line = filehandler.readline().strip()
-            line_split = line.split()
+            line_split = line.split('\t')
 
-            #  if we don't have three words, then we ignore... this will ignore full indel events
-            #  TODO: fix this in the file format by splitting by `\t`
-            have_three_words = len(line_split) == 3
-            if not have_three_words:
-                continue
-
-            variants.append(DenovoVariant(
-                start_index_in_linear_path=int(line_split[0]),
-                ref=line_split[1],
-                alt=line_split[2]
-            ))
+            start_index_in_linear_path = int(line_split[1]) - 1
+            ref = line_split[3]
+            alt = line_split[4]
+            variants.append(DenovoVariant(start_index_in_linear_path=start_index_in_linear_path, ref=ref, alt=alt))
         return variants
 
     def __populate__locus_name_to_denovo_loci(self):

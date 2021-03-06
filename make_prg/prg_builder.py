@@ -1,5 +1,5 @@
 import logging
-from typing import List, Union, Dict, Tuple
+from typing import List, Tuple
 
 from make_prg.from_msa import MSA
 from make_prg.io_utils import load_alignment_file
@@ -19,7 +19,6 @@ import os
 import shlex
 import subprocess
 import time
-from Bio.Seq import Seq
 from Bio import SeqIO
 from abc import ABC, abstractmethod
 
