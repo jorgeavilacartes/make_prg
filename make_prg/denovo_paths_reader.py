@@ -156,9 +156,9 @@ class DenovoPathsDB:
             line = filehandler.readline().strip()
             line_split = line.split('\t')
 
-            start_index_in_linear_path = int(line_split[1]) - 1
-            ref = line_split[3]
-            alt = line_split[4]
+            start_index_in_linear_path = int(line_split[0]) - 1
+            ref = line_split[1]
+            alt = line_split[2]
             variants.append(DenovoVariant(start_index_in_linear_path=start_index_in_linear_path, ref=ref, alt=alt))
         return variants
 
