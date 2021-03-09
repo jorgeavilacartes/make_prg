@@ -40,11 +40,11 @@ class DenovoVariant:
 
         # TODO: move this back to assert
         if not ref_is_consistent:
-            raise RuntimeError("Ref is not consistent."
-                               f"self = {self}"
-                               f"node = {node}"
-                               f"ref_wrt_indexes = {ref_wrt_indexes}"
-                               f"start_index_inside_node_sequence = {start_index_inside_node_sequence}"
+            raise RuntimeError("Ref is not consistent.\n"
+                               f"self = {self}\n"
+                               f"node = {node}\n"
+                               f"ref_wrt_indexes = {ref_wrt_indexes}\n"
+                               f"start_index_inside_node_sequence = {start_index_inside_node_sequence}\n"
                                f"end_index_inside_node_sequence = {end_index_inside_node_sequence}")
         # assert ref_is_consistent, f"Ref is not consistent for {self}. Node = {node}. ref_wrt_indexes = {ref_wrt_indexes}"
 
@@ -79,7 +79,15 @@ class MLPath:
     def get_node_at_index(self, index):
         nodes = self.__ml_path_index[index]
         only_one_node_is_overlapped = len(nodes) == 1
-        assert only_one_node_is_overlapped
+
+        # TODO: change this back to an assert
+        if not only_one_node_is_overlapped:
+            raise RuntimeError("Index overlap two or more nodes in the ML path.\n"
+                               f"self.__ml_path_index.all_intervals = {self.__ml_path_index.all_intervals}\n"
+                               f"index = {index}\n"
+                               f"nodes = {nodes}")
+
+        # assert only_one_node_is_overlapped
         node = list(nodes)[0].data
         return node
 
@@ -110,25 +118,29 @@ class DenovoLocusInfo:
         nodes_with_variant_applied_in_a_single_node = []
         variants_in_two_or_more_nodes = []
         for variant in self.variants:
-            node_of_first_base = self.ml_path.get_node_at_index(variant.start_index_in_linear_path)
-            if not variant.is_insertion_event():
-                node_of_last_base = self.ml_path.get_node_at_index(variant.end_index_in_linear_path-1)
-            else:
-                node_of_last_base = node_of_first_base
-            variant_in_a_single_node = node_of_first_base == node_of_last_base
-            if variant_in_a_single_node:
-                try:
-                    node_with_mutated_variant = MLPathNodeWithVariantApplied(
-                        ml_path_node=node_of_first_base,
-                        variant=variant,
-                        mutated_node_sequence=variant.get_mutated_sequence(node_of_first_base)
-                    )
-                    nodes_with_variant_applied_in_a_single_node.append(node_with_mutated_variant)
-                except RuntimeError as exc:
-                    print("Failed applying variants to node sequence", file=sys.stderr)
-                    print(exc, file=sys.stderr)
-            else:
-                variants_in_two_or_more_nodes.append(variant)
+            try:
+                node_of_first_base = self.ml_path.get_node_at_index(variant.start_index_in_linear_path)
+                if not variant.is_insertion_event():
+                    node_of_last_base = self.ml_path.get_node_at_index(variant.end_index_in_linear_path-1)
+                else:
+                    node_of_last_base = node_of_first_base
+                variant_in_a_single_node = node_of_first_base == node_of_last_base
+                if variant_in_a_single_node:
+                    try:
+                        node_with_mutated_variant = MLPathNodeWithVariantApplied(
+                            ml_path_node=node_of_first_base,
+                            variant=variant,
+                            mutated_node_sequence=variant.get_mutated_sequence(node_of_first_base)
+                        )
+                        nodes_with_variant_applied_in_a_single_node.append(node_with_mutated_variant)
+                    except RuntimeError as exc:
+                        print("Failed applying variants to node sequence", file=sys.stderr)
+                        print(exc, file=sys.stderr)
+                else:
+                    variants_in_two_or_more_nodes.append(variant)
+            except RuntimeError as exc:
+                print("Failed getting node at index", file=sys.stderr)
+                print(exc, file=sys.stderr)
 
         return nodes_with_variant_applied_in_a_single_node, variants_in_two_or_more_nodes
 
