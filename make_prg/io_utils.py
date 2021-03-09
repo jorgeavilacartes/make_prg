@@ -3,11 +3,23 @@ import re
 import gzip
 from pathlib import Path
 import fileinput
-
+from io import StringIO
 from Bio import AlignIO
+from typing import List
+import uuid
 
 from make_prg.from_msa import MSA
 from make_prg.prg_encoder import PrgEncoder, PRG_Ints
+
+
+def load_alignment_file_from_list_of_str(msa_sequences: List[str]):
+    msa = []
+    for index_seq, seq in enumerate(msa_sequences):
+        msa.append(f">Denovo_path_{index_seq}_random_id_{uuid.uuid4()}")
+        msa.append(seq)
+    msa_handler = StringIO("\n".join(msa))
+    alignment = AlignIO.read(msa_handler, format="fasta")
+    return alignment
 
 
 def load_alignment_file(msa_file: str, alignment_format: str) -> MSA:

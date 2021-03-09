@@ -2,7 +2,7 @@ import logging
 from typing import List, Tuple
 
 from make_prg.from_msa import MSA
-from make_prg.io_utils import load_alignment_file
+from make_prg.io_utils import load_alignment_file, load_alignment_file_from_list_of_str
 from make_prg.from_msa.cluster_sequences import kmeans_cluster_seqs_in_interval
 from make_prg.seq_utils import (
     ambiguous_bases,
@@ -13,63 +13,29 @@ from make_prg.seq_utils import (
 from make_prg.from_msa.interval_partition import IntervalPartitioner, Interval, IntervalType
 import pickle
 from pathlib import Path
-import uuid
-import shutil
 import os
 import shlex
-import subprocess
 import time
 from Bio import SeqIO
 from abc import ABC, abstractmethod
 import shelve
+import pyabpoa as pa
 
-
-# TODO: change to spoa or sth else
 class MSAAligner:
+    aligner = pa.msa_aligner(aln_mode='g',
+                             extra_b=-1,  # adaptive banding disabled
+                             is_diploid=0)
+
     @classmethod
-    def get_updated_alignment(cls, leaf_name: str, previous_alignment: Path, new_sequences: Path, prefix: Path) -> Path:
-        new_msa = prefix / "updated_msa.fa"
+    def get_updated_alignment(cls, leaf_name: str, previous_alignment: Path, new_sequences: List[str]) -> List[str]:
         previous_alignment = shlex.quote(str(previous_alignment))
-        new_sequences = new_sequences
-        mafft_tmpdir = Path(prefix / f"temp.mafft.{uuid.uuid4()}")
-        if mafft_tmpdir.exists():
-            shutil.rmtree(mafft_tmpdir)
-        mafft_tmpdir.mkdir()
-        env = os.environ
-        env["TMPDIR"] = str(mafft_tmpdir)
-
-        args = " ".join(
-            [
-                "mafft",
-                "--auto",
-                "--quiet",
-                "--thread",
-                "1",
-                "--add",
-                str(new_sequences),
-                str(previous_alignment),
-                ">",
-                str(new_msa),
-            ]
-        )
-
         start = time.time()
-        process = subprocess.Popen(
-            args, stderr=subprocess.PIPE, encoding="utf-8", shell=True, env=env,
-        )
-        exit_code = process.wait()
-        shutil.rmtree(mafft_tmpdir)
-        if exit_code != 0:
-            raise RuntimeError(
-                f"Failed to execute mafft for {leaf_name} due to the following error:\n"
-                f"{process.stderr.read()}"
-            )
+        msa_result = MSAAligner.aligner.msa(new_sequences, False, True, incr_fn=previous_alignment)
         stop = time.time()
         runtime = stop-start
-        print(f"Finished updating MSA for {leaf_name}")
-        print(f"MAFFT update runtime for {leaf_name} in seconds: {runtime:.3f}")
+        print(f"abPOA update runtime for {leaf_name} in seconds: {runtime:.3f}")
 
-        return new_msa
+        return msa_result.msa_seq
 
 
 class PrgBuilderRecursiveTreeNode(ABC):
@@ -341,20 +307,14 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         previous_msa_filename = temp_prefix / "previous_msa.fa"
         with open(previous_msa_filename, "w") as previous_msa_handler:
             SeqIO.write(self.alignment, previous_msa_handler, "fasta")
-        new_sequences_filename = temp_prefix / "new_sequences.fa"
-        with open(new_sequences_filename, "w") as new_sequences_handler:
-            for index_new_seq, new_seq in enumerate(self.new_sequences):
-                print(f">Denovo_path_{index_new_seq}_random_id_{uuid.uuid4()}", file=new_sequences_handler)
-                print(new_seq, file=new_sequences_handler)
 
         print(f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}...")
         new_msa = MSAAligner.get_updated_alignment(leaf_name=f"{self.prg_builder.locus_name}, node {self.id}",
                                                    previous_alignment=previous_msa_filename,
-                                                   new_sequences=new_sequences_filename,
-                                                   prefix=temp_prefix)
+                                                   new_sequences=list(self.new_sequences))
 
         # update the alignment
-        self.alignment = load_alignment_file(str(new_msa), "fasta")
+        self.alignment = load_alignment_file_from_list_of_str(new_msa)
 
         # update the other fields
         self._set_derived_helper_attributes()
