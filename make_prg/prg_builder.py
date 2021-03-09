@@ -20,8 +20,7 @@ from Bio import SeqIO
 from abc import ABC, abstractmethod
 import shelve
 import pyabpoa as pa
-import dbm
-dbm._defaultmod = dbm.ndbm
+import dbm.dumb
 
 class MSAAligner:
     aligner = pa.msa_aligner(aln_mode='g',
@@ -412,11 +411,13 @@ class PrgBuilderCollection:
         self.prefix = prefix
 
     def __enter__(self):
-        self.locus_name_to_prg_builder = shelve.open(self.prefix + ".update_DS", flag=self.mode)
+        self.db = dbm.dumb.open(self.prefix + ".update_DS", flag=self.mode)
+        self.locus_name_to_prg_builder = shelve.Shelf(self.db)
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.locus_name_to_prg_builder.close()
+        self.db.close()  # not sure this is needed
 
     def populate(self):
         assert self.mode == "c" or self.mode == "w"
