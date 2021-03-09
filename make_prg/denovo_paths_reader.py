@@ -153,7 +153,7 @@ class DenovoPathsDB:
         nb_of_variants = int(line.split()[0])
         variants = []
         for _ in range(nb_of_variants):
-            line = filehandler.readline().strip()
+            line = filehandler.readline()[:-1]
             line_split = line.split('\t')
 
             start_index_in_linear_path = int(line_split[0]) - 1
