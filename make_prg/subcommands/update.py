@@ -62,7 +62,10 @@ def register_parser(subparsers):
 
     return subparser_update_prg
 
-def update(locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_dir):
+def update(locus_name, prg_builder_collection, denovo_paths_db, temp_dir):
+    prg_builder_for_locus = prg_builder_collection.locus_name_to_prg_builder[locus_name]
+    variant_nodes_with_mutation = denovo_paths_db.locus_name_to_variant_nodes_with_mutation.get(locus_name, [])
+
     nb_of_variants_sucessfully_updated = 0
     nb_of_variants_with_failed_update = 0
 
@@ -124,9 +127,8 @@ def run(options):
         # update all PRGs with denovo sequences
         logging.info(f"Using {options.threads} threads to update PRGs...")
         multithreaded_input = []
-        for locus_name, prg_builder_for_locus in prg_builder_collection.locus_name_to_prg_builder.items():  # we do for all PRGs as those that don't have denovo variants will be generated also
-            variant_nodes_with_mutation = denovo_paths_db.locus_name_to_variant_nodes_with_mutation.get(locus_name, [])
-            multithreaded_input.append((locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_path))
+        for locus_name in prg_builder_collection.locus_name_to_prg_builder.keys():  # we do for all PRGs as those that don't have denovo variants will be generated also
+            multithreaded_input.append((locus_name, prg_builder_collection, denovo_paths_db, temp_path))
 
         # avoids multiprocessing Pool deadlocks (see https://pythonspeed.com/articles/python-multiprocessing/)
         multiprocessing.set_start_method("spawn")
