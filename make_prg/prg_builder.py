@@ -21,6 +21,7 @@ import subprocess
 import time
 from Bio import SeqIO
 from abc import ABC, abstractmethod
+import shelve
 
 
 # TODO: change to spoa or sth else
@@ -443,18 +444,20 @@ class PrgBuilderCollection:
     """
     Represent a collection of PrgBuilder and some other info, to be serialised and deserialised
     """
-    def __init__(self, PrgBuilder_pickle_filepaths, build_options):
-        self.locus_name_to_prg_builder = {}
-        for pickle_filepath in PrgBuilder_pickle_filepaths:
+    def __init__(self, PrgBuilder_pickle_filepaths, mode, prefix):
+        self.pickle_filepaths = PrgBuilder_pickle_filepaths
+        self.mode = mode
+        self.prefix = prefix
+
+    def __enter__(self):
+        self.locus_name_to_prg_builder = shelve.open(self.prefix + ".update_DS", flag=self.mode)
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.locus_name_to_prg_builder.close()
+
+    def populate(self):
+        assert self.mode == "c" or self.mode == "w"
+        for pickle_filepath in self.pickle_filepaths:
             prg_builder = PrgBuilder.deserialize(pickle_filepath)
             self.locus_name_to_prg_builder[prg_builder.locus_name] = prg_builder
-        self.build_options = build_options
-
-    def serialize(self):
-        with open(self.build_options.output_prefix + ".pickle", "wb") as output_filehandler:
-            pickle.dump(self, output_filehandler)
-
-    @staticmethod
-    def deserialize(filename):
-        with open(filename, "rb") as filehandler:
-            return pickle.load(filehandler)
