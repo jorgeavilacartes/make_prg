@@ -411,7 +411,7 @@ class PrgBuilderCollection:
         self.prefix = prefix
 
     def __enter__(self):
-        self.db = dbm.dumb.open(self.prefix + ".update_DS", flag=self.mode)
+        self.db = dbm.dumb.open(self.prefix + ".update_DS", flag=self.mode)  # TODO: improve on the usage of dbm.dumb
         self.locus_name_to_prg_builder = shelve.Shelf(self.db)
         return self
 
