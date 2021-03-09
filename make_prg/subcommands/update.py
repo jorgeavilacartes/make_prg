@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import shutil
 import multiprocessing
+import sys
 
 from make_prg import io_utils
 from make_prg.prg_builder import PrgBuilderCollection
@@ -75,7 +76,9 @@ def update(locus_name, variant_nodes_with_mutation, prg_builder_for_locus, temp_
                 prg_builder_tree_node.add_seq_to_batch_update(variant_node_with_mutation.mutated_node_sequence)
                 leaves_to_update.add(prg_builder_tree_node)
                 nb_of_variants_sucessfully_updated += 1
-            except RuntimeError:
+            except RuntimeError as exc:
+                print("Failed finding leaf", file=sys.stderr)
+                print(exc, file=sys.stderr)
                 nb_of_variants_with_failed_update += 1
 
         # update the changed leaves

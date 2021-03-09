@@ -420,7 +420,9 @@ class PrgBuilder(object):
         # TODO: move this back to assert
         interval_is_indexed = interval in self.leaves_index
         if not interval_is_indexed:
-            raise RuntimeError(f"Queried interval {interval} does not exist in leaves index")
+            raise RuntimeError(f"Queried interval {interval} does not exist in leaves index.\n"
+                               f"self.locus_name = {self.locus_name}\n"
+                               f"self.leaves_index.keys() = {self.leaves_index.keys()}")
 
         # assert interval in self.leaves_index, \
         #     f"Fatal error: queried interval {interval} does not exist in leaves index"
