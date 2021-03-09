@@ -135,7 +135,6 @@ def run(options):
 
     # concatenate output PRGs
     logging.info("Concatenating files from several threads into single final files...")
-    # TODO: do this glob optimisation also in from msa
     prg_files = [f"{temp_path}/{locus_name}/{locus_name}.prg.fa" for locus_name in prg_builder_collection.locus_name_to_prg_builder.keys()]
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 

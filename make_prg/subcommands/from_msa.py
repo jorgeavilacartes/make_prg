@@ -1,7 +1,6 @@
 import logging
 import os
 from pathlib import Path
-from glob import glob
 
 from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
 from make_prg import io_utils, prg_builder
@@ -144,18 +143,30 @@ def run(cl_options):
         pool.map(process_MSA, input_files, chunksize=1)
     logging.info(f"All PRGs generated!")
 
+
+    # get all files that were generated
+    prg_files = []
+    pickle_files = []
+    for process_num in range(1, options.threads+1):
+        temp_dir = Path(options.output_prefix + "_tmp") / f"ForkPoolWorker-{process_num}"
+        if temp_dir.exists():
+            for file in temp_dir.iterdir():
+                if file.is_file():
+                    if file.name.endswith(".prg.fa"):
+                        prg_files.append(file)
+                    elif file.name.endswith(".pickle"):
+                        pickle_files.append(file)
+
     # concatenate the prg.fa output files
     logging.info("Concatenating files from several threads into single final files...")
-    temp_path = Path(options.output_prefix + "_tmp")
-    prg_files = glob(str(temp_path)+"/*/*.prg.fa")
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 
     # create and serialise the PRG Builder collection
-    pickle_files = glob(str(temp_path)+"/*/*.pickle")
     prg_builder_collection = prg_builder.PrgBuilderCollection(pickle_files, options)
     prg_builder_collection.serialize()
 
     # remove temp files if needed
+    temp_path = Path(options.output_prefix + "_tmp")
     if not options.keep_temp and temp_path.exists():
         logging.info("Removing temp files...")
         shutil.rmtree(temp_path)
