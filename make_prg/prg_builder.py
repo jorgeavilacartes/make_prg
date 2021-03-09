@@ -20,6 +20,8 @@ from Bio import SeqIO
 from abc import ABC, abstractmethod
 import shelve
 import pyabpoa as pa
+import dbm
+dbm._defaultmod = dbm.ndbm
 
 class MSAAligner:
     aligner = pa.msa_aligner(aln_mode='g',
