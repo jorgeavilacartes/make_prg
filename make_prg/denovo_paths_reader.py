@@ -37,16 +37,7 @@ class DenovoVariant:
 
         ref_wrt_indexes = node.sequence[start_index_inside_node_sequence:end_index_inside_node_sequence]
         ref_is_consistent = self.ref == ref_wrt_indexes
-
-        # TODO: move this back to assert
-        if not ref_is_consistent:
-            raise RuntimeError("Ref is not consistent.\n"
-                               f"self = {self}\n"
-                               f"node = {node}\n"
-                               f"ref_wrt_indexes = {ref_wrt_indexes}\n"
-                               f"start_index_inside_node_sequence = {start_index_inside_node_sequence}\n"
-                               f"end_index_inside_node_sequence = {end_index_inside_node_sequence}")
-        # assert ref_is_consistent, f"Ref is not consistent for {self}. Node = {node}. ref_wrt_indexes = {ref_wrt_indexes}"
+        assert ref_is_consistent, f"Ref is not consistent for {self}. Node = {node}. ref_wrt_indexes = {ref_wrt_indexes}"
 
         mutated_sequence = node.sequence[:start_index_inside_node_sequence] + \
                            self.alt + node.sequence[end_index_inside_node_sequence:]
@@ -121,16 +112,12 @@ class DenovoLocusInfo:
                 node_of_last_base = node_of_first_base
             variant_in_a_single_node = node_of_first_base == node_of_last_base
             if variant_in_a_single_node:
-                try:
-                    node_with_mutated_variant = MLPathNodeWithVariantApplied(
-                        ml_path_node=node_of_first_base,
-                        variant=variant,
-                        mutated_node_sequence=variant.get_mutated_sequence(node_of_first_base)
-                    )
-                    nodes_with_variant_applied_in_a_single_node.append(node_with_mutated_variant)
-                except RuntimeError as exc:
-                    print("Failed applying variants to node sequence", file=sys.stderr)
-                    print(exc, file=sys.stderr)
+                node_with_mutated_variant = MLPathNodeWithVariantApplied(
+                    ml_path_node=node_of_first_base,
+                    variant=variant,
+                    mutated_node_sequence=variant.get_mutated_sequence(node_of_first_base)
+                )
+                nodes_with_variant_applied_in_a_single_node.append(node_with_mutated_variant)
             else:
                 variants_in_two_or_more_nodes.append(variant)
 
