@@ -18,9 +18,8 @@ import shlex
 import time
 from Bio import SeqIO
 from abc import ABC, abstractmethod
-import shelve
 import pyabpoa as pa
-import dbm.dumb
+
 
 class MSAAligner:
     aligner = pa.msa_aligner(aln_mode='g',
@@ -405,22 +404,21 @@ class PrgBuilderCollection:
     """
     Represent a collection of PrgBuilder and some other info, to be serialised and deserialised
     """
-    def __init__(self, PrgBuilder_pickle_filepaths, mode, prefix):
-        self.pickle_filepaths = PrgBuilder_pickle_filepaths
-        self.mode = mode
-        self.prefix = prefix
+    def __init__(self, locus_name_to_pickle_files, cl_options):
+        self.locus_name_to_pickle_files = locus_name_to_pickle_files
+        self.cl_options = cl_options
 
-    def __enter__(self):
-        self.db = dbm.dumb.open(self.prefix + ".update_DS", flag=self.mode)  # TODO: improve on the usage of dbm.dumb
-        self.locus_name_to_prg_builder = shelve.Shelf(self.db)
-        return self
+    def serialize(self):
+        with open(f"{self.cl_options.output_prefix}.update_DS", "wb") as filehandler:
+            pickle.dump(self, filehandler)
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        self.locus_name_to_prg_builder.close()
-        self.db.close()  # not sure this is needed
+    @staticmethod
+    def deserialize(filename):
+        with open(filename, "rb") as filehandler:
+            return pickle.load(filehandler)
 
-    def populate(self):
-        assert self.mode == "c" or self.mode == "w"
-        for pickle_filepath in self.pickle_filepaths:
-            prg_builder = PrgBuilder.deserialize(pickle_filepath)
-            self.locus_name_to_prg_builder[prg_builder.locus_name] = prg_builder
+    def to_absolute_paths(self):
+        output_prefix_parent = Path(self.cl_options.output_prefix).parent.absolute()
+        for locus_name, pickle_file in self.locus_name_to_pickle_files.items():
+            absolute_filepath = output_prefix_parent / pickle_file
+            self.locus_name_to_pickle_files[locus_name] = str(absolute_filepath)

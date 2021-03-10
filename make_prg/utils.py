@@ -4,12 +4,11 @@ import os
 import sys
 
 def output_files_already_exist(output_prefix):
-    return Path(output_prefix + "_tmp").exists() or \
+    return Path(output_prefix + "_prgs").exists() or \
+           Path(output_prefix + "_tmp").exists() or \
            Path(output_prefix + ".prg.fa").exists() or \
-           Path(output_prefix + ".log").exists() or \
-           Path(output_prefix + ".update_DS.bak").exists() or \
-           Path(output_prefix + ".update_DS.dat").exists() or \
-           Path(output_prefix + ".update_DS.dir").exists()
+           Path(output_prefix + ".update_DS").exists()
+
 
 formatter = logging.Formatter(
     fmt="%(levelname)s %(asctime)s %(message)s", datefmt="%d/%m/%Y %I:%M:%S"

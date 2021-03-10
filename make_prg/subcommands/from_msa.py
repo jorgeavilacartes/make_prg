@@ -5,7 +5,6 @@ from pathlib import Path
 from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
 from make_prg import io_utils, prg_builder
 import multiprocessing
-import shutil
 
 from make_prg.utils import output_files_already_exist, setup_stderr_logging
 
@@ -76,12 +75,6 @@ def register_parser(subparsers):
             "match. Default: {}".format(MIN_MATCH_LEN)
         ),
     )
-    subparser_msa.add_argument(
-        "--keep_temp",
-        action="store_true",
-        default=False,
-        help="Keep temp files."
-    )
     subparser_msa.set_defaults(func=run)
 
     return subparser_msa
@@ -99,9 +92,9 @@ def process_MSA(msa_filepath: Path):
     locus_name = msa_filepath.with_suffix("").name
     current_process = multiprocessing.current_process()
 
-    temp_dir = Path(options.output_prefix + "_tmp") / current_process.name
-    os.makedirs(temp_dir, exist_ok=True)
-    prefix = str(temp_dir / msa_name)
+    workdir = Path(options.output_prefix + "_prgs") / current_process.name
+    os.makedirs(workdir, exist_ok=True)
+    prefix = str(workdir / msa_name)
 
     # Set up file logging
     # logging_handler = setup_file_logging(prefix)
@@ -145,29 +138,25 @@ def run(cl_options):
 
     # get all files that were generated
     prg_files = []
-    pickle_files = []
+    locus_name_to_pickle_files = {}
     for process_num in range(1, options.threads+1):
-        temp_dir = Path(options.output_prefix + "_tmp") / f"ForkPoolWorker-{process_num}"
-        if temp_dir.exists():
-            for file in temp_dir.iterdir():
+        workdir = Path(options.output_prefix + "_prgs") / f"ForkPoolWorker-{process_num}"
+        if workdir.exists():
+            for file in workdir.iterdir():
                 if file.is_file():
                     if file.name.endswith(".prg.fa"):
                         prg_files.append(file)
                     elif file.name.endswith(".pickle"):
-                        pickle_files.append(file)
+                        locus_name = file.with_suffix("").with_suffix("").name
+                        relative_path = file.relative_to(Path(options.output_prefix).parent)
+                        locus_name_to_pickle_files[locus_name] = str(relative_path)
 
     # concatenate the prg.fa output files
     logging.info("Concatenating files from several threads into single final files...")
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 
     # create and serialise the PRG Builder collection
-    with prg_builder.PrgBuilderCollection(pickle_files, mode="c", prefix=cl_options.output_prefix) as prg_builder_collection:
-        prg_builder_collection.populate()
-
-    # remove temp files if needed
-    temp_path = Path(options.output_prefix + "_tmp")
-    if not options.keep_temp and temp_path.exists():
-        logging.info("Removing temp files...")
-        shutil.rmtree(temp_path)
+    prg_builder_collection = prg_builder.PrgBuilderCollection(locus_name_to_pickle_files, cl_options)
+    prg_builder_collection.serialize()
 
     logging.info("All done!")

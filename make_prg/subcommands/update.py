@@ -6,7 +6,7 @@ import multiprocessing
 import sys
 
 from make_prg import io_utils
-from make_prg.prg_builder import PrgBuilderCollection
+from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder
 from make_prg.utils import output_files_already_exist, setup_stderr_logging
 from make_prg.denovo_paths_reader import DenovoPathsDB
 
@@ -62,10 +62,9 @@ def register_parser(subparsers):
 
     return subparser_update_prg
 
-def update(locus_name, prg_builder_collection, denovo_paths_db, temp_dir):
-    prg_builder_for_locus = prg_builder_collection.locus_name_to_prg_builder[locus_name]
-    variant_nodes_with_mutation = denovo_paths_db.locus_name_to_variant_nodes_with_mutation.get(locus_name, [])
 
+def update(locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation, temp_dir):
+    prg_builder_for_locus = PrgBuilder.deserialize(prg_builder_pickle_filepath)
     nb_of_variants_sucessfully_updated = 0
     nb_of_variants_with_failed_update = 0
 
@@ -115,39 +114,41 @@ def run(options):
     setup_stderr_logging()
 
     logging.info(f"Reading update data structures...")
-    with PrgBuilderCollection(None, mode="r", prefix=options.input_prefix) as prg_builder_collection:
-        logging.info(f"Reading {options.denovo_paths}...")
-        denovo_paths_db = DenovoPathsDB(options.denovo_paths)
+    prg_builder_collection = PrgBuilderCollection.deserialize(f"{options.input_prefix}.update_DS")
+    prg_builder_collection.to_absolute_paths()
+    logging.info(f"Reading {options.denovo_paths}...")
+    denovo_paths_db = DenovoPathsDB(options.denovo_paths)
 
-        output_dir = Path(options.output_prefix).parent
-        os.makedirs(output_dir, exist_ok=True)
-        temp_path = Path(options.output_prefix+"_tmp")
-        os.makedirs(temp_path, exist_ok=True)
+    output_dir = Path(options.output_prefix).parent
+    os.makedirs(output_dir, exist_ok=True)
+    temp_path = Path(options.output_prefix+"_tmp")
+    os.makedirs(temp_path, exist_ok=True)
 
-        # update all PRGs with denovo sequences
-        logging.info(f"Using {options.threads} threads to update PRGs...")
-        multithreaded_input = []
-        for locus_name in prg_builder_collection.locus_name_to_prg_builder.keys():  # we do for all PRGs as those that don't have denovo variants will be generated also
-            multithreaded_input.append((locus_name, prg_builder_collection, denovo_paths_db, temp_path))
+    # update all PRGs with denovo sequences
+    logging.info(f"Using {options.threads} threads to update PRGs...")
+    multithreaded_input = []
+    for locus_name, prg_builder_pickle_filepath in prg_builder_collection.locus_name_to_pickle_files.items():  # we do for all PRGs as those that don't have denovo variants will be generated also
+        variant_nodes_with_mutation = denovo_paths_db.locus_name_to_variant_nodes_with_mutation.get(locus_name, [])
+        multithreaded_input.append((locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation, temp_path))
 
-        # avoids multiprocessing Pool deadlocks (see https://pythonspeed.com/articles/python-multiprocessing/)
-        multiprocessing.set_start_method("spawn")
-        with multiprocessing.Pool(options.threads) as pool:
-            pool.starmap(update, multithreaded_input, chunksize=1)
-        logging.info(f"All PRGs updated!")
+    # avoids multiprocessing Pool deadlocks (see https://pythonspeed.com/articles/python-multiprocessing/)
+    multiprocessing.set_start_method("spawn")
+    with multiprocessing.Pool(options.threads) as pool:
+        pool.starmap(update, multithreaded_input, chunksize=1)
+    logging.info(f"All PRGs updated!")
 
-        # concatenate output PRGs
-        logging.info("Concatenating files from several threads into single final files...")
-        prg_files = [f"{temp_path}/{locus_name}/{locus_name}.prg.fa" for locus_name in prg_builder_collection.locus_name_to_prg_builder.keys()]
-        io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
+    # concatenate output PRGs
+    logging.info("Concatenating files from several threads into single final files...")
+    prg_files = [f"{temp_path}/{locus_name}/{locus_name}.prg.fa" for locus_name in prg_builder_collection.locus_name_to_pickle_files.keys()]
+    io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 
-        stats_files = [f"{temp_path}/{locus_name}/{locus_name}.stats" for locus_name in
-                     prg_builder_collection.locus_name_to_prg_builder.keys()]
-        io_utils.concatenate_text_files(stats_files, options.output_prefix + ".stats")
+    stats_files = [f"{temp_path}/{locus_name}/{locus_name}.stats" for locus_name in
+                 prg_builder_collection.locus_name_to_pickle_files.keys()]
+    io_utils.concatenate_text_files(stats_files, options.output_prefix + ".stats")
 
-        # remove temp files if needed
-        if not options.keep_temp and temp_path.exists():
-            logging.info("Removing temp files...")
-            shutil.rmtree(temp_path)
+    # remove temp files if needed
+    if not options.keep_temp and temp_path.exists():
+        logging.info("Removing temp files...")
+        shutil.rmtree(temp_path)
 
-        logging.info("All done!")
+    logging.info("All done!")
