@@ -22,6 +22,10 @@ import pyabpoa as pa
 import uuid
 import shutil
 import subprocess
+import copy
+import numpy as np
+from Bio.Seq import Seq
+
 
 class MSAAligner(ABC):
     @classmethod
@@ -114,10 +118,11 @@ class PrgBuilderRecursiveTreeNode(ABC):
         # set the basic attributes
         self.id = prg_builder.get_next_node_id()
         self.nesting_level = nesting_level
-        self.alignment = self.remove_gaps(alignment)
         self.parent = parent
         self.prg_builder = prg_builder
         self.new_sequences = None
+
+        self.alignment = self.remove_gaps(alignment)
 
         self._set_derived_helper_attributes()
 
@@ -126,24 +131,29 @@ class PrgBuilderRecursiveTreeNode(ABC):
 
     def remove_gaps(self, alignment):
         """
-        Return a gapless alignment
+        Return a gapless alignment. This code is long and a bit convoluted because it is optimised (it was too slow if
+        done in the most intuitive way).
         """
-        gapless_alignment = None
+        alignment_as_array = np.array([list(rec) for rec in alignment], str, order="F")
+        gapless_sequences = [[] for _ in range(len(alignment))]
         for column_index in range(alignment.get_alignment_length()):
-            column_bases = alignment[:, column_index]
+            column_bases = alignment_as_array[:, column_index]
             column_bases_deduplicated = list(set(column_bases))
             just_gaps = column_bases_deduplicated == ["-"]
             if not just_gaps:
-                subaligment_with_this_column = alignment[:, column_index:column_index+1]
-                first_alignment_to_be_added = gapless_alignment is None
-                if first_alignment_to_be_added:
-                    gapless_alignment = subaligment_with_this_column
-                else:
-                    gapless_alignment = gapless_alignment + subaligment_with_this_column
+                for gapless_sequence, base in zip(gapless_sequences, column_bases):
+                    gapless_sequence.append(base)
 
-        alignment_is_composed_only_of_gaps = gapless_alignment is None
-        if alignment_is_composed_only_of_gaps:
-            gapless_alignment = MSA([])
+        gapless_records = []
+        for gapless_sequence, previous_record in zip(gapless_sequences, alignment):
+            new_record = copy.deepcopy(previous_record)
+            new_record.seq = Seq("".join(gapless_sequence))
+            gapless_records.append(new_record)
+
+        gapless_alignment = MSA(gapless_records)
+
+        if gapless_alignment.get_alignment_length() == 0:
+            print(f"Alignment composed only of gaps: {self.prg_builder.msa_file}")
 
         return gapless_alignment
 
