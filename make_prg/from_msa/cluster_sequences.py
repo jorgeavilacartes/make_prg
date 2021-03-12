@@ -141,19 +141,14 @@ def merge_clusters(clusters: List[ClusteredIDs], first_id: str) -> ClusteredIDs:
 
 
 def kmeans_cluster_seqs_in_interval(
-    interval: List[int], alignment: MSA, kmer_size: int,
+    alignment: MSA, kmer_size: int,
 ) -> ClusteredIDs:
-    """Divide sequences in interval into subgroups of similar sequences."""
-    interval_alignment = alignment[:, interval[0] : interval[1] + 1]
-
-    logging.debug("Get kmeans partition of interval [%d, %d]", interval[0], interval[1])
-
     # Find unique sequences for clustering, but keep each sequence's IDs
     seq_to_ids: SeqToIDs = defaultdict(list)
     seq_to_gapped_seqs: SeqToSeqs = defaultdict(list)
     small_seq_to_ids: SeqToIDs = defaultdict(list)
 
-    for record in interval_alignment:
+    for record in alignment:
         seq_with_gaps = str(record.seq)
         seq = ungap(seq_with_gaps)
         if len(seq) >= kmer_size:
@@ -190,10 +185,10 @@ def kmeans_cluster_seqs_in_interval(
     if num_sequences > 0:
         id_clustering: ClusteredIDs = extract_clusters(seq_to_ids, cluster_assignment)
 
-    first_id = interval_alignment[0].id
+    first_id = alignment[0].id
     result = merge_clusters([id_clustering, small_seq_to_ids.values()], first_id)
 
-    assert len(interval_alignment) == sum(
+    assert len(alignment) == sum(
         [len(i) for i in result]
     ), "Each input sequence should be in a cluster"
     return result

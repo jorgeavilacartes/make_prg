@@ -109,14 +109,12 @@ class PrgBuilderRecursiveTreeNode(ABC):
     def __init__(self,
                  nesting_level,
                  alignment,
-                 interval,
                  parent,
                  prg_builder):
         # set the basic attributes
         self.id = prg_builder.get_next_node_id()
         self.nesting_level = nesting_level
-        self.alignment = alignment
-        self.interval = interval
+        self.alignment = self.remove_gaps(alignment)
         self.parent = parent
         self.prg_builder = prg_builder
         self.new_sequences = None
@@ -125,6 +123,30 @@ class PrgBuilderRecursiveTreeNode(ABC):
 
         # generate recursion tree
         self._children = self._get_children()
+
+    def remove_gaps(self, alignment):
+        """
+        Return a gapless alignment
+        """
+        gapless_alignment = None
+        for column_index in range(alignment.get_alignment_length()):
+            column_bases = alignment[:, column_index]
+            column_bases_deduplicated = list(set(column_bases))
+            just_gaps = column_bases_deduplicated == ["-"]
+            if not just_gaps:
+                subaligment_with_this_column = alignment[:, column_index:column_index+1]
+                first_alignment_to_be_added = gapless_alignment is None
+                if first_alignment_to_be_added:
+                    gapless_alignment = subaligment_with_this_column
+                else:
+                    gapless_alignment = gapless_alignment + subaligment_with_this_column
+
+        alignment_is_not_composed_only_of_gaps = gapless_alignment is not None
+        assert alignment_is_not_composed_only_of_gaps
+
+        return gapless_alignment
+
+
 
     @abstractmethod
     def _set_derived_helper_attributes(self):
@@ -147,13 +169,11 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
     def __init__(self,
                  nesting_level,
                  alignment,
-                 interval,
                  parent,
                  prg_builder):
         super().__init__(
             nesting_level,
             alignment,
-            interval,
             parent,
             prg_builder
         )
@@ -169,7 +189,6 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
             child = PrgBuilderSingleClusterNode(
                 nesting_level=self.nesting_level,
                 alignment=alignment,
-                interval=self.interval,
                 parent=self,
                 prg_builder=self.prg_builder
             )
@@ -193,7 +212,6 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
     #  Clustering methods
     def _get_subalignments_by_clustering(self):
         id_lists = kmeans_cluster_seqs_in_interval(
-            [self.interval.start, self.interval.stop],
             self.alignment,
             self.prg_builder.min_match_length,
         )
@@ -205,8 +223,6 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
     ):
         list_records = [record for record in self.alignment if record.id in id_list]
         sub_alignment = MSA(list_records)
-        if self.interval is not None:
-            sub_alignment = sub_alignment[:, self.interval.start : self.interval.stop + 1]
         return sub_alignment
     #####################################################################################################
 
@@ -218,13 +234,11 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
     def __init__(self,
                  nesting_level,
                  alignment,
-                 interval,
                  parent,
                  prg_builder):
         super().__init__(
             nesting_level,
             alignment,
-            interval,
             parent,
             prg_builder
         )
@@ -244,35 +258,30 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         # stop conditions
         single_match_interval = (len(self.all_intervals) == 1) and (self.all_intervals[0] in self.match_intervals)
         max_nesting_level_reached = self.nesting_level == self.prg_builder.max_nesting
-        small_variant_site = self.interval.stop - self.interval.start <= self.prg_builder.min_match_length
+        small_variant_site = self.alignment.get_alignment_length() < self.prg_builder.min_match_length
         if single_match_interval or max_nesting_level_reached or small_variant_site:
             return list()
 
         children = []
         for interval in self.all_intervals:
+            sub_alignment = self.alignment[:, interval.start: interval.stop + 1]
+
             if interval in self.match_intervals:
                 # all seqs are not necessarily exactly the same: some can have 'N'
                 # thus still process all of them, to get the one with no 'N'.
-                sub_alignment = self.alignment[:, interval.start : interval.stop + 1]
                 seqs = get_interval_seqs(sub_alignment)
                 assert len(seqs) == 1, "Got >1 filtered sequences in match interval"
-                child = PrgBuilderSingleClusterNode(
-                    nesting_level=self.nesting_level + 1,
-                    alignment=sub_alignment,
-                    interval=interval,
-                    parent=self,
-                    prg_builder=self.prg_builder
-                )
-                children.append(child)
+                subclass = PrgBuilderSingleClusterNode
             else:
-                child = PrgBuilderMultiClusterNode(
-                    nesting_level=self.nesting_level + 1,
-                    alignment=self.alignment,
-                    interval=interval,
-                    parent=self,
-                    prg_builder=self.prg_builder
-                )
-                children.append(child)
+                subclass = PrgBuilderMultiClusterNode
+
+            child = subclass(
+                nesting_level=self.nesting_level + 1,
+                alignment=sub_alignment,
+                parent=self,
+                prg_builder=self.prg_builder
+            )
+            children.append(child)
 
         return children
 
@@ -416,10 +425,8 @@ class PrgBuilder(object):
         self.node_id = 0
 
         alignment = load_alignment_file(msa_file, alignment_format)
-        root_interval = Interval(IntervalType.Root, 0, alignment.get_alignment_length() - 1)
         self._root = PrgBuilderSingleClusterNode(nesting_level=1,
                                                  alignment=alignment,
-                                                 interval=root_interval,
                                                  parent=None,
                                                  prg_builder=self)
 
