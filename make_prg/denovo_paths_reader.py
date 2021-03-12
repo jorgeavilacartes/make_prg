@@ -119,6 +119,16 @@ class DenovoLocusInfo:
                 )
                 nodes_with_variant_applied_in_a_single_node.append(node_with_mutated_variant)
             else:
+                # TODO: do a split into the n nodes and update the n nodes
+                '''
+                Out of 22953 variants spanning multiple nodes, 15980 (~70%) is composed of only two bases in ref spanning
+                two nodes. We know exactly how to split this (first base to first node, second base to second node), so
+                we can easily recover back ~16k variants. We could actually do this strategy for all variants. If they
+                span n nodes, we just split the bases into the n nodes and update each of them. In the worst case, if we
+                make the wrong split, a bad path will be added, but then we won't genotype towards it. We can add bad paths
+                to the PRG in denovo, when pandora genotypes the samples it will see if they make sense or not
+                Better: weighted split, weight depends on the length of ML sequence for each node
+                '''
                 variants_in_two_or_more_nodes.append(variant)
 
         return nodes_with_variant_applied_in_a_single_node, variants_in_two_or_more_nodes

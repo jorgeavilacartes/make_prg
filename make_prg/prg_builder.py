@@ -178,7 +178,6 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
 
     ##################################################################################
     # traversal methods
-    # TODO memoize this?
     def preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
         site_num = self.prg_builder.get_next_site_num()
         prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
@@ -295,7 +294,6 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
 
     ##################################################################################
     # traversal methods
-    # TODO memoize this?
     def preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
         is_leaf_node = len(self._children) == 0
         if is_leaf_node:
@@ -319,7 +317,6 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
             if (
                 len(ambiguous_bases.intersection(column)) > 0
                 or len(column) != 1
-                or column == {"-"}
             ):
                 consensus_string += NONMATCH
             else:
