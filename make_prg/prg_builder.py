@@ -141,8 +141,9 @@ class PrgBuilderRecursiveTreeNode(ABC):
                 else:
                     gapless_alignment = gapless_alignment + subaligment_with_this_column
 
-        alignment_is_not_composed_only_of_gaps = gapless_alignment is not None
-        assert alignment_is_not_composed_only_of_gaps
+        alignment_is_composed_only_of_gaps = gapless_alignment is None
+        if alignment_is_composed_only_of_gaps:
+            gapless_alignment = MSA([])
 
         return gapless_alignment
 
