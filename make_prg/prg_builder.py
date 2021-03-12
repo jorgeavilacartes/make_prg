@@ -151,13 +151,7 @@ class PrgBuilderRecursiveTreeNode(ABC):
             gapless_records.append(new_record)
 
         gapless_alignment = MSA(gapless_records)
-
-        if gapless_alignment.get_alignment_length() == 0:
-            print(f"Alignment composed only of gaps: {self.prg_builder.msa_file}")
-
         return gapless_alignment
-
-
 
     @abstractmethod
     def _set_derived_helper_attributes(self):

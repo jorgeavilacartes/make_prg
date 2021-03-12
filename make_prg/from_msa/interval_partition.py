@@ -87,8 +87,10 @@ class IntervalPartitioner:
             it_type = IntervalType.Match
             if any(map(is_non_match, consensus_string)):
                 it_type = IntervalType.NonMatch
-            self._append(Interval(it_type, 0, len(consensus_string) - 1))
 
+            consensus_string_is_empty = len(consensus_string) == 0  # happens when the alignment is just gaps
+            if not consensus_string_is_empty:
+                self._append(Interval(it_type, 0, len(consensus_string) - 1))
         else:
             cur_interval = self._new_interval(consensus_string[0], 0)
 
