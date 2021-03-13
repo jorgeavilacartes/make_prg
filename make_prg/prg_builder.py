@@ -129,13 +129,17 @@ class PrgBuilderRecursiveTreeNode(ABC):
         # generate recursion tree
         self._children = self._get_children()
 
-    def remove_gaps(self, alignment):
-        """
-        Return a gapless alignment. This code is long and a bit convoluted because it is optimised (it was too slow if
-        done in the most intuitive way).
-        """
+    def __get_unique_sequences_after_removing_all_gaps(self, alignment):
+        unique_gapless_sequences = set()
+        for record in alignment:
+            gapless_sequence = str(record.seq).replace("-", "")
+            unique_gapless_sequences.add(gapless_sequence)
+        return list(unique_gapless_sequences)
+
+    def __get_sequences_without_columns_full_of_gaps(self, alignment):
         alignment_as_array = np.array([list(rec) for rec in alignment], str, order="F")
         gapless_sequences = [[] for _ in range(len(alignment))]
+
         for column_index in range(alignment.get_alignment_length()):
             column_bases = alignment_as_array[:, column_index]
             column_bases_deduplicated = list(set(column_bases))
@@ -144,10 +148,24 @@ class PrgBuilderRecursiveTreeNode(ABC):
                 for gapless_sequence, base in zip(gapless_sequences, column_bases):
                     gapless_sequence.append(base)
 
+        return ["".join(gapless_sequence) for gapless_sequence in gapless_sequences]
+
+    def remove_gaps(self, alignment):
+        """
+        Return a gapless alignment. This code is long and a bit convoluted because it is optimised (it was too slow if
+        done in the most intuitive way).
+        """
+        unique_sequences = self.__get_unique_sequences_after_removing_all_gaps(alignment)
+        all_sequences_are_the_same = len(unique_sequences) == 1
+        if all_sequences_are_the_same:
+            gapless_sequences = unique_sequences * len(alignment)
+        else:
+            gapless_sequences = self.__get_sequences_without_columns_full_of_gaps(alignment)
+
         gapless_records = []
         for gapless_sequence, previous_record in zip(gapless_sequences, alignment):
             new_record = copy.deepcopy(previous_record)
-            new_record.seq = Seq("".join(gapless_sequence))
+            new_record.seq = Seq(gapless_sequence)
             gapless_records.append(new_record)
 
         gapless_alignment = MSA(gapless_records)
