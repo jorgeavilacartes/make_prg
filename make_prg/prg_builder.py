@@ -26,6 +26,10 @@ import copy
 import numpy as np
 from Bio.Seq import Seq
 
+MATCH_SCORE = 2
+MISMATCH_SCORE = -1
+GAP_OPEN_SCORE = -4
+GAP_EXTEND_SCORE = -2
 
 class MSAAligner(ABC):
     @classmethod

@@ -1,10 +1,11 @@
 from typing import List, Tuple
-from collections import defaultdict
+from collections import defaultdict, deque
 import re
 from intervaltree.intervaltree import IntervalTree
 import logging
 import sys
-import types
+from Bio import pairwise2
+from prg_builder import *
 
 
 class MLPathNode:
@@ -42,6 +43,49 @@ class DenovoVariant:
         mutated_sequence = node.sequence[:start_index_inside_node_sequence] + \
                            self.alt + node.sequence[end_index_inside_node_sequence:]
         return mutated_sequence
+
+    def split_variant(self, ml_path_nodes: List[MLPathNode], ml_path_nodes_to_nb_of_bases) -> List["DenovoVariant"]:
+        """
+        Split this variant into a list of variants WRT to how it is distributed along the ML path
+        """
+        # 1. align ref to alt
+        alignment = pairwise2.align.globalms(self.ref, self.alt,
+                                             MATCH_SCORE, MISMATCH_SCORE, GAP_OPEN_SCORE, GAP_EXTEND_SCORE)
+
+        alignment_is_unique = len(alignment) == 1
+        assert alignment_is_unique
+        alignment = alignment[0]
+
+        ref_alignment = deque(alignment.seqA)
+        alt_alignment = deque(alignment.seqB)
+
+        # 2. split variants at the boundaries of the alignments
+        split_variants = []
+        current_index_in_linear_path = self.start_index_in_linear_path
+        for ml_path_node in ml_path_nodes:
+            sub_ref = []
+            sub_alt = []
+            assert ml_path_node in ml_path_nodes_to_nb_of_bases
+            nb_of_bases_to_consume = ml_path_nodes_to_nb_of_bases[ml_path_node]
+            current_start_in_linear_path = current_index_in_linear_path
+
+            while nb_of_bases_to_consume > 0:
+                ref_base = ref_alignment.popleft()
+                if ref_base != "-":
+                    sub_ref.append(ref_base)
+                    current_index_in_linear_path += 1
+                    nb_of_bases_to_consume -= 1
+
+                alt_base = alt_alignment.popleft()
+                if alt_base != "-":
+                    sub_alt.append(alt_base)
+
+            split_variant = DenovoVariant(current_start_in_linear_path,
+                                          "".join(sub_ref),
+                                          "".join(sub_alt))
+            split_variants.append(split_variant)
+
+        return split_variants
 
     def is_insertion_event(self):
         return len(self.ref) == 0
@@ -95,43 +139,53 @@ class DenovoLocusInfo:
         self.ml_path = ml_path
         self.variants = variants
 
-    def get_nodes_with_variant_applied(self) -> Tuple[List[MLPathNodeWithVariantApplied], List[DenovoVariant]]:
+    def get_nodes_with_variant_applied(self) -> List[MLPathNodeWithVariantApplied]:
         """
         Get ML path nodes with the variants applied.
-        @return: a pair. First element is all nodes with variant applied when ref goes through a single node.
-        If ref goes through two or more nodes, we add the variant to the list returned in the last element,
-        and ignore it for now
+        @return: all nodes with variant applied
         """
-        nodes_with_variant_applied_in_a_single_node = []
-        variants_in_two_or_more_nodes = []
+        nodes_with_variant_applied = []
         for variant in self.variants:
-            node_of_first_base = self.ml_path.get_node_at_index(variant.start_index_in_linear_path)
-            if not variant.is_insertion_event():
-                node_of_last_base = self.ml_path.get_node_at_index(variant.end_index_in_linear_path-1)
+            if variant.is_insertion_event():
+                # interval is empty
+                ml_path_node = self.ml_path.get_node_at_index(variant.start_index_in_linear_path)
+                ml_path_nodes = [ml_path_node]
+                ml_path_nodes_to_nb_of_bases = {ml_path_node: 1}
             else:
-                node_of_last_base = node_of_first_base
-            variant_in_a_single_node = node_of_first_base == node_of_last_base
-            if variant_in_a_single_node:
-                node_with_mutated_variant = MLPathNodeWithVariantApplied(
-                    ml_path_node=node_of_first_base,
-                    variant=variant,
-                    mutated_node_sequence=variant.get_mutated_sequence(node_of_first_base)
-                )
-                nodes_with_variant_applied_in_a_single_node.append(node_with_mutated_variant)
-            else:
-                # TODO: do a split into the n nodes and update the n nodes
-                '''
-                Out of 22953 variants spanning multiple nodes, 15980 (~70%) is composed of only two bases in ref spanning
-                two nodes. We know exactly how to split this (first base to first node, second base to second node), so
-                we can easily recover back ~16k variants. We could actually do this strategy for all variants. If they
-                span n nodes, we just split the bases into the n nodes and update each of them. In the worst case, if we
-                make the wrong split, a bad path will be added, but then we won't genotype towards it. We can add bad paths
-                to the PRG in denovo, when pandora genotypes the samples it will see if they make sense or not
-                Better: weighted split, weight depends on the length of ML sequence for each node
-                '''
-                variants_in_two_or_more_nodes.append(variant)
+                # we have a real interval
+                ml_path_nodes = []
+                ml_path_nodes_to_nb_of_bases = defaultdict(int)
+                for index_in_linear_path in range(variant.start_index_in_linear_path, variant.end_index_in_linear_path):
+                    ml_path_node = self.ml_path.get_node_at_index(index_in_linear_path)
+                    if ml_path_node not in ml_path_nodes:
+                        ml_path_nodes.append(ml_path_node)
+                    ml_path_nodes_to_nb_of_bases[ml_path_node] += 1
 
-        return nodes_with_variant_applied_in_a_single_node, variants_in_two_or_more_nodes
+            assert len(ml_path_nodes) > 0
+            variant_goes_through_several_leaves = len(ml_path_nodes) > 1
+            if variant_goes_through_several_leaves:
+                print(f"Variant goes through several leaves:", file=sys.stderr)
+                print(f"self.sample: {self.sample}", file=sys.stderr)
+                print(f"self.locus: {self.locus}", file=sys.stderr)
+                print(f"variant: {variant}", file=sys.stderr)
+                print(f"ml_path_nodes: {ml_path_nodes}", file=sys.stderr)
+                print(f"ml_path_nodes_to_nb_of_bases: {ml_path_nodes_to_nb_of_bases}", file=sys.stderr)
+                split_variants = variant.split_variant(ml_path_nodes, ml_path_nodes_to_nb_of_bases)
+                print(f"split_variants: {split_variants}", file=sys.stderr)
+            else:
+                split_variants = [variant]
+
+            assert len(split_variants) == len(ml_path_nodes)
+
+            for split_variant, ml_path_node in zip(split_variants, ml_path_nodes):
+                node_with_mutated_variant = MLPathNodeWithVariantApplied(
+                    ml_path_node=ml_path_node,
+                    variant=split_variant,
+                    mutated_node_sequence=split_variant.get_mutated_sequence(ml_path_node)
+                )
+                nodes_with_variant_applied.append(node_with_mutated_variant)
+
+        return nodes_with_variant_applied
 
 
 class DenovoPathsDB:
@@ -203,21 +257,10 @@ class DenovoPathsDB:
 
     def __populate__locus_name_to_variant_nodes_with_mutation(self):
         self.__locus_name_to_variant_nodes_with_mutation = defaultdict(list)
-        number_of_valid_variants = 0
-        self.__ignored_variants_due_to_spanning_multiple_nodes = []
         for locus_name, denovo_loci in self.__locus_name_to_denovo_loci.items():
             for denovo_locus in denovo_loci:
-                nodes_with_variant_applied_in_a_single_node, variants_in_two_or_more_nodes = \
-                        denovo_locus.get_nodes_with_variant_applied()
-                self.__locus_name_to_variant_nodes_with_mutation[locus_name].extend(
-                    nodes_with_variant_applied_in_a_single_node)
-                number_of_valid_variants += len(nodes_with_variant_applied_in_a_single_node)
-                self.__ignored_variants_due_to_spanning_multiple_nodes.extend(variants_in_two_or_more_nodes)
-        logging.warning(f"Number of valid variants (spanning a single node): {number_of_valid_variants}")
-        logging.warning(f"Number of variants ignored due to spanning multiple nodes: "
-                     f"{len(self.__ignored_variants_due_to_spanning_multiple_nodes)}")
-        ignored_variants_as_str = "\n".join([str(x) for x in self.__ignored_variants_due_to_spanning_multiple_nodes])
-        logging.warning(f"Variants spanning multiple nodes: {ignored_variants_as_str}")
+                nodes_with_variant_applied = denovo_locus.get_nodes_with_variant_applied()
+                self.__locus_name_to_variant_nodes_with_mutation[locus_name].extend(nodes_with_variant_applied)
 
     @property
     def locus_name_to_variant_nodes_with_mutation(self):
