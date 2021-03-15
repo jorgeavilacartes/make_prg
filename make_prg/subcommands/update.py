@@ -6,7 +6,7 @@ import multiprocessing
 import sys
 
 from make_prg import io_utils
-from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder
+from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
 from make_prg.utils import output_files_already_exist, setup_stderr_logging
 from make_prg.denovo_paths_reader import DenovoPathsDB
 
@@ -62,6 +62,18 @@ def register_parser(subparsers):
 
     return subparser_update_prg
 
+def get_stats_on_variants(stats_files):
+    nb_of_variants_successfully_applied = 0
+    nb_of_variants_that_failed_to_be_applied = 0
+    for stat_file in stats_files:
+        with open(stat_file) as stat_file_fh:
+            line_split = stat_file_fh.readline().strip().split()
+            nb_of_variants_successfully_applied_for_this_locus = int(line_split[1])
+            nb_of_variants_successfully_applied += nb_of_variants_successfully_applied_for_this_locus
+            nb_of_variants_that_failed_to_be_applied_for_this_locus = int(line_split[2])
+            nb_of_variants_that_failed_to_be_applied += nb_of_variants_that_failed_to_be_applied_for_this_locus
+    return nb_of_variants_successfully_applied, nb_of_variants_that_failed_to_be_applied
+
 
 def update(locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation, temp_dir):
     prg_builder_for_locus = PrgBuilder.deserialize(prg_builder_pickle_filepath)
@@ -79,9 +91,8 @@ def update(locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation,
                 prg_builder_tree_node.add_seq_to_batch_update(variant_node_with_mutation.mutated_node_sequence)
                 leaves_to_update.add(prg_builder_tree_node)
                 nb_of_variants_sucessfully_updated += 1
-            except RuntimeError as exc:
-                print("Failed finding leaf", file=sys.stderr)
-                print(exc, file=sys.stderr)
+            except LeafNotFoundException as exc:
+                print(f"Failed finding leaf: {exc}", file=sys.stderr)
                 nb_of_variants_with_failed_update += 1
 
         # update the changed leaves
@@ -142,9 +153,13 @@ def run(options):
     prg_files = [f"{temp_path}/{locus_name}/{locus_name}.prg.fa" for locus_name in prg_builder_collection.locus_name_to_pickle_files.keys()]
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 
+    # sum up stats files and output stats
     stats_files = [f"{temp_path}/{locus_name}/{locus_name}.stats" for locus_name in
                  prg_builder_collection.locus_name_to_pickle_files.keys()]
-    io_utils.concatenate_text_files(stats_files, options.output_prefix + ".stats")
+    nb_of_variants_successfully_applied, nb_of_variants_that_failed_to_be_applied = \
+        get_stats_on_variants(stats_files)
+    print(f"Number of variants successfully applied: {nb_of_variants_successfully_applied}")
+    print(f"Number of variants that failed to be applied: {nb_of_variants_that_failed_to_be_applied}")
 
     # remove temp files if needed
     if not options.keep_temp and temp_path.exists():

@@ -407,6 +407,9 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
     ##################################################################################
 
 
+class LeafNotFoundException(Exception):
+    pass
+
 class PrgBuilder(object):
     """
     Prg builder based from a multiple sequence alignment.
@@ -456,15 +459,13 @@ class PrgBuilder(object):
         self.leaves_index[interval] = node
 
     def get_node_given_interval(self, interval: Tuple[int, int]):
-        # TODO: move this back to assert
+        # TODO: move this back to assert once is solved
         interval_is_indexed = interval in self.leaves_index
         if not interval_is_indexed:
-            raise RuntimeError(f"Queried interval {interval} does not exist in leaves index.\n"
-                               f"self.locus_name = {self.locus_name}\n"
-                               f"self.leaves_index.keys() = {self.leaves_index.keys()}")
+            raise LeafNotFoundException(f"Queried interval {interval} does not exist in leaves index for locus {self.locus_name}")
 
         # assert interval in self.leaves_index, \
-        #     f"Fatal error: queried interval {interval} does not exist in leaves index"
+        #     f"Fatal error: Queried interval {interval} does not exist in leaves index for locus {self.locus_name}"
 
         return self.leaves_index[interval]
 
