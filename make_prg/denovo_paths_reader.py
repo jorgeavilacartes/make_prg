@@ -68,7 +68,12 @@ class DenovoVariant:
                 assert True, "Unreachable code"  # just to be sure
         else:
             alignment_is_unique = len(alignment) == 1
-            assert alignment_is_unique
+
+            if not alignment_is_unique:
+                print("Alignment is not unique, getting the first one anyway", file=sys.stderr)
+                print("Alignments:", file=sys.stderr)
+                print(alignment, file=sys.stderr)
+
             alignment = alignment[0]
             return alignment.seqA, alignment.seqB
 
