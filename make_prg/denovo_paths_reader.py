@@ -53,7 +53,11 @@ class DenovoVariant:
                                              MATCH_SCORE, MISMATCH_SCORE, GAP_OPEN_SCORE, GAP_EXTEND_SCORE)
 
         alignment_is_unique = len(alignment) == 1
-        assert alignment_is_unique
+
+        if not alignment_is_unique:
+            print("alignment is not unique, getting the first one anyway... Alignments:", file=sys.stderr)
+            print(alignment, file=sys.stderr)
+
         alignment = alignment[0]
 
         ref_alignment = deque(alignment.seqA)
