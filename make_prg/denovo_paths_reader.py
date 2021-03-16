@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from collections import defaultdict, deque
 import re
 from intervaltree.intervaltree import IntervalTree
@@ -44,13 +44,21 @@ class DenovoVariant:
                            self.alt + node.sequence[end_index_inside_node_sequence:]
         return mutated_sequence
 
-    def split_variant(self, ml_path_nodes: List[MLPathNode], ml_path_nodes_to_nb_of_bases) -> List["DenovoVariant"]:
+    def split_variant(self, ml_path_nodes: List[MLPathNode], ml_path_nodes_to_nb_of_bases) -> Optional[List["DenovoVariant"]]:
         """
         Split this variant into a list of variants WRT to how it is distributed along the ML path
         """
         # 1. align ref to alt
         alignment = pairwise2.align.globalms(self.ref, self.alt,
                                              MATCH_SCORE, MISMATCH_SCORE, GAP_OPEN_SCORE, GAP_EXTEND_SCORE)
+
+        unable_to_align = len(alignment) == 0
+        if unable_to_align:
+            print("Unable to align:")
+            print(f"ref = {self.ref}")
+            print(f"alt = {self.alt}")
+            return None
+
 
         alignment_is_unique = len(alignment) == 1
 
@@ -175,6 +183,11 @@ class DenovoLocusInfo:
                 print(f"ml_path_nodes: {ml_path_nodes}", file=sys.stderr)
                 print(f"ml_path_nodes_to_nb_of_bases: {ml_path_nodes_to_nb_of_bases}", file=sys.stderr)
                 split_variants = variant.split_variant(ml_path_nodes, ml_path_nodes_to_nb_of_bases)
+
+                split_was_unsuccessful = split_variants is None
+                if split_was_unsuccessful:
+                    continue
+
                 print(f"split_variants: {split_variants}", file=sys.stderr)
             else:
                 split_variants = [variant]
