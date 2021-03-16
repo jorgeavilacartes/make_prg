@@ -44,32 +44,39 @@ class DenovoVariant:
                            self.alt + node.sequence[end_index_inside_node_sequence:]
         return mutated_sequence
 
+
+    @staticmethod
+    def align(ref, alt):
+        alignment = pairwise2.align.globalms(ref, alt, MATCH_SCORE, MISMATCH_SCORE, GAP_OPEN_SCORE, GAP_EXTEND_SCORE)
+        empty_alignment = len(alignment) == 0
+        if empty_alignment:
+            #  this usually happens if ref or alt are empty, let's check
+            ref_is_empty = len(ref) == 0
+            alt_is_empty = len(alt) == 0
+
+            both_are_empty = ref_is_empty and alt_is_empty
+            assert not both_are_empty
+
+            if ref_is_empty:
+                return "-" * len(alt), alt
+            elif alt_is_empty:
+                return ref, "-" * len(ref)
+            else:
+                assert True, f"Unable to align: ref = {ref}, alt = {alt}"
+        else:
+            alignment_is_unique = len(alignment) == 1
+            assert alignment_is_unique
+            alignment = alignment[0]
+            return alignment.seqA, alignment.seqB
+
     def split_variant(self, ml_path_nodes: List[MLPathNode], ml_path_nodes_to_nb_of_bases) -> Optional[List["DenovoVariant"]]:
         """
         Split this variant into a list of variants WRT to how it is distributed along the ML path
         """
         # 1. align ref to alt
-        alignment = pairwise2.align.globalms(self.ref, self.alt,
-                                             MATCH_SCORE, MISMATCH_SCORE, GAP_OPEN_SCORE, GAP_EXTEND_SCORE)
-
-        unable_to_align = len(alignment) == 0
-        if unable_to_align:
-            print("Unable to align:")
-            print(f"ref = {self.ref}")
-            print(f"alt = {self.alt}")
-            return None
-
-
-        alignment_is_unique = len(alignment) == 1
-
-        if not alignment_is_unique:
-            print("alignment is not unique, getting the first one anyway... Alignments:", file=sys.stderr)
-            print(alignment, file=sys.stderr)
-
-        alignment = alignment[0]
-
-        ref_alignment = deque(alignment.seqA)
-        alt_alignment = deque(alignment.seqB)
+        alignment = self.align(self.ref, self.alt)
+        ref_alignment = deque(alignment[0])
+        alt_alignment = deque(alignment[1])
 
         # 2. split variants at the boundaries of the alignments
         split_variants = []
