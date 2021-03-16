@@ -54,15 +54,18 @@ class DenovoVariant:
             ref_is_empty = len(ref) == 0
             alt_is_empty = len(alt) == 0
 
+            # only one should be empty
             both_are_empty = ref_is_empty and alt_is_empty
             assert not both_are_empty
+            both_are_not_empty = (not ref_is_empty) and (not alt_is_empty)
+            assert not both_are_not_empty
 
             if ref_is_empty:
                 return "-" * len(alt), alt
             elif alt_is_empty:
                 return ref, "-" * len(ref)
             else:
-                assert True, f"Unable to align: ref = {ref}, alt = {alt}"
+                assert True, "Unreachable code"  # just to be sure
         else:
             alignment_is_unique = len(alignment) == 1
             assert alignment_is_unique
