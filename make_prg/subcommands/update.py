@@ -7,7 +7,7 @@ import sys
 
 from make_prg import io_utils
 from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
-from make_prg.utils import output_files_already_exist, setup_stderr_logging
+from make_prg.utils import output_files_already_exist, setup_logging, print_with_time
 from make_prg.denovo_paths_reader import DenovoPathsDB
 
 def register_parser(subparsers):
@@ -82,7 +82,7 @@ def update(locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation,
 
     we_have_variants = len(variant_nodes_with_mutation) > 0
     if we_have_variants:
-        print(f"Updating {locus_name} ...")
+        print_with_time(f"Updating {locus_name} ...")
 
         leaves_to_update = set()
         for variant_node_with_mutation in variant_nodes_with_mutation:
@@ -98,16 +98,16 @@ def update(locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation,
         # update the changed leaves
         for leaf in leaves_to_update:
             leaf.batch_update(temp_dir)
-        print(f"Updated {locus_name}: {len(variant_nodes_with_mutation)} denovo sequences added!")
+        print_with_time(f"Updated {locus_name}: {len(variant_nodes_with_mutation)} denovo sequences added!")
     else:
-        print(f"{locus_name} has no new variants, no update needed")
+        print_with_time(f"{locus_name} has no new variants, no update needed")
 
     # regenerate PRG
     locus_prefix = temp_dir / locus_name / locus_name
     locus_prefix_parent = locus_prefix.parent
     os.makedirs(locus_prefix_parent, exist_ok=True)
     prg = prg_builder_for_locus.build_prg()
-    print(f"Write PRG file to {locus_prefix}.prg.fa")
+    print_with_time(f"Write PRG file to {locus_prefix}.prg.fa")
     io_utils.write_prg(str(locus_prefix), prg)
 
     with open(f"{locus_prefix}.stats", "w") as stats_filehandler:
@@ -122,7 +122,7 @@ def run(options):
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
-    setup_stderr_logging()
+    setup_logging()
 
     logging.info(f"Reading update data structures...")
     prg_builder_collection = PrgBuilderCollection.deserialize(f"{options.input_prefix}.update_DS")
@@ -158,8 +158,8 @@ def run(options):
                  prg_builder_collection.locus_name_to_pickle_files.keys()]
     nb_of_variants_successfully_applied, nb_of_variants_that_failed_to_be_applied = \
         get_stats_on_variants(stats_files)
-    print(f"Number of variants successfully applied: {nb_of_variants_successfully_applied}")
-    print(f"Number of variants that failed to be applied: {nb_of_variants_that_failed_to_be_applied}")
+    print_with_time(f"Number of variants successfully applied: {nb_of_variants_successfully_applied}")
+    print_with_time(f"Number of variants that failed to be applied: {nb_of_variants_that_failed_to_be_applied}")
 
     # remove temp files if needed
     if not options.keep_temp and temp_path.exists():

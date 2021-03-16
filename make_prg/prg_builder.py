@@ -25,17 +25,21 @@ import subprocess
 import copy
 import numpy as np
 from Bio.Seq import Seq
+from make_prg.utils import print_with_time
+
 
 MATCH_SCORE = 2
 MISMATCH_SCORE = -1
 GAP_OPEN_SCORE = -4
 GAP_EXTEND_SCORE = -2
 
+
 class MSAAligner(ABC):
     @classmethod
     @abstractmethod
     def get_updated_alignment(cls, leaf_name: str, previous_alignment: Path, new_sequences: List[str], temp_prefix: Path) -> Path:
         pass
+
 
 class MSAAlignerAbPOA(MSAAligner):
     aligner = pa.msa_aligner(aln_mode='g',
@@ -57,7 +61,7 @@ class MSAAlignerAbPOA(MSAAligner):
 
         stop = time.time()
         runtime = stop-start
-        print(f"abPOA update runtime for {leaf_name} in seconds: {runtime:.3f}")
+        print_with_time(f"abPOA update runtime for {leaf_name} in seconds: {runtime:.3f}")
 
         return new_msa_filepath
 
@@ -108,7 +112,7 @@ class MSAAlignerMAFFT(MSAAligner):
             )
         stop = time.time()
         runtime = stop-start
-        print(f"MAFFT update runtime for {leaf_name} in seconds: {runtime:.3f}")
+        print_with_time(f"MAFFT update runtime for {leaf_name} in seconds: {runtime:.3f}")
 
         return new_msa
 
@@ -390,7 +394,7 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         with open(previous_msa_filename, "w") as previous_msa_handler:
             SeqIO.write(self.alignment, previous_msa_handler, "fasta")
 
-        print(f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}...")
+        print_with_time(f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}...")
         msa_aligner = MSAAlignerMAFFT
         new_msa = msa_aligner.get_updated_alignment(leaf_name=f"{self.prg_builder.locus_name}, node {self.id}",
                                                    previous_alignment=previous_msa_filename,

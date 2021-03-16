@@ -67,14 +67,7 @@ class DenovoVariant:
             else:
                 assert True, "Unreachable code"  # just to be sure
         else:
-            alignment_is_unique = len(alignment) == 1
-
-            if not alignment_is_unique:
-                print("Alignment is not unique, getting the first one anyway", file=sys.stderr)
-                print("Alignments:", file=sys.stderr)
-                print(alignment, file=sys.stderr)
-
-            alignment = alignment[0]
+            alignment = alignment[0]  # get the first alignment - we might have several equally good ones
             return alignment.seqA, alignment.seqB
 
     def split_variant(self, ml_path_nodes: List[MLPathNode], ml_path_nodes_to_nb_of_bases) -> Optional[List["DenovoVariant"]]:
@@ -191,19 +184,10 @@ class DenovoLocusInfo:
             assert len(ml_path_nodes) > 0
             variant_goes_through_several_leaves = len(ml_path_nodes) > 1
             if variant_goes_through_several_leaves:
-                print(f"Variant goes through several leaves:", file=sys.stderr)
-                print(f"self.sample: {self.sample}", file=sys.stderr)
-                print(f"self.locus: {self.locus}", file=sys.stderr)
-                print(f"variant: {variant}", file=sys.stderr)
-                print(f"ml_path_nodes: {ml_path_nodes}", file=sys.stderr)
-                print(f"ml_path_nodes_to_nb_of_bases: {ml_path_nodes_to_nb_of_bases}", file=sys.stderr)
                 split_variants = variant.split_variant(ml_path_nodes, ml_path_nodes_to_nb_of_bases)
-
                 split_was_unsuccessful = split_variants is None
                 if split_was_unsuccessful:
                     continue
-
-                print(f"split_variants: {split_variants}", file=sys.stderr)
             else:
                 split_variants = [variant]
 
@@ -234,8 +218,8 @@ class DenovoPathsDB:
                 end_index = int(matches.group(2)) + 1  # TODO: fix pandora to give us non-inclusive end intervals instead
                 sequence = matches.group(3)
             except Exception as exc:
-                print(f"Failed matching ML path regex to line: {line}")
-                print(f"Exception: {str(exc)}")
+                print(f"Failed matching ML path regex to line: {line}", file=sys.stderr)
+                print(f"Exception: {str(exc)}", file=sys.stderr)
                 sys.exit(1)
 
             assert start_index < end_index

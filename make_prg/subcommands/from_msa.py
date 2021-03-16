@@ -6,7 +6,7 @@ from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
 from make_prg import io_utils, prg_builder
 import multiprocessing
 
-from make_prg.utils import output_files_already_exist, setup_stderr_logging
+from make_prg.utils import output_files_already_exist, setup_logging
 
 options = None
 
@@ -130,7 +130,7 @@ def run(cl_options):
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
-    setup_stderr_logging()
+    setup_logging()
     logging.info(f"Using {options.threads} threads to generate PRGs...")
     with multiprocessing.Pool(options.threads) as pool:
         pool.map(process_MSA, input_files, chunksize=1)
