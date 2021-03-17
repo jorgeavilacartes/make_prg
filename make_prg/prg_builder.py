@@ -52,6 +52,8 @@ class MSAAlignerAbPOA(MSAAligner):
         start = time.time()
 
         # TODO: AbPOA do not process multiline fasta!!!! Run sample example and see results
+        # TODO: this is broken, AbPOA is not working! But for now we are requiring mafft in $PATH anyway
+        # TODO: fix this and evaluate AbPOA
         msa_result = cls.aligner.msa(new_sequences, False, True, incr_fn=previous_alignment)
         new_msa_filepath = temp_prefix / "updated_msa.fa"
         with open(new_msa_filepath, "w") as new_msa_filehandler:
