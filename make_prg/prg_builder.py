@@ -361,7 +361,6 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                 site_num = self.prg_builder.get_next_site_num()
                 prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
                 for seq_index, seq in enumerate(seqs):
-                    # TODO: recheck this
                     site_num_for_this_seq = (site_num + 1) if (seq_index < len(seqs) - 1) else site_num
                     start_index = len(prg_as_list)
                     prg_as_list.extend(seq)

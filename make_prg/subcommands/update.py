@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import multiprocessing
 import sys
+import subprocess
 
 from make_prg import io_utils
 from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
@@ -118,11 +119,27 @@ def update(locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation,
     # TODO: change this?
 
 
+def check_if_mafft_is_runnable():
+    logging.info("Detecting mafft, running mafft --version...")
+    try:
+        result = subprocess.Popen(["mafft", "--version"])
+        result.communicate()
+        return_code = result.returncode
+        mafft_is_runnable = return_code == 0
+        if mafft_is_runnable:
+            logging.info("mafft detected!")
+        else:
+            raise RuntimeError("mafft not detected, mafft is needed to be in $PATH to run make_prg update command")
+    except:
+        raise RuntimeError("mafft not detected, mafft is needed to be in $PATH to run make_prg update command")
+
+
 def run(options):
+    setup_logging()
+    check_if_mafft_is_runnable()
+
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
-
-    setup_logging()
 
     logging.info(f"Reading update data structures...")
     prg_builder_collection = PrgBuilderCollection.deserialize(f"{options.input_prefix}.update_DS")
