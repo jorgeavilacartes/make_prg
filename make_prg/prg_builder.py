@@ -18,7 +18,6 @@ import shlex
 import time
 from Bio import SeqIO
 from abc import ABC, abstractmethod
-import pyabpoa as pa
 import uuid
 import shutil
 import subprocess
@@ -39,33 +38,6 @@ class MSAAligner(ABC):
     @abstractmethod
     def get_updated_alignment(cls, leaf_name: str, previous_alignment: Path, new_sequences: List[str], temp_prefix: Path) -> Path:
         pass
-
-
-class MSAAlignerAbPOA(MSAAligner):
-    aligner = pa.msa_aligner(aln_mode='g',
-                             extra_b=-1,  # adaptive banding disabled
-                             is_diploid=0)
-
-    @classmethod
-    def get_updated_alignment(cls, leaf_name: str, previous_alignment: Path, new_sequences: List[str], temp_prefix: Path) -> Path:
-        previous_alignment = shlex.quote(str(previous_alignment))
-        start = time.time()
-
-        # TODO: AbPOA do not process multiline fasta!!!! Run sample example and see results
-        # TODO: this is broken, AbPOA is not working! But for now we are requiring mafft in $PATH anyway
-        # TODO: fix this and evaluate AbPOA
-        msa_result = cls.aligner.msa(new_sequences, False, True, incr_fn=previous_alignment)
-        new_msa_filepath = temp_prefix / "updated_msa.fa"
-        with open(new_msa_filepath, "w") as new_msa_filehandler:
-            for index_seq, seq in enumerate(msa_result.msa_seq):
-                print(f">Denovo_path_{index_seq}_random_id_{uuid.uuid4()}", file=new_msa_filehandler)
-                print(seq, file=new_msa_filehandler)
-
-        stop = time.time()
-        runtime = stop-start
-        print_with_time(f"abPOA update runtime for {leaf_name} in seconds: {runtime:.3f}")
-
-        return new_msa_filepath
 
 
 class MSAAlignerMAFFT(MSAAligner):
