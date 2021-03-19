@@ -5,7 +5,7 @@ from intervaltree.intervaltree import IntervalTree
 import logging
 import sys
 from Bio import pairwise2
-from prg_builder import *
+from make_prg.prg_builder import *
 
 
 class MLPathNode:
