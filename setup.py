@@ -10,9 +10,10 @@ setup(
     test_suite="nose.collector",
     tests_require=["nose >= 1.3", "hypothesis >= 4.0"],
     install_requires=[
-        "biopython>=1.70",
-        "numpy>=1.14.0",
-        "scikit-learn>=0.19.1",
+        "biopython==1.78",
+        "numpy==1.20.0",
+        "scikit-learn==0.24.1",
+        "intervaltree==3.1.0"
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
