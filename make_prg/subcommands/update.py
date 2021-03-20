@@ -141,7 +141,7 @@ def run(options):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
     logging.info(f"Reading update data structures...")
-    prg_builder_collection = PrgBuilderCollection.deserialize(f"{options.input_prefix}.update_DS")
+    prg_builder_collection = PrgBuilderCollection.deserialize(options.update_DS)
     prg_builder_collection.to_absolute_paths()
     logging.info(f"Reading {options.denovo_paths}...")
     denovo_paths_db = DenovoPathsDB(options.denovo_paths)
