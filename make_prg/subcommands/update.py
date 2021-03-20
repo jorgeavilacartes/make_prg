@@ -18,13 +18,12 @@ def register_parser(subparsers):
         help="Update PRGs given new sequences output by pandora.",
     )
     subparser_update_prg.add_argument(
-        "-i", "--input_prefix",
+        "-u", "--update_DS",
         action="store",
         type=str,
         required=True,
         help=(
-            "Input filepath prefix to update data structures. Points to <prefix>.update_DS.bak, <prefix>.update_DS.dat, and "
-            "<prefix>.update_DS.dir."
+            "Filepath to the update data structures. Should point to a file *.update_DS."
         ),
     )
     subparser_update_prg.add_argument(
@@ -33,7 +32,7 @@ def register_parser(subparsers):
         type=str,
         required=True,
         help=(
-            "Filepath containing denovo sequences output by pandora (denovo_paths.txt)."
+            "Filepath containing denovo sequences output by pandora. Should point to a denovo_paths.txt file."
         ),
     )
     subparser_update_prg.add_argument(
