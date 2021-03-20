@@ -40,7 +40,7 @@ class DenovoVariant:
         assert start_index_inside_node_sequence >= 0
 
         end_index_inside_node_sequence = start_index_inside_node_sequence + len(self.ref)
-        assert end_index_inside_node_sequence < len(node.sequence)
+        assert end_index_inside_node_sequence <= len(node.sequence)
 
         ref_wrt_indexes = node.sequence[start_index_inside_node_sequence:end_index_inside_node_sequence]
         ref_is_consistent = self.ref == ref_wrt_indexes
