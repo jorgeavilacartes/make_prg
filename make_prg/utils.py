@@ -11,7 +11,7 @@ def output_files_already_exist(output_prefix):
            Path(output_prefix + ".update_DS").exists()
 
 
-datefmt="%d/%m/%Y %I:%M:%S"
+datefmt="%d/%m/%Y %H:%M:%S"
 formatter = logging.Formatter(
     fmt="%(levelname)s %(asctime)s %(message)s", datefmt=datefmt
 )
