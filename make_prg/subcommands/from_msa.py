@@ -96,9 +96,6 @@ def process_MSA(msa_filepath: Path):
     os.makedirs(workdir, exist_ok=True)
     prefix = str(workdir / msa_name)
 
-    # Set up file logging
-    # logging_handler = setup_file_logging(prefix)
-
     try:
         builder = prg_builder.PrgBuilder(
             locus_name=locus_name,
@@ -111,9 +108,8 @@ def process_MSA(msa_filepath: Path):
         logging.info(f"Write PRG file to {prefix}.prg.fa")
         io_utils.write_prg(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
-        # m = aseq.max_nesting_level_reached
-        # logging.info(f"Max_nesting_reached\t{m}")
 
+        # TODO: add back GFA writing
         # logging.info(f"Write GFA file to {prefix}.gfa")
         # io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
     except ValueError as value_error:
@@ -124,13 +120,14 @@ def process_MSA(msa_filepath: Path):
 
 
 def run(cl_options):
+    setup_logging()
+
     global options
     options = cl_options
     input_files = get_all_input_files(options.input)
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
-    setup_logging()
     logging.info(f"Using {options.threads} threads to generate PRGs...")
     with multiprocessing.Pool(options.threads) as pool:
         pool.map(process_MSA, input_files, chunksize=1)

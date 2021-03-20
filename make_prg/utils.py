@@ -24,6 +24,6 @@ def setup_logging():
 
 
 def print_with_time(message):
-    dateTimeObj = datetime.now()
-    timestampStr = dateTimeObj.strftime(datefmt)
-    print(f"{timestampStr} {message}")
+    date_time_obj = datetime.now()
+    timestamp_str = date_time_obj.strftime(datefmt)
+    print(f"{timestamp_str} {message}")
