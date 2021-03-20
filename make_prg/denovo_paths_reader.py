@@ -1,11 +1,11 @@
-from typing import List, Tuple, Optional
+from typing import Optional
 from collections import defaultdict, deque
 import re
 from intervaltree.intervaltree import IntervalTree
-import logging
 import sys
 from Bio import pairwise2
 from make_prg.prg_builder import *
+from make_prg.utils import assert_sequence_is_composed_of_ACGT_only
 
 
 class MLPathNode:
@@ -26,7 +26,10 @@ class MLPathNode:
 class DenovoVariant:
     def __init__(self, start_index_in_linear_path, ref, alt):
         assert ref != alt, "Error: pandora produced a ref == alt"
+        assert_sequence_is_composed_of_ACGT_only(ref)
+        assert_sequence_is_composed_of_ACGT_only(alt)
         assert start_index_in_linear_path >= 0, "Error: Pandora produced a negative index for variant pos"
+
         self.start_index_in_linear_path = start_index_in_linear_path
         self.end_index_in_linear_path = start_index_in_linear_path + len(ref)
         self.ref = ref
@@ -34,7 +37,10 @@ class DenovoVariant:
 
     def get_mutated_sequence(self, node: MLPathNode):
         start_index_inside_node_sequence = self.start_index_in_linear_path-node.start_index_in_linear_path
+        assert start_index_inside_node_sequence >= 0
+
         end_index_inside_node_sequence = start_index_inside_node_sequence + len(self.ref)
+        assert end_index_inside_node_sequence < len(node.sequence)
 
         ref_wrt_indexes = node.sequence[start_index_inside_node_sequence:end_index_inside_node_sequence]
         ref_is_consistent = self.ref == ref_wrt_indexes

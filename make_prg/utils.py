@@ -27,3 +27,8 @@ def print_with_time(message):
     date_time_obj = datetime.now()
     timestamp_str = date_time_obj.strftime(datefmt)
     print(f"{timestamp_str} {message}")
+
+
+def assert_sequence_is_composed_of_ACGT_only(seq):
+    for base in seq:
+        assert base in "ACGT"

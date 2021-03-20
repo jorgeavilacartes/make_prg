@@ -156,6 +156,7 @@ def write_prg(output_prefix: str, prg_string: str):
     with prg_filename.open("w") as prg:
         print(f">{sample}\n{prg_string}", file=prg)
 
+    # TODO: add this back
     # prg_ints_fpath = Path(output_prefix + ".bin")
     # prg_encoder = PrgEncoder()
     # prg_ints: PRG_Ints = prg_encoder.encode(prg_string)
