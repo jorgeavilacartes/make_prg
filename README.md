@@ -7,9 +7,9 @@ Multiple Sequence Alignments.
 
 ## Table of Contents
 - [Install](#install)
-  - [No installation needed - precompiled portable binary](#conda)
+  - [No installation needed - precompiled portable binary](#no-installation-needed---precompiled-portable-binary)
   - [pip](#pip)
-- [Running on a sample example](#usage)
+- [Running on a sample example](#running-on-a-sample-example)
 - [Usage](#usage)
 
 ## Install
