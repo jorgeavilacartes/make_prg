@@ -15,9 +15,9 @@ Multiple Sequence Alignments.
 
 ## Dependencies
 
-`make_prg` has two commands: `from_msa` and `update. The `update` requires `MAFFT` to be in your `PATH`. It can be installed:
+`make_prg` has two commands: `from_msa` and `update`. The `update` command requires `MAFFT` to be in your `PATH`. It can be installed:
   1. from source: https://mafft.cbrc.jp/alignment/software/;
-  2. using conda: `conda install -c bioconda mafft`;
+  2. using `conda`: `conda install -c bioconda mafft`;
 
 ## Install
 
