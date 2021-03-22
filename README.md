@@ -6,11 +6,18 @@ Multiple Sequence Alignments.
 [TOC]: #
 
 ## Table of Contents
+- [Dependencies](#dependencies)
 - [Install](#install)
   - [No installation needed - precompiled portable binary](#no-installation-needed---precompiled-portable-binary)
   - [pip](#pip)
 - [Running on a sample example](#running-on-a-sample-example)
 - [Usage](#usage)
+
+## Dependencies
+
+`make_prg` has two commands: `from_msa` and `update. The `update` requires `MAFFT` to be in your `PATH`. It can be installed:
+  1. from source: https://mafft.cbrc.jp/alignment/software/;
+  2. using conda: `conda install -c bioconda mafft`;
 
 ## Install
 
@@ -49,7 +56,7 @@ pip install git+https://github.com/leoisl/make_prg
 
 * **Running**:
 ```
-./make_prg -h
+make_prg -h
 ```
 
 ## Running on a sample example
