@@ -107,3 +107,5 @@ ENV/
 .idea
 /sample_example/msas_output/
 /sample_example/msas_updated/
+
+sample_example/make_prg_0.2.0_prototype
