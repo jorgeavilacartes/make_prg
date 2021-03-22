@@ -14,6 +14,8 @@ denovo_paths/denovo_paths.txt : contains some denovo paths on 3 of these 4 genes
 
 ## Dependencies
 
+* **There is no need to have `make_prg` installed. The running script will automatically download
+  and run the precompiled binary**;
 * `MAFFT` has to be in your `PATH`. It can be installed:
   1. from source: https://mafft.cbrc.jp/alignment/software/;
   2. using conda: `conda install -c bioconda mafft`;
