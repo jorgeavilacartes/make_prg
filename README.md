@@ -1,6 +1,6 @@
 # make_prg
 
-A tool to create and update PRGs for input to [Pandora][pandora] and [Gramtools][gramtools] from a set of 
+A tool to create and update PRGs for input to [Pandora][pandora] from a set of 
 Multiple Sequence Alignments.
 
 [TOC]: #
@@ -116,5 +116,4 @@ optional arguments:
   --keep_temp           Keep temp files.
 ```
 
-[gramtools]: https://github.com/iqbal-lab-org/gramtools
 [pandora]: https://github.com/rmcolq/pandora
