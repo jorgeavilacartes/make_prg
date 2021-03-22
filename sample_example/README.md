@@ -9,7 +9,7 @@ We run:
 
 ```
 msas/ : contains the MSAs of 4 genes we are using as toy example here;
-denovo_paths/denovo_paths.txt : contains some denovo paths on 2 of these 7 genes;
+denovo_paths/denovo_paths.txt : contains some denovo paths on 3 of these 4 genes. This file is produced by pandora;
 ```
 
 ## Dependencies
