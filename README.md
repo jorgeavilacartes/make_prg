@@ -1,74 +1,62 @@
 # make_prg
 
-A tool to create a PRG for input to [Pandora][pandora] and [Gramtools][gramtools] from a
-Multiple Sequence Alignment.
+A tool to create and update PRGs for input to [Pandora][pandora] and [Gramtools][gramtools] from a set of 
+Multiple Sequence Alignments.
 
 [TOC]: #
 
 ## Table of Contents
 - [Install](#install)
-  - [Conda](#conda)
-  - [Local](#local)
-  - [Container](#container)
+  - [No installation needed - precompiled portable binary](#conda)
+  - [pip](#pip)
+- [Running on a sample example](#usage)
 - [Usage](#usage)
-  - [CLI](#cli)
-  - [Nextflow](#nextflow)
-- [Input](#input)
-- [Changing parameters](#changing-parameters)
 
 ## Install
 
-### Conda
+### No installation needed - precompiled portable binary
 
-[![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/make_prg)](https://anaconda.org/bioconda/make_prg)
-[![bioconda version](https://anaconda.org/bioconda/make_prg/badges/platforms.svg)](https://anaconda.org/bioconda/make_prg)
+You can use `make_prg` with no installation at all by simply downloading the precompiled binary, and running it.
+In this binary, all libraries are linked statically.
 
-Prerequisite: [`conda`][conda] (and bioconda channel [correctly set up][channels])
+* **Requirements**: None
 
+* **Download**:
+  ```
+  wget https://github.com/leoisl/make_prg/releases/download/v0.2.0_prototype/make_prg_0.2.0_prototype
+  ```
+* **Running**:
+```
+chmod +x make_prg_0.2.0_prototype
+./make_prg_0.2.0_prototype -h
+```
+
+* **Credits**:
+  * Compilation is done using [PyInstaller](https://github.com/pyinstaller/pyinstaller).
+
+* **Notes**:
+  * We provide precompiled binaries for Linux OS only;
+
+
+### pip
+
+* **Requirements**: `python>=3`
+
+* **Installing**:
 ```sh
-conda install make_prg
+pip install git+https://github.com/leoisl/make_prg
 ```
 
-### Local
-
-Requirements: `python>=3`
-
-```sh
-git clone https://github.com/rmcolq/make_prg.git
-cd make_prg
-python -m pip install .
-make_prg --help
+* **Running**:
+```
+./make_prg -h
 ```
 
-To additionally run the tests
+## Running on a sample example
 
-```shell
-python -m pip install nose hypothesis
-nosetests tests/
-```
-
-This installs the CLI tool `make_prg`. The nextflow script `make_prg_nexflow.nf` assumes
-that `make_prg` is installed.
-
-### Container
-
-[![Docker Repository on Quay](https://quay.io/repository/iqballab/make_prg/status "Docker Repository on Quay")](https://quay.io/repository/iqballab/make_prg)
-
-Containers for this tool are [hosted on quay.io][tags].
-
-An example, of running it in a [Singularity][singularity] container would be
-
-```
-tag="latest"
-URI="docker://quay.io/iqballab/make_prg:${tag}"
-singularity exec "$URI" make_prg --help
-```
-
-A list of the valid tags can be found [here][tags].
+See [sample example](sample_example).
 
 ## Usage
-
-### CLI
 
 ```
 $ make_prg --help
@@ -79,82 +67,54 @@ Subcommand entrypoint
 optional arguments:
   -h, --help     show this help message and exit
   -V, --version  show program's version number and exit
-  -v, --verbose  Run with high verbosity (debug level logging)
 
 Available subcommands:
+  
+    from_msa     Make PRG from multiple sequence alignment dir
+    update       Update PRGs given new sequences output by pandora.
 
-    from_msa     Make PRG from multiple sequence alignment
 ```
 
 #### `from_msa`
 
 ```
 $ make_prg from_msa --help
-usage: make_prg from_msa [options] <MSA input file>
-
-positional arguments:
-  MSA                   Input file: a multiple sequence alignment in supported alignment_format. If not in aligned fasta
-                        alignment_format, use -f to input the alignment_format type
+usage: make_prg from_msa
 
 optional arguments:
   -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        Input dir: all files in this will try to be read as the supported alignment_format. If not aligned in fasta alignment_format, use -f to input the alignment_format type
+  -o OUTPUT_PREFIX, --output_prefix OUTPUT_PREFIX
+                        Output prefix: prefix for the output files
+  -t THREADS, --threads THREADS
+                        Number of threads
   -f ALIGNMENT_FORMAT, --alignment_format ALIGNMENT_FORMAT
-                        Alignment format of MSA, must be a biopython AlignIO input alignment_format. See
-                        http://biopython.org/wiki/AlignIO. Default: fasta
+                        Alignment format of MSA, must be a biopython AlignIO input alignment_format. See http://biopython.org/wiki/AlignIO. Default: fasta
   --max_nesting MAX_NESTING
                         Maximum number of levels to use for nesting. Default: 5
   --min_match_length MIN_MATCH_LENGTH
                         Minimum number of consecutive characters which must be identical for a match. Default: 7
-  -p OUTPUT_PREFIX, --prefix OUTPUT_PREFIX
-                        Output prefix
-  --no_overwrite        Do not overwrite pre-existing prg file with same name
-  -v, --verbose         Run with high verbosity (debug level logging)
 ```
 
-### Nextflow
-
-Requirements: [Nextflow][nf]
+#### `update`
 
 ```
-    Usage: nextflow run make_prg_nexflow.nf <arguments>
+$ make_prg update --help
+usage: make_prg update_prg
 
-    Required arguments:
-      --tsv_in  FILENAME  An index file of MSA to build PRGs of
-
-    Optional arguments:
+optional arguments:
+  -h, --help            show this help message and exit
+  -u UPDATE_DS, --update_DS UPDATE_DS
+                        Filepath to the update data structures. Should point to a file *.update_DS.
+  -d DENOVO_PATHS, --denovo_paths DENOVO_PATHS
+                        Filepath containing denovo sequences output by pandora. Should point to a denovo_paths.txt file.
+  -o OUTPUT_PREFIX, --output_prefix OUTPUT_PREFIX
+                        Output prefix: prefix for the output files
+  -t THREADS, --threads THREADS
+                        Number of threads
+  --keep_temp           Keep temp files.
 ```
 
-## Input
-
-Multiple Sequence Alignment files for genes/dna sequences for which we wantPRGs, and an
-tab-separated index of these in the form:
-
-```
-sample_id       infile
-GC0000001   /absolute/path/to/GC0000001_na_aln.fa.gz
-GC0000002   /absolute/path/to/GC0000002_na_aln.fa
-```
-
-## Changing parameters
-
-There are some parameters at the top of the nextflow file which could be changed but
-which I have not made command line parameters:
-
-```
-max_nesting             This is the maximum number depth of bubbles in PRG, setting to 1 will allow variants, \\
-                        but no nesting
-min_match_length        Controls graph complexity
-alignment_format        Any format accepted by biopython's AlignIO
-max_forks_make_prg      If working on a cluster which allows unlimited parallel jobs per user, this will be \\
-                        used by nextflow to control maximum number of processes of this type that can run in \\
-                        parallel.
-max_forks_make_fasta
-```
-
-[channels]: https://bioconda.github.io/user/install.html#set-up-channels
 [gramtools]: https://github.com/iqbal-lab-org/gramtools
-[nf]: https://www.nextflow.io/
 [pandora]: https://github.com/rmcolq/pandora
-[singularity]: https://sylabs.io/
-[tags]: https://quay.io/repository/iqballab/make_prg?tab=tags
-[conda]: https://conda.io
