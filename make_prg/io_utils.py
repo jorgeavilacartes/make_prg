@@ -1,4 +1,3 @@
-import logging
 import re
 import gzip
 from pathlib import Path
@@ -7,13 +6,12 @@ from Bio import AlignIO
 
 from make_prg.from_msa import MSA
 from make_prg.prg_encoder import PrgEncoder, PRG_Ints
+from make_prg.utils import print_with_time
 
 
 def load_alignment_file(msa_file: str, alignment_format: str) -> MSA:
     msa_file = str(msa_file)
-    logging.info("Read from MSA file %s", msa_file)
     if msa_file.endswith(".gz"):
-        logging.debug("MSA is gzipped")
         handle = gzip.open(msa_file, "rt")
         alignment = AlignIO.read(handle, alignment_format)
         handle.close()
@@ -68,9 +66,9 @@ class GFA_Output:
         end_ids = []
         # iterate through sites present, updating gfa_string with each in turn
         while str(self.gfa_site) in prg_string:
-            logging.debug("gfa_site: %d", self.gfa_site)
+            print_with_time("gfa_site: %d", self.gfa_site)
             prgs = self.split_on_site(prg_string, self.gfa_site)
-            logging.debug("prgs: %s", prgs)
+            print_with_time("prgs: %s", prgs)
             assert len(prgs) == 3, "Invalid prg sequence %s for site %d and id %d" % (
                 prg_string,
                 self.gfa_site,
@@ -97,9 +95,9 @@ class GFA_Output:
                 self.gfa_site + 1,
                 self.gfa_id,
             )
-            logging.debug("vars: %s", vars)
+            print_with_time("vars: %s", vars)
             self.gfa_site += 2
-            logging.debug("gfa_site: %d", self.gfa_site)
+            print_with_time("gfa_site: %d", self.gfa_site)
             for var_string in vars:
                 if pre_var_id != None:
                     self.gfa_string += "L\t%d\t+\t%d\t+\t0M\n" % (

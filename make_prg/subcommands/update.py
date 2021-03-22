@@ -1,4 +1,3 @@
-import logging
 import os
 from pathlib import Path
 import shutil
@@ -8,7 +7,7 @@ import subprocess
 
 from make_prg import io_utils
 from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
-from make_prg.utils import output_files_already_exist, setup_logging, print_with_time
+from make_prg.utils import output_files_already_exist, print_with_time
 from make_prg.denovo_paths_reader import DenovoPathsDB
 
 def register_parser(subparsers):
@@ -119,14 +118,14 @@ def update(locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation,
 
 
 def check_if_mafft_is_runnable():
-    logging.info("Detecting mafft, running mafft --version...")
+    print_with_time("Detecting mafft, running mafft --version...")
     try:
         result = subprocess.Popen(["mafft", "--version"])
         result.communicate()
         return_code = result.returncode
         mafft_is_runnable = return_code == 0
         if mafft_is_runnable:
-            logging.info("mafft detected!")
+            print_with_time("mafft detected!")
         else:
             raise RuntimeError("mafft not detected, mafft is needed to be in $PATH to run make_prg update command")
     except:
@@ -134,16 +133,16 @@ def check_if_mafft_is_runnable():
 
 
 def run(options):
-    setup_logging()
     check_if_mafft_is_runnable()
 
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
-    logging.info(f"Reading update data structures...")
+    # NB: don't use logging, it causes deadlocks: https://pythonspeed.com/articles/python-multiprocessing/
+    print_with_time(f"Reading update data structures...")
     prg_builder_collection = PrgBuilderCollection.deserialize(options.update_DS)
     prg_builder_collection.to_absolute_paths()
-    logging.info(f"Reading {options.denovo_paths}...")
+    print_with_time(f"Reading {options.denovo_paths}...")
     denovo_paths_db = DenovoPathsDB(options.denovo_paths)
 
     output_dir = Path(options.output_prefix).parent
@@ -152,23 +151,18 @@ def run(options):
     os.makedirs(temp_path, exist_ok=True)
 
     # update all PRGs with denovo sequences
-    logging.info(f"Using {options.threads} threads to update PRGs...")
+    print_with_time(f"Using {options.threads} threads to update PRGs...")
     multithreaded_input = []
     for locus_name, prg_builder_pickle_filepath in prg_builder_collection.locus_name_to_pickle_files.items():  # we do for all PRGs as those that don't have denovo variants will be generated also
         variant_nodes_with_mutation = denovo_paths_db.locus_name_to_variant_nodes_with_mutation.get(locus_name, [])
         multithreaded_input.append((locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation, temp_path))
 
-    # required for pyisntaller to produce a binary that won't crash
-    # see https://github.com/pyinstaller/pyinstaller/issues/4865
-    multiprocessing.freeze_support()
-    # avoids multiprocessing Pool deadlocks (see https://pythonspeed.com/articles/python-multiprocessing/)
-    multiprocessing.set_start_method("spawn")
     with multiprocessing.Pool(options.threads) as pool:
         pool.starmap(update, multithreaded_input, chunksize=1)
-    logging.info(f"All PRGs updated!")
+    print_with_time(f"All PRGs updated!")
 
     # concatenate output PRGs
-    logging.info("Concatenating files from several threads into single final files...")
+    print_with_time("Concatenating files from several threads into single final files...")
     prg_files = [f"{temp_path}/{locus_name}/{locus_name}.prg.fa" for locus_name in prg_builder_collection.locus_name_to_pickle_files.keys()]
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 
@@ -182,7 +176,7 @@ def run(options):
 
     # remove temp files if needed
     if not options.keep_temp and temp_path.exists():
-        logging.info("Removing temp files...")
+        print_with_time("Removing temp files...")
         shutil.rmtree(temp_path)
 
-    logging.info("All done!")
+    print_with_time("All done!")

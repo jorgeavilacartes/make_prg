@@ -1,4 +1,3 @@
-import logging
 from typing import List, Tuple
 
 from make_prg.from_msa import MSA

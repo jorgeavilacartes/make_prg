@@ -1,4 +1,3 @@
-import logging
 import os
 from pathlib import Path
 
@@ -6,7 +5,7 @@ from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
 from make_prg import io_utils, prg_builder
 import multiprocessing
 
-from make_prg.utils import output_files_already_exist, setup_logging
+from make_prg.utils import output_files_already_exist, print_with_time
 
 options = None
 
@@ -87,7 +86,7 @@ def get_all_input_files(input_dir):
 
 
 def process_MSA(msa_filepath: Path):
-    logging.info(f"Generating PRG for {msa_filepath}...")
+    print_with_time(f"Generating PRG for {msa_filepath}...")
     msa_name = msa_filepath.name
     locus_name = msa_filepath.with_suffix("").name
     current_process = multiprocessing.current_process()
@@ -105,33 +104,32 @@ def process_MSA(msa_filepath: Path):
             min_match_length=options.min_match_length,
         )
         prg = builder.build_prg()
-        logging.info(f"Write PRG file to {prefix}.prg.fa")
+        print_with_time(f"Write PRG file to {prefix}.prg.fa")
         io_utils.write_prg(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
 
         # TODO: add back GFA writing
-        # logging.info(f"Write GFA file to {prefix}.gfa")
+        # print_with_time(f"Write GFA file to {prefix}.gfa")
         # io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
     except ValueError as value_error:
         if "No records found in handle" in value_error.args[0]:
-            logging.warning(f"No records found in MSA {msa_filepath}, skipping...")
+            print_with_time(f"No records found in MSA {msa_filepath}, skipping...")
         else:
             raise value_error
 
 
 def run(cl_options):
-    setup_logging()
-
     global options
     options = cl_options
     input_files = get_all_input_files(options.input)
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
-    logging.info(f"Using {options.threads} threads to generate PRGs...")
+    # NB: don't use logging, it causes deadlocks: https://pythonspeed.com/articles/python-multiprocessing/
+    print_with_time(f"Using {options.threads} threads to generate PRGs...")
     with multiprocessing.Pool(options.threads) as pool:
         pool.map(process_MSA, input_files, chunksize=1)
-    logging.info(f"All PRGs generated!")
+    print_with_time(f"All PRGs generated!")
 
     # get all files that were generated
     prg_files = []
@@ -149,11 +147,11 @@ def run(cl_options):
                         locus_name_to_pickle_files[locus_name] = str(relative_path)
 
     # concatenate the prg.fa output files
-    logging.info("Concatenating files from several threads into single final files...")
+    print_with_time("Concatenating files from several threads into single final files...")
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 
     # create and serialise the PRG Builder collection
     prg_builder_collection = prg_builder.PrgBuilderCollection(locus_name_to_pickle_files, cl_options)
     prg_builder_collection.serialize()
 
-    logging.info("All done!")
+    print_with_time("All done!")
