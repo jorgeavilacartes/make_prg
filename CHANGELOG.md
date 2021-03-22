@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0_prototype] - 2021-03-22
+
+### Added
+
+- `update` command to `make_prg`, which is able to update PRGs based on denovo sequences;
+- A script to build portable binary executables;
+
+### Changed
+
+- `make_prg from_msa` is now multithreaded and receives as input a directory with fasta files to build PRGs from;
+- `make_prg from msa` output format: it now creates a single `.prg.fa` file and a `.update_DS` file,
+  which contains data structures that make the PRG updateable;
+
+### Removed
+- Docker recipe;
+
 ## [0.1.1] - 2021-01-22
 ### Added
 - Dockerfile
