@@ -61,7 +61,8 @@ make_prg -h
 
 ## Running on a sample example
 
-See [sample example](sample_example).
+To see how to input files to both `make_prg from_msa` and `make_prg update`, and the outputs
+they create on a sample example, see [sample example](sample_example).
 
 ## Usage
 
