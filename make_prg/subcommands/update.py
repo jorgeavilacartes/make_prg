@@ -158,6 +158,9 @@ def run(options):
         variant_nodes_with_mutation = denovo_paths_db.locus_name_to_variant_nodes_with_mutation.get(locus_name, [])
         multithreaded_input.append((locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation, temp_path))
 
+    # required for pyisntaller to produce a binary that won't crash
+    # see https://github.com/pyinstaller/pyinstaller/issues/4865
+    multiprocessing.freeze_support()
     # avoids multiprocessing Pool deadlocks (see https://pythonspeed.com/articles/python-multiprocessing/)
     multiprocessing.set_start_method("spawn")
     with multiprocessing.Pool(options.threads) as pool:
