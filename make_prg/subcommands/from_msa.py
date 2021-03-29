@@ -122,6 +122,11 @@ def run(cl_options):
     global options
     options = cl_options
     input_files = get_all_input_files(options.input)
+
+    there_is_no_input_files = len(input_files) == 0
+    if there_is_no_input_files:
+        print_with_time(f"WARNING: no input files found at {options.input}")
+
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
