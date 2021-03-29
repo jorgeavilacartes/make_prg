@@ -3,6 +3,7 @@ import gzip
 from pathlib import Path
 import fileinput
 from Bio import AlignIO
+import os
 
 from make_prg.from_msa import MSA
 from make_prg.prg_encoder import PrgEncoder, PRG_Ints
@@ -165,6 +166,14 @@ def write_prg(output_prefix: str, prg_string: str):
 
 
 def concatenate_text_files(input_filepaths, output_filepath):
-    with open(output_filepath, 'w') as fout, fileinput.input(input_filepaths) as fin:
-        for line in fin:
-            fout.write(line)
+    output_filepath_parent_dir = Path(output_filepath).parent
+    os.makedirs(output_filepath_parent_dir, exist_ok=True)
+
+    with open(output_filepath, 'w') as fout:
+        empty_input = len(input_filepaths) == 0
+        if empty_input:
+            return
+        else:
+            with fileinput.input(input_filepaths) as fin:
+                for line in fin:
+                    fout.write(line)
