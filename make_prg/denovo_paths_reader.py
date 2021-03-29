@@ -261,7 +261,11 @@ class DenovoPathsDB:
         with open(self.filename) as filehandler:
             # read nb_of_samples
             line = filehandler.readline().strip()
-            nb_of_samples = int(line.split()[0])
+            try:
+                nb_of_samples = int(line.split()[0])
+            except IndexError:
+                print_with_time(f"WARNING: file containing denovo paths ({self.filename}) is empty, is it the correct file?")
+                return
 
             for sample_index in range(nb_of_samples):
                 # read each sample
