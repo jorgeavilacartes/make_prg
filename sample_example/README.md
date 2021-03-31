@@ -20,6 +20,8 @@ denovo_paths/denovo_paths.txt : contains some denovo paths on 3 of these 4 genes
   1. from source: https://mafft.cbrc.jp/alignment/software/;
   2. using conda: `conda install -c bioconda mafft`;
 * `wget`;
+* `GLIBC >= 2.17` (present on `Ubuntu >= 13.04`, `Debian >= 8.0`, `CentOS >= 7`, `RHEL >= 7.9`,
+  `Fedora >= 19`, etc);
 
 ## Running
 
