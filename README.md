@@ -26,7 +26,9 @@ Multiple Sequence Alignments.
 You can use `make_prg` with no installation at all by simply downloading the precompiled binary, and running it.
 In this binary, all libraries are linked statically.
 
-* **Requirements**: None
+* **Requirements**:
+  * `GLIBC >= 2.17` (present on `Ubuntu >= 13.04`, `Debian >= 8.0`, `CentOS >= 7`, `RHEL >= 7.9`,
+  `Fedora >= 19`, etc);
 
 * **Download**:
   ```
