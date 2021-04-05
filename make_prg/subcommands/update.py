@@ -157,7 +157,7 @@ def run(options):
         variant_nodes_with_mutation = denovo_paths_db.locus_name_to_variant_nodes_with_mutation.get(locus_name, [])
         multithreaded_input.append((locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation, temp_path))
 
-    with multiprocessing.Pool(options.threads) as pool:
+    with multiprocessing.Pool(options.threads, maxtasksperchild=1) as pool:
         pool.starmap(update, multithreaded_input, chunksize=1)
     print_with_time(f"All PRGs updated!")
 
