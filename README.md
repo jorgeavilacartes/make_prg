@@ -49,7 +49,7 @@ chmod +x make_prg_0.2.0_prototype
 
 ### pip
 
-* **Requirements**: `python>=3`
+* **Requirements**: `python>=3.7`
 
 * **Installing**:
 ```sh
