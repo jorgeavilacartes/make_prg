@@ -2,8 +2,8 @@
 set -eu
 
 # configs
-make_prg_URL="https://github.com/leoisl/make_prg/releases/download/v0.2.0_prototype/make_prg_0.2.0_prototype"
-make_prg_executable="./make_prg_0.2.0_prototype"
+make_prg_URL="https://github.com/leoisl/make_prg/releases/download/v0.2.0/make_prg_0.2.0"
+make_prg_executable="./make_prg_0.2.0"
 
 wget "${make_prg_URL}" -O "${make_prg_executable}"
 chmod +x "${make_prg_executable}"

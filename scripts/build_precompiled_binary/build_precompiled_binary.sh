@@ -14,7 +14,7 @@ if [ -d "${PORTABLE_EXECUTABLE_BUILD_DIR}" ]; then
   exit 1
 fi
 
-version="0.2.0_prototype"
+version="0.2.0"
 sudo docker run --rm \
   -v "$(pwd)":/make_prg \
   leandroishilima/make_prg_precompiled_binary_builder:0.0.1 \

@@ -4,6 +4,6 @@ from pkg_resources import get_distribution
 try:
     __version__ = get_distribution("make_prg").version
 except:
-    __version__ = "0.2.0_prototype"
+    __version__ = "0.2.0"
 
 __all__ = ["from_msa", "subcommands", "io_utils", "seq_utils"]

@@ -32,12 +32,12 @@ In this binary, all libraries are linked statically.
 
 * **Download**:
   ```
-  wget https://github.com/leoisl/make_prg/releases/download/v0.2.0_prototype/make_prg_0.2.0_prototype
+  wget https://github.com/leoisl/make_prg/releases/download/v0.2.0/make_prg_0.2.0
   ```
 * **Running**:
 ```
-chmod +x make_prg_0.2.0_prototype
-./make_prg_0.2.0_prototype -h
+chmod +x make_prg_0.2.0
+./make_prg_0.2.0 -h
 ```
 
 * **Credits**:
