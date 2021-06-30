@@ -38,10 +38,16 @@ GAP_EXTEND_SCORE = -2
 
 
 class MSAAligner(ABC):
-    @classmethod
+    def __init__(self, executable: str):
+        self.executable = executable
+
+    @abstractmethod
+    def is_executable(self) -> bool:
+        pass
+
     @abstractmethod
     def get_updated_alignment(
-        cls,
+        self,
         leaf_name: str,
         previous_alignment: Path,
         new_sequences: List[str],
@@ -51,9 +57,11 @@ class MSAAligner(ABC):
 
 
 class MSAAlignerMAFFT(MSAAligner):
-    @classmethod
+    def is_executable(self) -> bool:
+        return shutil.which(self.executable) is not None
+
     def get_updated_alignment(
-        cls,
+        self,
         leaf_name: str,
         previous_alignment: Path,
         new_sequences: List[str],
@@ -79,7 +87,7 @@ class MSAAlignerMAFFT(MSAAligner):
 
         args = " ".join(
             [
-                "mafft",
+                self.executable,
                 "--auto",
                 "--quiet",
                 "--thread",
@@ -115,7 +123,7 @@ class MSAAlignerMAFFT(MSAAligner):
 
 
 class PrgBuilderRecursiveTreeNode(ABC):
-    def __init__(self, nesting_level, alignment, parent, prg_builder):
+    def __init__(self, nesting_level, alignment, parent, prg_builder, mafft: str):
         # set the basic attributes
         self.id = prg_builder.get_next_node_id()
         self.nesting_level = nesting_level
@@ -124,6 +132,7 @@ class PrgBuilderRecursiveTreeNode(ABC):
         self.new_sequences = None
 
         self.alignment = self.remove_gaps(alignment)
+        self.mafft = mafft
 
         self._set_derived_helper_attributes()
 
@@ -167,13 +176,13 @@ class PrgBuilderRecursiveTreeNode(ABC):
         pass
 
     @abstractmethod
-    def batch_update(self, temp_prefix):
+    def batch_update(self, temp_prefix, mafft: str = "mafft"):
         pass
 
 
 class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
-    def __init__(self, nesting_level, alignment, parent, prg_builder):
-        super().__init__(nesting_level, alignment, parent, prg_builder)
+    def __init__(self, nesting_level, alignment, parent, prg_builder, mafft):
+        super().__init__(nesting_level, alignment, parent, prg_builder, mafft=mafft)
 
     def _set_derived_helper_attributes(self):
         pass  # nothing to set here
@@ -188,6 +197,7 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
                 alignment=alignment,
                 parent=self,
                 prg_builder=self.prg_builder,
+                mafft=self.mafft,
             )
             children.append(child)
         return children
@@ -228,13 +238,13 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
 
     #####################################################################################################
 
-    def batch_update(self, temp_prefix):
+    def batch_update(self, temp_prefix, mafft: str = ""):
         assert False, "Update was called on a non-leaf node"
 
 
 class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
-    def __init__(self, nesting_level, alignment, parent, prg_builder):
-        super().__init__(nesting_level, alignment, parent, prg_builder)
+    def __init__(self, nesting_level, alignment, parent, prg_builder, mafft):
+        super().__init__(nesting_level, alignment, parent, prg_builder, mafft=mafft)
 
     def _set_derived_helper_attributes(self):
         self.consensus = self._get_consensus()
@@ -277,6 +287,7 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                 alignment=sub_alignment,
                 parent=self,
                 prg_builder=self.prg_builder,
+                mafft=self.mafft,
             )
             children.append(child)
 
@@ -364,7 +375,8 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
             self.new_sequences = set()
         self.new_sequences.add(new_sequence)
 
-    def batch_update(self, temp_prefix):
+    def batch_update(self, temp_prefix, mafft: str = "mafft"):
+        self.mafft = mafft
         no_update_to_be_done = (
             self.new_sequences is None or len(self.new_sequences) == 0
         )
@@ -384,7 +396,17 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         logger.debug(
             f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}..."
         )
-        msa_aligner = MSAAlignerMAFFT
+        msa_aligner = MSAAlignerMAFFT(self.mafft)
+        logger.debug("Detecting mafft...")
+        mafft_is_runnable = msa_aligner.is_executable()
+
+        if mafft_is_runnable:
+            logger.debug("mafft detected!")
+        else:
+            raise RuntimeError(
+                f"Could not execute mafft using `{msa_aligner.executable}`"
+            )
+
         new_msa = msa_aligner.get_updated_alignment(
             leaf_name=f"{self.prg_builder.locus_name}, node {self.id}",
             previous_alignment=previous_msa_filename,
@@ -418,7 +440,13 @@ class PrgBuilder(object):
     """
 
     def __init__(
-        self, locus_name, msa_file, alignment_format, max_nesting, min_match_length
+        self,
+        locus_name,
+        msa_file,
+        alignment_format,
+        max_nesting,
+        min_match_length,
+        mafft: str,
     ):
         self.locus_name = locus_name
         self.msa_file = msa_file
@@ -427,10 +455,15 @@ class PrgBuilder(object):
         self.min_match_length = min_match_length
         self.leaves_index = {}
         self.node_id = 0
+        self.mafft = mafft
 
         alignment = load_alignment_file(msa_file, alignment_format)
         self._root = PrgBuilderSingleClusterNode(
-            nesting_level=1, alignment=alignment, parent=None, prg_builder=self
+            nesting_level=1,
+            alignment=alignment,
+            parent=None,
+            prg_builder=self,
+            mafft=self.mafft,
         )
 
     def build_prg(self):
@@ -494,8 +527,7 @@ class PrgBuilderCollection:
         with open(filename, "rb") as filehandler:
             return pickle.load(filehandler)
 
-    def to_absolute_paths(self):
-        output_prefix_parent = Path(self.cl_options.output_prefix).parent.absolute()
+    def to_absolute_paths(self, parent: Path):
         for locus_name, pickle_file in self.locus_name_to_pickle_files.items():
-            absolute_filepath = output_prefix_parent / pickle_file
+            absolute_filepath = parent / pickle_file
             self.locus_name_to_pickle_files[locus_name] = str(absolute_filepath)

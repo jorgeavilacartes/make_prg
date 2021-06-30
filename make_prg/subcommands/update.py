@@ -1,11 +1,6 @@
-# todo: change logging to loguru
-# todo: allow specifying path to mafft
-# todo: use update_DS parent as parent for pickle files
-# todo: add force behaviour
 import multiprocessing
 import os
 import shutil
-import subprocess
 from pathlib import Path
 
 from loguru import logger
@@ -59,6 +54,11 @@ def register_parser(subparsers):
         help="Number of threads",
     )
     subparser_update_prg.add_argument(
+        "--mafft",
+        help="Path to MAFFT executable. By default, it is assumed to be on PATH",
+        default="mafft",
+    )
+    subparser_update_prg.add_argument(
         "--keep_temp", action="store_true", default=False, help="Keep temp files."
     )
 
@@ -85,7 +85,11 @@ def get_stats_on_variants(stats_files):
 
 
 def update(
-    locus_name, prg_builder_pickle_filepath, variant_nodes_with_mutation, temp_dir
+    locus_name,
+    prg_builder_pickle_filepath,
+    variant_nodes_with_mutation,
+    temp_dir,
+    mafft: str,
 ):
     prg_builder_for_locus = PrgBuilder.deserialize(prg_builder_pickle_filepath)
     nb_of_variants_sucessfully_updated = 0
@@ -112,7 +116,7 @@ def update(
 
         # update the changed leaves
         for leaf in leaves_to_update:
-            leaf.batch_update(temp_dir)
+            leaf.batch_update(temp_dir, mafft=mafft)
         logger.debug(
             f"Updated {locus_name}: {len(variant_nodes_with_mutation)} denovo sequences added!"
         )
@@ -138,35 +142,14 @@ def update(
     # TODO: change this?
 
 
-def check_if_mafft_is_runnable():
-    logger.debug("Detecting mafft, running mafft --version...")
-    try:
-        result = subprocess.Popen(["mafft", "--version"])
-        result.communicate()
-        return_code = result.returncode
-        mafft_is_runnable = return_code == 0
-        if mafft_is_runnable:
-            logger.debug("mafft detected!")
-        else:
-            raise RuntimeError(
-                "mafft not detected, mafft is needed to be in $PATH to run make_prg update command"
-            )
-    except:
-        raise RuntimeError(
-            "mafft not detected, mafft is needed to be in $PATH to run make_prg update command"
-        )
-
-
 def run(options):
-    check_if_mafft_is_runnable()
-
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
     # NB: don't use logging, it causes deadlocks: https://pythonspeed.com/articles/python-multiprocessing/
     logger.info("Reading update data structures...")
     prg_builder_collection = PrgBuilderCollection.deserialize(options.update_DS)
-    prg_builder_collection.to_absolute_paths()
+    prg_builder_collection.to_absolute_paths(Path(options.update_DS).parent)
     logger.info(f"Reading {options.denovo_paths}...")
     denovo_paths_db = DenovoPathsDB(options.denovo_paths)
 
@@ -195,6 +178,7 @@ def run(options):
                 prg_builder_pickle_filepath,
                 variant_nodes_with_mutation,
                 temp_path,
+                options.mafft,
             )
         )
 
