@@ -5,9 +5,10 @@ import fileinput
 from Bio import AlignIO
 import os
 
+from loguru import logger
+
 from make_prg.from_msa import MSA
 from make_prg.prg_encoder import PrgEncoder, PRG_Ints
-from make_prg.utils import print_with_time
 
 
 def load_alignment_file(msa_file: str, alignment_format: str) -> MSA:
@@ -63,13 +64,13 @@ class GFA_Output:
 
     def build_gfa_string(self, prg_string, pre_var_id=None):
         """Takes prg_string and builds a gfa_string with fragments
-           from the prg_string."""
+        from the prg_string."""
         end_ids = []
         # iterate through sites present, updating gfa_string with each in turn
         while str(self.gfa_site) in prg_string:
-            print_with_time("gfa_site: %d", self.gfa_site)
+            logger.trace("gfa_site: {}", self.gfa_site)
             prgs = self.split_on_site(prg_string, self.gfa_site)
-            print_with_time("prgs: %s", prgs)
+            logger.trace("prgs: {}", prgs)
             assert len(prgs) == 3, "Invalid prg sequence %s for site %d and id %d" % (
                 prg_string,
                 self.gfa_site,
@@ -96,9 +97,9 @@ class GFA_Output:
                 self.gfa_site + 1,
                 self.gfa_id,
             )
-            print_with_time("vars: %s", vars)
+            logger.trace("vars: {}", vars)
             self.gfa_site += 2
-            print_with_time("gfa_site: %d", self.gfa_site)
+            logger.trace("gfa_site: {}", self.gfa_site)
             for var_string in vars:
                 if pre_var_id != None:
                     self.gfa_string += "L\t%d\t+\t%d\t+\t0M\n" % (
@@ -164,12 +165,11 @@ def write_prg(output_prefix: str, prg_string: str):
     #     prg_encoder.write(prg_ints, ostream)
 
 
-
 def concatenate_text_files(input_filepaths, output_filepath):
     output_filepath_parent_dir = Path(output_filepath).parent
     os.makedirs(output_filepath_parent_dir, exist_ok=True)
 
-    with open(output_filepath, 'w') as fout:
+    with open(output_filepath, "w") as fout:
         empty_input = len(input_filepaths) == 0
         if empty_input:
             return

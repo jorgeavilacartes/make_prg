@@ -1,6 +1,7 @@
 from typing import Generator, Sequence, Tuple
 import itertools
-from make_prg.utils import print_with_time
+
+from loguru import logger
 
 from make_prg.from_msa import MSA
 
@@ -78,12 +79,10 @@ def get_interval_seqs(interval_alignment: MSA):
                 expanded_seqs.append(expanded_str)
 
     if len(expanded_set) == 0:
-        print_with_time(
-            "WARNING: Every sequence must have contained an N in this slice - redo sequence curation"
+        logger.warning(
+            "Every sequence must have contained an N in this slice - redo sequence curation"
         )
-        print_with_time(f'Sequences were: {" ".join(callback_seqs)}')
-        print_with_time(
-            "Using these sequences anyway, and should be ignored downstream"
-        )
+        logger.warning(f'Sequences were: {" ".join(callback_seqs)}')
+        logger.warning("Using these sequences anyway, and should be ignored downstream")
         return callback_seqs
     return expanded_seqs

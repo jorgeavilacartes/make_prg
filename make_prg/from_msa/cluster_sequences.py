@@ -140,7 +140,8 @@ def merge_clusters(clusters: List[ClusteredIDs], first_id: str) -> ClusteredIDs:
 
 
 def kmeans_cluster_seqs_in_interval(
-    alignment: MSA, kmer_size: int,
+    alignment: MSA,
+    kmer_size: int,
 ) -> ClusteredIDs:
     # Find unique sequences for clustering, but keep each sequence's IDs
     seq_to_ids: SeqToIDs = defaultdict(list)

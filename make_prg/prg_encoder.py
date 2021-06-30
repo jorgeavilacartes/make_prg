@@ -48,7 +48,8 @@ class PrgEncoder:
 
     @staticmethod
     def write(
-        encoding: List[int], ostream: BinaryIO,
+        encoding: List[int],
+        ostream: BinaryIO,
     ):
         ostream.write(b"".join(map(to_bytes, encoding)))
 

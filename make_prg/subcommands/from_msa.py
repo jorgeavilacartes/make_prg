@@ -1,13 +1,13 @@
+import multiprocessing
 import os
 from pathlib import Path
 
-from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
+from loguru import logger
+
 from make_prg import io_utils, prg_builder
-import multiprocessing
+from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
+from make_prg.utils import output_files_already_exist
 
-from make_prg.utils import output_files_already_exist, print_with_time
-
-options = None
 
 def register_parser(subparsers):
     subparser_msa = subparsers.add_parser(
@@ -16,7 +16,8 @@ def register_parser(subparsers):
         help="Make PRG from multiple sequence alignment dir",
     )
     subparser_msa.add_argument(
-        "-i", "--input",
+        "-i",
+        "--input",
         action="store",
         type=str,
         required=True,
@@ -27,16 +28,16 @@ def register_parser(subparsers):
         ),
     )
     subparser_msa.add_argument(
-        "-o", "--output_prefix",
+        "-o",
+        "--output_prefix",
         action="store",
         type=str,
         required=True,
-        help=(
-            "Output prefix: prefix for the output files"
-        ),
+        help=("Output prefix: prefix for the output files"),
     )
     subparser_msa.add_argument(
-        "-t", "--threads",
+        "-t",
+        "--threads",
         action="store",
         type=int,
         default=1,
@@ -81,12 +82,14 @@ def register_parser(subparsers):
 
 def get_all_input_files(input_dir):
     input_dir = Path(input_dir)
-    all_files = [Path(path).absolute() for path in input_dir.iterdir() if path.is_file()]
+    all_files = [
+        Path(path).absolute() for path in input_dir.iterdir() if path.is_file()
+    ]
     return all_files
 
 
 def process_MSA(msa_filepath: Path):
-    print_with_time(f"Generating PRG for {msa_filepath}...")
+    logger.info(f"Generating PRG for {msa_filepath}...")
     msa_name = msa_filepath.name
     locus_name = msa_filepath.with_suffix("").name
     current_process = multiprocessing.current_process()
@@ -104,7 +107,7 @@ def process_MSA(msa_filepath: Path):
             min_match_length=options.min_match_length,
         )
         prg = builder.build_prg()
-        print_with_time(f"Write PRG file to {prefix}.prg.fa")
+        logger.info(f"Write PRG file to {prefix}.prg.fa")
         io_utils.write_prg(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
 
@@ -113,7 +116,7 @@ def process_MSA(msa_filepath: Path):
         # io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
     except ValueError as value_error:
         if "No records found in handle" in value_error.args[0]:
-            print_with_time(f"No records found in MSA {msa_filepath}, skipping...")
+            logger.warning(f"No records found in MSA {msa_filepath}, skipping...")
         else:
             raise value_error
 
@@ -125,22 +128,24 @@ def run(cl_options):
 
     there_is_no_input_files = len(input_files) == 0
     if there_is_no_input_files:
-        print_with_time(f"WARNING: no input files found at {options.input}")
+        logger.warning(f"no input files found at {options.input}")
 
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
     # NB: don't use logging, it causes deadlocks: https://pythonspeed.com/articles/python-multiprocessing/
-    print_with_time(f"Using {options.threads} threads to generate PRGs...")
+    logger.debug(f"Using {options.threads} threads to generate PRGs...")
     with multiprocessing.Pool(options.threads) as pool:
         pool.map(process_MSA, input_files, chunksize=1)
-    print_with_time(f"All PRGs generated!")
+    logger.success(f"All PRGs generated!")
 
     # get all files that were generated
     prg_files = []
     locus_name_to_pickle_files = {}
-    for process_num in range(1, options.threads+1):
-        workdir = Path(options.output_prefix + "_prgs") / f"ForkPoolWorker-{process_num}"
+    for process_num in range(1, options.threads + 1):
+        workdir = (
+            Path(options.output_prefix + "_prgs") / f"ForkPoolWorker-{process_num}"
+        )
         if workdir.exists():
             for file in workdir.iterdir():
                 if file.is_file():
@@ -148,15 +153,19 @@ def run(cl_options):
                         prg_files.append(file)
                     elif file.name.endswith(".pickle"):
                         locus_name = file.with_suffix("").with_suffix("").name
-                        relative_path = file.relative_to(Path(options.output_prefix).parent)
+                        relative_path = file.relative_to(
+                            Path(options.output_prefix).parent
+                        )
                         locus_name_to_pickle_files[locus_name] = str(relative_path)
 
     # concatenate the prg.fa output files
-    print_with_time("Concatenating files from several threads into single final files...")
+    logger.debug("Concatenating files from several threads into single final files...")
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 
     # create and serialise the PRG Builder collection
-    prg_builder_collection = prg_builder.PrgBuilderCollection(locus_name_to_pickle_files, cl_options)
+    prg_builder_collection = prg_builder.PrgBuilderCollection(
+        locus_name_to_pickle_files, cl_options
+    )
     prg_builder_collection.serialize()
 
-    print_with_time("All done!")
+    logger.success("All done!")
