@@ -446,7 +446,7 @@ class PrgBuilder(object):
         alignment_format,
         max_nesting,
         min_match_length,
-        mafft: str,
+        mafft: str = "",
     ):
         self.locus_name = locus_name
         self.msa_file = msa_file
