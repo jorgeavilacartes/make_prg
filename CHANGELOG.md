@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `-v,--verbose` flag to control logging
+- Ability to specify the MAFFT binary [[#1][1]]
+
+### Changed
+
+- Logging switched to `loguru` [[#7][7]]
+
+### Fixed
+
+- Use the parent path of the update data structure to locate pickle objects
+
 ## [0.2.0] - 2021-05-07
 
 ### Changed
@@ -56,3 +69,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.1.1]: https://github.com/rmcolq/make_prg/releases/v0.1.1
 [0.1.0]: https://github.com/rmcolq/make_prg/releases/v0.1.0
+
+[1]: https://github.com/leoisl/make_prg/issues/1
+[7]: https://github.com/leoisl/make_prg/issues/7

@@ -32,12 +32,12 @@ In this binary, all libraries are linked statically.
 
 * **Download**:
   ```
-  wget https://github.com/leoisl/make_prg/releases/download/v0.2.0/make_prg_0.2.0
+  wget https://github.com/leoisl/make_prg/releases/download/v0.3.0/make_prg_0.3.0
   ```
 * **Running**:
 ```
-chmod +x make_prg_0.2.0
-./make_prg_0.2.0 -h
+chmod +x make_prg_0.3.0
+./make_prg_0.3.0 -h
 ```
 
 * **Credits**:
@@ -105,13 +105,14 @@ optional arguments:
                         Maximum number of levels to use for nesting. Default: 5
   --min_match_length MIN_MATCH_LENGTH
                         Minimum number of consecutive characters which must be identical for a match. Default: 7
+  -v, --verbose         Increase output verbosity
 ```
 
 #### `update`
 
 ```
 $ make_prg update --help
-usage: make_prg update_prg
+usage: make_prg update
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -123,7 +124,9 @@ optional arguments:
                         Output prefix: prefix for the output files
   -t THREADS, --threads THREADS
                         Number of threads
+  --mafft MAFFT         Path to MAFFT executable. By default, it is assumed to be on PATH
   --keep_temp           Keep temp files.
+  -v, --verbose         Increase output verbosity
 ```
 
 [pandora]: https://github.com/rmcolq/pandora
