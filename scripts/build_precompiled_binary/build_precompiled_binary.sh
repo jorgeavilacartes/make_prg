@@ -15,9 +15,9 @@ if [ -d "${PORTABLE_EXECUTABLE_BUILD_DIR}" ]; then
 fi
 
 version="0.3.0"
-sudo docker run --rm \
+docker run --rm \
   -v "$(pwd)":/make_prg \
-  leandroishilima/make_prg_precompiled_binary_builder:0.0.1 \
+  leandroishilima/make_prg_precompiled_binary_builder:${version} \
    /bin/bash -c \
    "cd make_prg && pyinstaller \
   --noconfirm \
