@@ -1,0 +1,148 @@
+from pathlib import Path
+import os
+from glob import glob
+import shutil
+
+configfile: "config.yaml"
+
+def get_samples():
+    samples = []
+    for file in [file for file in os.listdir(config["assemblies_dir"]) if file.endswith(".fa")]:
+        file_name = Path(file).with_suffix("")
+        samples.append(str(file_name))
+    return samples
+
+def get_gff_files(prokka_outputs):
+    gff_files = list(map(lambda dirpath: glob(f"{dirpath}/*.gff")[0], prokka_outputs))
+    return gff_files
+
+
+rule all:
+    input:
+        config["output_dir"] + "/final_msas/"
+
+rule fix_assembly_headers:
+    input:
+        fasta = config["assemblies_dir"] + "/{sample}.fa"
+    output:
+        fixed_fasta = config["output_dir"] + "/fixed_assemblies/{sample}.fa"
+    threads: 1
+    resources:
+        mem_mb=200
+    log:
+        "logs/fix_assembly_headers_{sample}.log"
+    run:
+        with open(input.fasta) as input_fasta_fh, open(output.fixed_fasta, "w") as output_fasta_fh:
+            contig_id=0
+            for line in input_fasta_fh:
+                if line.startswith(">"):
+                    print(f">{wildcards.sample}_{contig_id}", file=output_fasta_fh)
+                    contig_id+=1
+                else:
+                    print(line.strip(), file=output_fasta_fh)
+
+rule run_prokka:
+    input:
+        fasta=rules.fix_assembly_headers.output.fixed_fasta
+    output:
+        prokka_output = directory(config["output_dir"] + "/prokka/{sample}/")
+    threads: 8
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 8000
+    log:
+        "logs/run_prokka_{sample}.log"
+    conda:
+        "envs/panaroo.yaml"
+    shell:
+        """
+        prokka --addgenes --addmrna --locustag {wildcards.sample} --prefix  {wildcards.sample} \
+        --cpus {threads} --outdir {output.prokka_output} {input.fasta}
+        """
+
+rule run_panaroo:
+    input:
+        prokka_outputs = expand(rules.run_prokka.output.prokka_output, sample=get_samples())
+    output:
+        panaroo_output = directory(config["output_dir"] + "/panaroo/")
+    threads: 16
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 16000
+    log:
+        "logs/run_panaroo.log"
+    conda:
+        "envs/panaroo.yaml"
+    params:
+        prokka_gffs = lambda wildcards, input: get_gff_files(input.prokka_outputs)
+    shell:
+        "panaroo -i {params.prokka_gffs} -o {output.panaroo_output} --clean-mode sensitive -a pan --merge_paralogs -t {threads}"
+
+rule run_roary:
+    input:
+        prokka_outputs = expand(rules.run_prokka.output.prokka_output, sample=get_samples())
+    output:
+        roary_outdir = directory(config["output_dir"] + "/roary/")
+    threads: 16
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 16000
+    log:
+        "logs/run_roary.log"
+    singularity:
+        "docker://leandroishilima/piggy:latest"
+    params:
+        prokka_gffs = lambda wildcards, input: get_gff_files(input.prokka_outputs)
+    shell:
+        "roary -e -n -i 90 -s -p {threads} -f {output.roary_outdir} {params.prokka_gffs}"
+
+rule get_prokka_gffs_for_piggy:
+    input:
+        prokka_outputs = expand(rules.run_prokka.output.prokka_output,sample=get_samples())
+    output:
+        prokka_gffs = directory(config["output_dir"] + "/prokka_gffs/")
+    threads: 1
+    resources:
+        mem_mb = 200
+    log:
+        "logs/get_prokka_gffs_for_piggy.log"
+    params:
+        prokka_output = config["output_dir"] + "/prokka"
+    shell:
+        "mkdir -p {output.prokka_gffs} && cp {params.prokka_output}/*/*.gff {output.prokka_gffs}"
+
+rule run_piggy:
+    input:
+        roary_outdir = rules.run_roary.output.roary_outdir,
+        prokka_gffs = rules.get_prokka_gffs_for_piggy.output.prokka_gffs
+    output:
+        piggy_outdir= directory(config["output_dir"] + "/piggy/"),
+    threads: 16
+    resources:
+        mem_mb = lambda wildcards, attempt: attempt * 16000
+    log:
+        "logs/run_piggy.log"
+    singularity:
+        "docker://leandroishilima/piggy:latest"
+    shell:
+        "piggy -t {threads} -i {input.prokka_gffs} -r {input.roary_outdir} -o {output.piggy_outdir}"
+
+
+rule concatenate_and_fix_MSAs:
+    input:
+        panaroo_output = rules.run_panaroo.output.panaroo_output,
+        piggy_output = rules.run_piggy.output.piggy_outdir
+    output:
+        final_msas = directory(config["output_dir"] + "/final_msas/"),
+    threads: 1
+    resources:
+        mem_mb = 200
+    log:
+        "logs/concatenate_and_fix_MSAs.log"
+    run:
+        def copy_files(src, dest, prefix):
+            index = 0
+            for file in os.listdir(src):
+                shutil.copyfile(f"{src}/{file}", f"{dest}/{prefix}_{index}.fa")
+                index += 1
+
+        os.makedirs(output.final_msas, exist_ok=True)
+        copy_files(input.panaroo_output+"/aligned_gene_sequences", output.final_msas, "Gene")
+        copy_files(input.piggy_output + "/cluster_intergenic_alignment_files",output.final_msas,"IGR")

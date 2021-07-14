@@ -1,0 +1,4 @@
+assemblies_dir: assemblies
+output_dir: output
+panaroo_container: docker://quay.io/biocontainers/panaroo:1.2.8--pyhdfd78af_0
+piggy_container: docker://leandroishilima/piggy:latest
