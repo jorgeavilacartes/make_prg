@@ -113,3 +113,5 @@ sample_example/make_prg_*
 /scripts/assemblies_to_PanRG/.snakemake/
 /scripts/assemblies_to_PanRG/output/
 /scripts/assemblies_to_PanRG/.parallel/
+/scripts/assemblies_to_PanRG/scripts/assemblies/
+/scripts/assemblies_to_PanRG/scripts/assemblies_with_filenames_fixed/
