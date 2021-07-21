@@ -115,3 +115,7 @@ sample_example/make_prg_*
 /scripts/assemblies_to_PanRG/.parallel/
 /scripts/assemblies_to_PanRG/scripts/assemblies/
 /scripts/assemblies_to_PanRG/scripts/assemblies_with_filenames_fixed/
+/scripts/build_msas_from_first_approximations/.snakemake/
+/scripts/build_msas_from_first_approximations/FA_MSAs/
+/scripts/build_msas_from_first_approximations/fastas/
+/scripts/build_msas_from_first_approximations/msas/

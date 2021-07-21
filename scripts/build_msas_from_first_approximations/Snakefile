@@ -1,0 +1,34 @@
+import os
+
+configfile: "config.yaml"
+
+def get_all_msas_files():
+    all_msas = [file for file in os.listdir(config["fastas"]) if file.endswith(".fa") ]
+    all_msas = [f"{config['output_dir']}/{msa}" for msa in all_msas]
+    return all_msas
+
+rule all:
+    input: get_all_msas_files()
+
+rule build_MSAs:
+    input:
+        fasta = config["fastas"] + "/{locus}.fa"
+    output:
+        msa = config["output_dir"] + "/{locus}.fa"
+    threads: 2
+    resources:
+        mem_mb=lambda wildcards, attempt: {1: 4000, 2: 8000, 3: 16000}.get(attempt,32000)
+    shadow: "shallow"
+    singularity: config["clustalo_container"]
+    log:
+        "logs/build_MSAs/{locus}.log"
+    shell:
+        """
+        nb_of_seqs=`grep "^>" {input.fasta} | wc -l`
+        if [ "$nb_of_seqs" -eq 1 ]
+        then
+            cp {input.fasta} {output.msa}
+        else
+            clustalo --threads {threads} --in {input.fasta} --out {output.msa}
+        fi
+        """
