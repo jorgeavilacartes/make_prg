@@ -119,3 +119,6 @@ sample_example/make_prg_*
 /scripts/build_msas_from_first_approximations/FA_MSAs/
 /scripts/build_msas_from_first_approximations/fastas/
 /scripts/build_msas_from_first_approximations/msas/
+.snakemake
+logs
+/scripts/build_msas_from_racon_out/out/

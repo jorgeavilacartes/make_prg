@@ -1,0 +1,3 @@
+pandora_discovery_dir: sample_data/pandora_discover_out
+output_dir: out
+clustalo_container: docker://quay.io/biocontainers/clustalo:1.2.4--h1b792b2_4

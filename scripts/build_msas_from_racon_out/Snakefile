@@ -1,0 +1,84 @@
+configfile: "config.yaml"
+
+rule all:
+    input: config["output_dir"] + "/all_msas_done.flag"
+
+checkpoint build_fastas:
+    input:
+        pandora_discovery_dir = config["pandora_discovery_dir"]
+    output:
+        fasta_dir = directory(f'{config["output_dir"]}/fastas'),
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: {1: 4000, 2: 8000, 3: 16000}.get(attempt,32000)
+    log:
+        "logs/build_fastas.log"
+    run:
+        from pathlib import Path
+        from collections import defaultdict
+        import pysam
+
+        pandora_discovery_dir = Path(input.pandora_discovery_dir).absolute()
+        sample_dirs = [sample for sample in pandora_discovery_dir.iterdir()
+                       if sample.is_dir()]
+
+        locus_to_sample_to_seq = defaultdict(lambda: defaultdict(str))
+        for sample_dir in sample_dirs:
+            sample = sample_dir.name
+            with pysam.FastxFile(str(sample_dir / "denovo_sequences.fa")) as denovo_seq_fh:
+                for fasta_record in denovo_seq_fh:
+                    locus = fasta_record.name
+                    sequence = fasta_record.sequence
+                    locus_to_sample_to_seq[locus][sample] = sequence
+
+        fasta_output_dir = Path(f'{config["output_dir"]}/fastas/')
+        fasta_output_dir.mkdir(parents=True)
+        for locus, sample_to_seq in locus_to_sample_to_seq.items():
+            with open(f"{fasta_output_dir}/{locus}.fa", "w") as locus_fh:
+                for sample, seq in sample_to_seq.items():
+                    print(f">{locus}_{sample}", file=locus_fh)
+                    print(seq, file=locus_fh)
+
+
+
+rule build_MSAs:
+    input:
+        fasta = f'{config["output_dir"]}/fastas/{{locus}}.fa'
+    output:
+        msa = config["output_dir"] + "/msas/{locus}.fa"
+    threads: 2
+    resources:
+        mem_mb=lambda wildcards, attempt: {1: 4000, 2: 8000, 3: 16000}.get(attempt,32000)
+    shadow: "shallow"
+    singularity: config["clustalo_container"]
+    log:
+        "logs/build_MSAs/{locus}.log"
+    shell:
+        """
+        nb_of_seqs=`grep "^>" {input.fasta} | wc -l`
+        if [ "$nb_of_seqs" -eq 1 ]
+        then
+            cp {input.fasta} {output.msa}
+        else
+            clustalo --threads {threads} --in {input.fasta} --out {output.msa}
+        fi
+        """
+
+def get_all_msas_files(wildcards):
+    fasta_dir = checkpoints.build_fastas.get().output[0]
+    fasta_dir = Path(fasta_dir).absolute()
+    loci = [fasta_file.name for fasta_file in fasta_dir.iterdir()
+                   if fasta_file.is_file() and fasta_file.suffix==".fa"]
+    msas_files = [f'{config["output_dir"]}/msas/{locus}' for locus in loci]
+    return msas_files
+
+rule flag_that_all_MSAs_are_done:
+    input:
+        loci = get_all_msas_files
+    output:
+        config["output_dir"] + "/all_msas_done.flag"
+    threads: 1
+    resources:
+        mem_mb=100
+    shell:
+        "touch {output}"
