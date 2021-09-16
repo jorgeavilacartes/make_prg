@@ -57,6 +57,6 @@ rule flag_that_all_MSAs_are_done:
         config["output_dir"] + "/all_msas_done.flag"
     threads: 1
     resources:
-        mem_mb=100
+        mem_mb=4000
     shell:
         "touch {output}"
