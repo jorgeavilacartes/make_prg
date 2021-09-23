@@ -29,7 +29,9 @@ import subprocess
 import copy
 import numpy as np
 from Bio.Seq import Seq
-
+import networkx as nx
+import matplotlib.pyplot as plt
+from collections import defaultdict
 
 MATCH_SCORE = 2
 MISMATCH_SCORE = -1
@@ -136,8 +138,16 @@ class PrgBuilderRecursiveTreeNode(ABC):
 
         self._set_derived_helper_attributes()
 
+        self.prg_builder.all_nodes.append(self)
+
+        is_root = self.id == 0
+        if not is_root:
+            self.prg_builder.graph.add_node(self.id)
+
         # generate recursion tree
         self._children = self._get_children()
+
+
 
     def remove_gaps(self, alignment):
         """
@@ -193,13 +203,14 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
         children = []
         for alignment in cluster_subalignments:
             child = PrgBuilderSingleClusterNode(
-                nesting_level=self.nesting_level,
+                nesting_level=self.nesting_level + 1,  # TODO FIXME: this was added just for drawing purposes, roll back
                 alignment=alignment,
                 parent=self,
                 prg_builder=self.prg_builder,
                 mafft=self.mafft,
             )
             children.append(child)
+            self.prg_builder.graph.add_edge(self.id, child.id)
         return children
 
     ##################################################################################
@@ -290,6 +301,12 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                 mafft=self.mafft,
             )
             children.append(child)
+            edge_from_root = self.id == 0
+            if not edge_from_root:
+                self.prg_builder.graph.add_edge(self.id, child.id)
+            has_siblings = len(children) > 1
+            if has_siblings:
+                self.prg_builder.graph.add_edge(children[-2].id, child.id)
 
         return children
 
@@ -348,6 +365,7 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                 prg_as_list.extend(seqs[0])
                 end_index = len(prg_as_list) + 1
                 self.prg_builder.update_leaves_index(start_index, end_index, node=self)
+                self.prg_builder.leaf_id_to_seq[self.id] = seqs[0]
             else:
                 # Add the variant seqs to the prg.
                 site_num = self.prg_builder.get_next_site_num()
@@ -362,6 +380,7 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                     self.prg_builder.update_leaves_index(
                         start_index, end_index, node=self
                     )
+                    self.prg_builder.leaf_id_to_seq[self.id] = seq
                     prg_as_list.extend(
                         f"{delim_char}{site_num_for_this_seq}{delim_char}"
                     )
@@ -456,6 +475,9 @@ class PrgBuilder(object):
         self.leaves_index = {}
         self.node_id = 0
         self.mafft = mafft
+        self.all_nodes = []
+        self.graph = nx.DiGraph()
+        self.leaf_id_to_seq = {}
 
         alignment = load_alignment_file(msa_file, alignment_format)
         self._root = PrgBuilderSingleClusterNode(
@@ -507,6 +529,30 @@ class PrgBuilder(object):
     def deserialize(filename):
         with open(filename, "rb") as filehandler:
             return pickle.load(filehandler)
+
+    def output_graph(self, filename):
+        nesting_level_to_node_ids = defaultdict(list)
+        for node in self.all_nodes:
+            nesting_level_to_node_ids[node.nesting_level].append(node.id)
+
+
+        plt.figure(figsize=(20, 10))
+        a_graph = nx.drawing.nx_agraph.to_agraph(self.graph)
+        for node in a_graph.nodes():
+            node.attr["label"] = self.leaf_id_to_seq.get(int(node.name), node.name)
+
+        for nesting_level, nodes in nesting_level_to_node_ids.items():
+            a_graph.add_subgraph(nodes, rank="same")
+        a_graph.layout(prog="dot")
+        a_graph.draw(filename)
+
+        a_graph.draw(f"{filename}.dot")
+
+        ## See original saving of each node location to node_pos
+        # return node_pos
+        # pos = nx.drawing.nx_agraph.graphviz_layout(self.graph, prog='dot', args='-Gnodesep=2 -layout=layout_reingold_tilford')
+        # nx.draw(self.graph, pos=pos, with_labels=True, font_weight='bold', arrows=True)
+        # plt.savefig(filename)
 
 
 class PrgBuilderCollection:

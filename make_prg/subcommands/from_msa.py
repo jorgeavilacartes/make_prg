@@ -110,6 +110,7 @@ def process_MSA(msa_filepath: Path):
         logger.info(f"Write PRG file to {prefix}.prg.fa")
         io_utils.write_prg(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
+        builder.output_graph(f"{prefix}.png")
 
         # TODO: add back GFA writing
         # print_with_time(f"Write GFA file to {prefix}.gfa")
