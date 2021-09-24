@@ -125,10 +125,11 @@ class MSAAlignerMAFFT(MSAAligner):
 
 
 class PrgBuilderRecursiveTreeNode(ABC):
-    def __init__(self, nesting_level, alignment, parent, prg_builder, mafft: str):
+    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, mafft: str):
         # set the basic attributes
         self.id = prg_builder.get_next_node_id()
         self.nesting_level = nesting_level
+        self.drawing_level = drawing_level
         self.parent = parent
         self.prg_builder = prg_builder
         self.new_sequences = None
@@ -191,8 +192,8 @@ class PrgBuilderRecursiveTreeNode(ABC):
 
 
 class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
-    def __init__(self, nesting_level, alignment, parent, prg_builder, mafft):
-        super().__init__(nesting_level, alignment, parent, prg_builder, mafft=mafft)
+    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, mafft):
+        super().__init__(nesting_level, drawing_level, alignment, parent, prg_builder, mafft=mafft)
 
     def _set_derived_helper_attributes(self):
         pass  # nothing to set here
@@ -203,7 +204,8 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
         children = []
         for alignment in cluster_subalignments:
             child = PrgBuilderSingleClusterNode(
-                nesting_level=self.nesting_level + 1,  # TODO FIXME: this was added just for drawing purposes, roll back
+                nesting_level=self.nesting_level,
+                drawing_level=self.drawing_level+1,
                 alignment=alignment,
                 parent=self,
                 prg_builder=self.prg_builder,
@@ -254,8 +256,8 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
 
 
 class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
-    def __init__(self, nesting_level, alignment, parent, prg_builder, mafft):
-        super().__init__(nesting_level, alignment, parent, prg_builder, mafft=mafft)
+    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, mafft):
+        super().__init__(nesting_level, drawing_level, alignment, parent, prg_builder, mafft=mafft)
 
     def _set_derived_helper_attributes(self):
         self.consensus = self._get_consensus()
@@ -295,6 +297,7 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
 
             child = subclass(
                 nesting_level=self.nesting_level + 1,
+                drawing_level=self.drawing_level + 1,
                 alignment=sub_alignment,
                 parent=self,
                 prg_builder=self.prg_builder,
@@ -355,6 +358,8 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         return consensus_string
 
     def _get_prg(self, prg_as_list, delim_char):
+        site_start_index = len(prg_as_list)
+
         for interval in self.all_intervals:
             sub_alignment = self.alignment[:, interval.start : interval.stop + 1]
             seqs = get_interval_seqs(sub_alignment)
@@ -365,7 +370,6 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                 prg_as_list.extend(seqs[0])
                 end_index = len(prg_as_list) + 1
                 self.prg_builder.update_leaves_index(start_index, end_index, node=self)
-                self.prg_builder.leaf_id_to_seq[self.id] = seqs[0]
             else:
                 # Add the variant seqs to the prg.
                 site_num = self.prg_builder.get_next_site_num()
@@ -380,10 +384,12 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                     self.prg_builder.update_leaves_index(
                         start_index, end_index, node=self
                     )
-                    self.prg_builder.leaf_id_to_seq[self.id] = seq
                     prg_as_list.extend(
                         f"{delim_char}{site_num_for_this_seq}{delim_char}"
                     )
+
+        site_end_index = len(prg_as_list)
+        self.prg_builder.leaf_id_to_seq[self.id] = "".join(prg_as_list[site_start_index:site_end_index])
 
     ##################################################################################
 
@@ -482,6 +488,7 @@ class PrgBuilder(object):
         alignment = load_alignment_file(msa_file, alignment_format)
         self._root = PrgBuilderSingleClusterNode(
             nesting_level=1,
+            drawing_level=1,
             alignment=alignment,
             parent=None,
             prg_builder=self,
@@ -531,28 +538,20 @@ class PrgBuilder(object):
             return pickle.load(filehandler)
 
     def output_graph(self, filename):
-        nesting_level_to_node_ids = defaultdict(list)
+        drawing_level_to_node_ids = defaultdict(list)
         for node in self.all_nodes:
-            nesting_level_to_node_ids[node.nesting_level].append(node.id)
-
+            drawing_level_to_node_ids[node.drawing_level].append(node.id)
 
         plt.figure(figsize=(20, 10))
         a_graph = nx.drawing.nx_agraph.to_agraph(self.graph)
         for node in a_graph.nodes():
             node.attr["label"] = self.leaf_id_to_seq.get(int(node.name), node.name)
 
-        for nesting_level, nodes in nesting_level_to_node_ids.items():
+        for drawing_level, nodes in drawing_level_to_node_ids.items():
             a_graph.add_subgraph(nodes, rank="same")
         a_graph.layout(prog="dot")
         a_graph.draw(filename)
-
         a_graph.draw(f"{filename}.dot")
-
-        ## See original saving of each node location to node_pos
-        # return node_pos
-        # pos = nx.drawing.nx_agraph.graphviz_layout(self.graph, prog='dot', args='-Gnodesep=2 -layout=layout_reingold_tilford')
-        # nx.draw(self.graph, pos=pos, with_labels=True, font_weight='bold', arrows=True)
-        # plt.savefig(filename)
 
 
 class PrgBuilderCollection:
