@@ -19,113 +19,19 @@ from make_prg.from_msa.interval_partition import (
 import pickle
 from pathlib import Path
 import os
-import shlex
-import time
 from Bio import SeqIO
 from abc import ABC, abstractmethod
-import uuid
-import shutil
-import subprocess
 import copy
 import numpy as np
 from Bio.Seq import Seq
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import defaultdict
-
-MATCH_SCORE = 2
-MISMATCH_SCORE = -1
-GAP_OPEN_SCORE = -4
-GAP_EXTEND_SCORE = -2
-
-
-class MSAAligner(ABC):
-    def __init__(self, executable: str):
-        self.executable = executable
-
-    @abstractmethod
-    def is_executable(self) -> bool:
-        pass
-
-    @abstractmethod
-    def get_updated_alignment(
-        self,
-        leaf_name: str,
-        previous_alignment: Path,
-        new_sequences: List[str],
-        temp_prefix: Path,
-    ) -> Path:
-        pass
-
-
-class MSAAlignerMAFFT(MSAAligner):
-    def is_executable(self) -> bool:
-        return shutil.which(self.executable) is not None
-
-    def get_updated_alignment(
-        self,
-        leaf_name: str,
-        previous_alignment: Path,
-        new_sequences: List[str],
-        temp_prefix: Path,
-    ) -> Path:
-        new_sequences_filename = temp_prefix / "new_sequences.fa"
-        with open(new_sequences_filename, "w") as new_sequences_handler:
-            for index_new_seq, new_seq in enumerate(new_sequences):
-                print(
-                    f">Denovo_path_{index_new_seq}_random_id_{uuid.uuid4()}",
-                    file=new_sequences_handler,
-                )
-                print(new_seq, file=new_sequences_handler)
-
-        new_msa = temp_prefix / "updated_msa.fa"
-        previous_alignment = shlex.quote(str(previous_alignment))
-        mafft_tmpdir = Path(temp_prefix / f"temp.mafft.{uuid.uuid4()}")
-        if mafft_tmpdir.exists():
-            shutil.rmtree(mafft_tmpdir)
-        mafft_tmpdir.mkdir()
-        env = os.environ
-        env["TMPDIR"] = str(mafft_tmpdir)
-
-        args = " ".join(
-            [
-                self.executable,
-                "--auto",
-                "--quiet",
-                "--thread",
-                "1",
-                "--add",
-                str(new_sequences_filename),
-                str(previous_alignment),
-                ">",
-                str(new_msa),
-            ]
-        )
-
-        start = time.time()
-        process = subprocess.Popen(
-            args,
-            stderr=subprocess.PIPE,
-            encoding="utf-8",
-            shell=True,
-            env=env,
-        )
-        exit_code = process.wait()
-        shutil.rmtree(mafft_tmpdir)
-        if exit_code != 0:
-            raise RuntimeError(
-                f"Failed to execute MAFFT for {leaf_name} due to the following error:\n"
-                f"{process.stderr.read()}"
-            )
-        stop = time.time()
-        runtime = stop - start
-        logger.debug(f"MAFFT update runtime for {leaf_name} in seconds: {runtime:.3f}")
-
-        return new_msa
+from make_prg.msa_aligner import MSAAligner
 
 
 class PrgBuilderRecursiveTreeNode(ABC):
-    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, mafft: str):
+    def __init__(self, nesting_level: int, drawing_level: int, alignment, parent, prg_builder, aligner: MSAAligner):
         # set the basic attributes
         self.id = prg_builder.get_next_node_id()
         self.nesting_level = nesting_level
@@ -135,7 +41,7 @@ class PrgBuilderRecursiveTreeNode(ABC):
         self.new_sequences = None
 
         self.alignment = self.remove_gaps(alignment)
-        self.mafft = mafft
+        self.aligner = aligner
 
         self._set_derived_helper_attributes()
 
@@ -147,7 +53,6 @@ class PrgBuilderRecursiveTreeNode(ABC):
 
         # generate recursion tree
         self._children = self._get_children()
-
 
 
     def remove_gaps(self, alignment):
@@ -187,13 +92,13 @@ class PrgBuilderRecursiveTreeNode(ABC):
         pass
 
     @abstractmethod
-    def batch_update(self, temp_prefix, mafft: str = "mafft"):
+    def batch_update(self, temp_prefix, aligner):
         pass
 
 
 class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
-    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, mafft):
-        super().__init__(nesting_level, drawing_level, alignment, parent, prg_builder, mafft=mafft)
+    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, aligner: MSAAligner):
+        super().__init__(nesting_level, drawing_level, alignment, parent, prg_builder, aligner)
 
     def _set_derived_helper_attributes(self):
         pass  # nothing to set here
@@ -209,7 +114,7 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
                 alignment=alignment,
                 parent=self,
                 prg_builder=self.prg_builder,
-                mafft=self.mafft,
+                aligner=self.aligner,
             )
             children.append(child)
             self.prg_builder.graph.add_edge(self.id, child.id)
@@ -251,13 +156,13 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
 
     #####################################################################################################
 
-    def batch_update(self, temp_prefix, mafft: str = ""):
+    def batch_update(self, temp_prefix, aligner: MSAAligner):
         assert False, "Update was called on a non-leaf node"
 
 
 class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
-    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, mafft):
-        super().__init__(nesting_level, drawing_level, alignment, parent, prg_builder, mafft=mafft)
+    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, aligner: MSAAligner):
+        super().__init__(nesting_level, drawing_level, alignment, parent, prg_builder, aligner)
 
     def _set_derived_helper_attributes(self):
         self.consensus = self._get_consensus()
@@ -301,7 +206,7 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                 alignment=sub_alignment,
                 parent=self,
                 prg_builder=self.prg_builder,
-                mafft=self.mafft,
+                aligner=self.aligner,
             )
             children.append(child)
             edge_from_root = self.id == 0
@@ -400,8 +305,8 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
             self.new_sequences = set()
         self.new_sequences.add(new_sequence)
 
-    def batch_update(self, temp_prefix, mafft: str = "mafft"):
-        self.mafft = mafft
+    def batch_update(self, temp_prefix, aligner: MSAAligner):
+        self.aligner = aligner
         no_update_to_be_done = (
             self.new_sequences is None or len(self.new_sequences) == 0
         )
@@ -421,18 +326,8 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         logger.debug(
             f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}..."
         )
-        msa_aligner = MSAAlignerMAFFT(self.mafft)
-        logger.debug("Detecting mafft...")
-        mafft_is_runnable = msa_aligner.is_executable()
 
-        if mafft_is_runnable:
-            logger.debug("mafft detected!")
-        else:
-            raise RuntimeError(
-                f"Could not execute mafft using `{msa_aligner.executable}`"
-            )
-
-        new_msa = msa_aligner.get_updated_alignment(
+        new_msa = self.aligner.get_updated_alignment(
             leaf_name=f"{self.prg_builder.locus_name}, node {self.id}",
             previous_alignment=previous_msa_filename,
             new_sequences=list(self.new_sequences),
@@ -463,7 +358,6 @@ class PrgBuilder(object):
     Prg builder based from a multiple sequence alignment.
     Note min_match_length must be strictly greater than max_nesting + 1.
     """
-
     def __init__(
         self,
         locus_name,
@@ -471,16 +365,17 @@ class PrgBuilder(object):
         alignment_format,
         max_nesting,
         min_match_length,
-        mafft: str = "",
+        aligner: MSAAligner,
     ):
+        # trivial attributes
         self.locus_name = locus_name
-        self.msa_file = msa_file
-        self.alignment_format = alignment_format
         self.max_nesting = max_nesting
         self.min_match_length = min_match_length
+        self.aligner = aligner
+
         self.leaves_index = {}
         self.node_id = 0
-        self.mafft = mafft
+
         self.all_nodes = []
         self.graph = nx.DiGraph()
         self.leaf_id_to_seq = {}
@@ -492,7 +387,7 @@ class PrgBuilder(object):
             alignment=alignment,
             parent=None,
             prg_builder=self,
-            mafft=self.mafft,
+            aligner=self.aligner,
         )
 
     def build_prg(self):
