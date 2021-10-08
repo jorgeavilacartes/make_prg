@@ -164,9 +164,7 @@ def run(cl_options):
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 
     # create and serialise the PRG Builder collection
-    prg_builder_collection = prg_builder.PrgBuilderCollection(
-        locus_name_to_pickle_files, cl_options
-    )
-    prg_builder_collection.serialize()
+    prg_builder_collection = prg_builder.PrgBuilderCollection(locus_name_to_pickle_files)
+    prg_builder_collection.serialize(f"{options.output_prefix}.update_DS")
 
     logger.success("All done!")

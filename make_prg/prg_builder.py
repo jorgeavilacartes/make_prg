@@ -451,23 +451,21 @@ class PrgBuilder(object):
 
 class PrgBuilderCollection:
     """
-    Represent a collection of PrgBuilder and some other info, to be serialised and deserialised
+    Represent a collection of PrgBuilder, to be serialised and deserialised
     """
-
-    def __init__(self, locus_name_to_pickle_files, cl_options):
+    def __init__(self, locus_name_to_pickle_files):
         self.locus_name_to_pickle_files = locus_name_to_pickle_files
-        self.cl_options = cl_options
 
-    def serialize(self):
-        with open(f"{self.cl_options.output_prefix}.update_DS", "wb") as filehandler:
+    def serialize(self, filepath: [Path, str]):
+        with open(filepath, "wb") as filehandler:
             pickle.dump(self, filehandler)
 
     @staticmethod
-    def deserialize(filename):
-        with open(filename, "rb") as filehandler:
+    def deserialize(filepath: [Path, str]):
+        with open(filepath, "rb") as filehandler:
             return pickle.load(filehandler)
 
-    def to_absolute_paths(self, parent: Path):
+    def to_absolute_paths_wrt_given_parent(self, parent: Path):
         for locus_name, pickle_file in self.locus_name_to_pickle_files.items():
             absolute_filepath = parent / pickle_file
             self.locus_name_to_pickle_files[locus_name] = str(absolute_filepath)
