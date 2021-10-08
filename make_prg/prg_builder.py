@@ -19,7 +19,6 @@ from make_prg.from_msa.interval_partition import (
 import pickle
 from pathlib import Path
 import os
-from Bio import SeqIO
 from abc import ABC, abstractmethod
 import copy
 import numpy as np
@@ -30,32 +29,23 @@ from collections import defaultdict
 from make_prg.msa_aligner import MSAAligner
 
 
-class PrgBuilderRecursiveTreeNode(ABC):
-    def __init__(self, nesting_level: int, drawing_level: int, alignment, parent, prg_builder, aligner: MSAAligner):
+class RecursiveTreeNode(ABC):
+    def __init__(self, nesting_level: int, alignment, parent, prg_builder):
         # set the basic attributes
-        self.id = prg_builder.get_next_node_id()
         self.nesting_level = nesting_level
-        self.drawing_level = drawing_level
         self.parent = parent
         self.prg_builder = prg_builder
+
         self.new_sequences = None
-
-        self.alignment = self.remove_gaps(alignment)
-        self.aligner = aligner
-
+        self.id = self.prg_builder.get_next_node_id()
+        self.alignment = self._remove_gaps(alignment)
         self._set_derived_helper_attributes()
-
-        self.prg_builder.all_nodes.append(self)
-
-        is_root = self.id == 0
-        if not is_root:
-            self.prg_builder.graph.add_node(self.id)
 
         # generate recursion tree
         self._children = self._get_children()
 
-
-    def remove_gaps(self, alignment):
+    @staticmethod
+    def _remove_gaps(alignment):
         """
         Return a gapless alignment. This code is long and a bit convoluted because it is optimised (it was too slow if
         done in the most intuitive way).
@@ -88,17 +78,18 @@ class PrgBuilderRecursiveTreeNode(ABC):
         pass
 
     @abstractmethod
-    def preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
+    def preorder_traversal_to_build_prg(self, prg_as_list, delim_char=" "):
         pass
 
     @abstractmethod
-    def batch_update(self, temp_prefix, aligner):
+    def batch_update(self):
         pass
 
 
-class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
-    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, aligner: MSAAligner):
-        super().__init__(nesting_level, drawing_level, alignment, parent, prg_builder, aligner)
+class MultiClusterNode(RecursiveTreeNode):
+    # TODO: do we even need this constructor?
+    def __init__(self, nesting_level, alignment, parent, prg_builder):
+        super().__init__(nesting_level, alignment, parent, prg_builder)
 
     def _set_derived_helper_attributes(self):
         pass  # nothing to set here
@@ -108,21 +99,18 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
         cluster_subalignments = self._get_subalignments_by_clustering()
         children = []
         for alignment in cluster_subalignments:
-            child = PrgBuilderSingleClusterNode(
+            child = SingleClusterNode(
                 nesting_level=self.nesting_level,
-                drawing_level=self.drawing_level+1,
                 alignment=alignment,
                 parent=self,
-                prg_builder=self.prg_builder,
-                aligner=self.aligner,
+                prg_builder=self.prg_builder
             )
             children.append(child)
-            self.prg_builder.graph.add_edge(self.id, child.id)
         return children
 
     ##################################################################################
     # traversal methods
-    def preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
+    def preorder_traversal_to_build_prg(self, prg_as_list, delim_char=" "):
         site_num = self.prg_builder.get_next_site_num()
         prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
 
@@ -134,7 +122,6 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
             prg_as_list.extend(
                 f"{delim_char}{site_num_to_separate_alleles}{delim_char}"
             )
-
     ##################################################################################
 
     #####################################################################################################
@@ -153,16 +140,16 @@ class PrgBuilderMultiClusterNode(PrgBuilderRecursiveTreeNode):
         list_records = [record for record in self.alignment if record.id in id_list]
         sub_alignment = MSA(list_records)
         return sub_alignment
-
     #####################################################################################################
 
-    def batch_update(self, temp_prefix, aligner: MSAAligner):
+    def batch_update(self):
         assert False, "Update was called on a non-leaf node"
 
 
-class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
-    def __init__(self, nesting_level, drawing_level, alignment, parent, prg_builder, aligner: MSAAligner):
-        super().__init__(nesting_level, drawing_level, alignment, parent, prg_builder, aligner)
+class SingleClusterNode(RecursiveTreeNode):
+    # TODO: do we even need this constructor?
+    def __init__(self, nesting_level, alignment, parent, prg_builder):
+        super().__init__(nesting_level, alignment, parent, prg_builder)
 
     def _set_derived_helper_attributes(self):
         self.consensus = self._get_consensus()
@@ -176,7 +163,7 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         ).get_intervals()
 
     def _get_children(self):
-        # stop conditions
+        # base cases / stop conditions
         single_match_interval = (len(self.all_intervals) == 1) and (
             self.all_intervals[0] in self.match_intervals
         )
@@ -190,59 +177,34 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         children = []
         for interval in self.all_intervals:
             sub_alignment = self.alignment[:, interval.start : interval.stop + 1]
-
-            if interval in self.match_intervals:
+            is_a_match_interval = interval in self.match_intervals
+            if is_a_match_interval:
                 # all seqs are not necessarily exactly the same: some can have 'N'
                 # thus still process all of them, to get the one with no 'N'.
                 seqs = get_interval_seqs(sub_alignment)
                 assert len(seqs) == 1, "Got >1 filtered sequences in match interval"
-                subclass = PrgBuilderSingleClusterNode
+                subclass = SingleClusterNode
             else:
-                subclass = PrgBuilderMultiClusterNode
+                subclass = MultiClusterNode
 
             child = subclass(
                 nesting_level=self.nesting_level + 1,
-                drawing_level=self.drawing_level + 1,
                 alignment=sub_alignment,
                 parent=self,
-                prg_builder=self.prg_builder,
-                aligner=self.aligner,
+                prg_builder=self.prg_builder
             )
             children.append(child)
-            edge_from_root = self.id == 0
-            if not edge_from_root:
-                self.prg_builder.graph.add_edge(self.id, child.id)
-            has_siblings = len(children) > 1
-            if has_siblings:
-                self.prg_builder.graph.add_edge(children[-2].id, child.id)
 
         return children
-
-    ##################################################################################
-    # properties
-    @property
-    def prop_in_match_intervals(self):
-        length_match_intervals = 0
-        for interval in self.match_intervals:
-            length_match_intervals += interval.stop - interval.start + 1
-        return length_match_intervals / float(self.length)
-
-    @property
-    def num_seqs(self):
-        return len(self.alignment)
-
-    ##################################################################################
-
     ##################################################################################
     # traversal methods
-    def preorder_traversal_to_build_prg(self, prg_as_list, delim_char):
+    def preorder_traversal_to_build_prg(self, prg_as_list, delim_char=" "):
         is_leaf_node = len(self._children) == 0
         if is_leaf_node:
             self._get_prg(prg_as_list, delim_char)
         else:
             for child in self._children:
                 child.preorder_traversal_to_build_prg(prg_as_list, delim_char)
-
     ##################################################################################
 
     ##################################################################################
@@ -263,8 +225,6 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
         return consensus_string
 
     def _get_prg(self, prg_as_list, delim_char):
-        site_start_index = len(prg_as_list)
-
         for interval in self.all_intervals:
             sub_alignment = self.alignment[:, interval.start : interval.stop + 1]
             seqs = get_interval_seqs(sub_alignment)
@@ -292,10 +252,6 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
                     prg_as_list.extend(
                         f"{delim_char}{site_num_for_this_seq}{delim_char}"
                     )
-
-        site_end_index = len(prg_as_list)
-        self.prg_builder.leaf_id_to_seq[self.id] = "".join(prg_as_list[site_start_index:site_end_index])
-
     ##################################################################################
 
     ##################################################################################
@@ -305,37 +261,23 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
             self.new_sequences = set()
         self.new_sequences.add(new_sequence)
 
-    def batch_update(self, temp_prefix, aligner: MSAAligner):
-        self.aligner = aligner
+    def batch_update(self):
         no_update_to_be_done = (
             self.new_sequences is None or len(self.new_sequences) == 0
         )
         if no_update_to_be_done:
             return
-        self._update_leaf(temp_prefix)
+        self._update_leaf()
 
-    def _update_leaf(self, temp_prefix):
-        # update the MSA
-        temp_prefix = temp_prefix / self.prg_builder.locus_name / f"node_{self.id}"
-        os.makedirs(temp_prefix, exist_ok=True)
-
-        previous_msa_filename = temp_prefix / "previous_msa.fa"
-        with open(previous_msa_filename, "w") as previous_msa_handler:
-            SeqIO.write(self.alignment, previous_msa_handler, "fasta")
-
+    def _update_leaf(self):
         logger.debug(
             f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}..."
         )
 
-        new_msa = self.aligner.get_updated_alignment(
-            leaf_name=f"{self.prg_builder.locus_name}, node {self.id}",
-            previous_alignment=previous_msa_filename,
-            new_sequences=list(self.new_sequences),
-            temp_prefix=temp_prefix,
+        self.alignment = self.prg_builder.aligner.get_updated_alignment(
+            previous_alignment=self.alignment,
+            new_sequences=list(self.new_sequences)
         )
-
-        # update the alignment
-        self.alignment = load_alignment_file(str(new_msa), "fasta")
 
         # update the other fields
         self._set_derived_helper_attributes()
@@ -345,7 +287,6 @@ class PrgBuilderSingleClusterNode(PrgBuilderRecursiveTreeNode):
 
         # regenerate recursion tree
         self._children = self._get_children()
-
     ##################################################################################
 
 
@@ -356,7 +297,7 @@ class LeafNotFoundException(Exception):
 class PrgBuilder(object):
     """
     Prg builder based from a multiple sequence alignment.
-    Note min_match_length must be strictly greater than max_nesting + 1.
+    Note min_match_length must be strictly greater than max_nesting + 1. TODO: why?
     """
     def __init__(
         self,
@@ -367,33 +308,25 @@ class PrgBuilder(object):
         min_match_length,
         aligner: MSAAligner,
     ):
-        # trivial attributes
         self.locus_name = locus_name
         self.max_nesting = max_nesting
         self.min_match_length = min_match_length
         self.aligner = aligner
-
+        self.next_node_id = 0
         self.leaves_index = {}
-        self.node_id = 0
-
-        self.all_nodes = []
-        self.graph = nx.DiGraph()
-        self.leaf_id_to_seq = {}
 
         alignment = load_alignment_file(msa_file, alignment_format)
-        self._root = PrgBuilderSingleClusterNode(
+        self._root = SingleClusterNode(
             nesting_level=1,
-            drawing_level=1,
             alignment=alignment,
             parent=None,
-            prg_builder=self,
-            aligner=self.aligner,
+            prg_builder=self
         )
 
     def build_prg(self):
         self._site_num = 5
         prg_as_list = []
-        self._root.preorder_traversal_to_build_prg(prg_as_list, delim_char=" ")
+        self._root.preorder_traversal_to_build_prg(prg_as_list)
         prg = "".join(prg_as_list)
         return prg
 
@@ -403,8 +336,8 @@ class PrgBuilder(object):
         return previous_site_num
 
     def get_next_node_id(self):
-        self.node_id += 1
-        return self.node_id - 1
+        self.next_node_id += 1
+        return self.next_node_id - 1
 
     def update_leaves_index(self, start_index: int, end_index: int, node):
         interval = (start_index, end_index)
@@ -438,7 +371,7 @@ class PrgBuilder(object):
             drawing_level_to_node_ids[node.drawing_level].append(node.id)
 
         plt.figure(figsize=(20, 10))
-        a_graph = nx.drawing.nx_agraph.to_agraph(self.graph)
+        a_graph = nx.drawing.nx_agraph.to_agraph(self.recursion_tree)
         for node in a_graph.nodes():
             node.attr["label"] = self.leaf_id_to_seq.get(int(node.name), node.name)
 
