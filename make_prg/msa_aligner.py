@@ -7,6 +7,9 @@ import time
 import subprocess
 from loguru import logger
 import os
+from Bio.AlignIO import MultipleSeqAlignment
+from Bio import SeqIO
+from make_prg.io_utils import load_alignment_file
 
 
 class TempDirAlreadyExistsError(Exception):
@@ -33,7 +36,7 @@ class MSAAligner(ABC):
         self._set_tmpdir(tmpdir)
 
     @abstractmethod
-    def get_updated_alignment(self, previous_alignment: Path, new_sequences: List[str]) -> Path:
+    def get_updated_alignment(self, current_alignment: MultipleSeqAlignment, new_sequences: List[str]) -> MultipleSeqAlignment:
         pass
 
     @abstractmethod
@@ -63,7 +66,7 @@ class MSAAligner(ABC):
 
     @staticmethod
     def _create_new_sequences_file(directory: Path, new_sequences: List[str]) -> Path:
-        new_sequences_filepath = directory / f"new_sequences_{uuid.uuid4()}.fa"
+        new_sequences_filepath = directory / f"new_sequences.fa"
         with open(new_sequences_filepath, "w") as new_sequences_handler:
             for index_new_seq, new_seq in enumerate(new_sequences):
                 print(
@@ -93,11 +96,16 @@ class MAFFT(MSAAligner):
     def _cleanup_run(self, run_tmpdir) -> None:
         shutil.rmtree(run_tmpdir)
 
-    def get_updated_alignment(self, previous_alignment: Path, new_sequences: List[str]) -> Path:
+    def get_updated_alignment(self, current_alignment: MultipleSeqAlignment, new_sequences: List[str]) -> MultipleSeqAlignment:
         # setup
         run_tmpdir = self._prepare_run_tmpdir()
+
+        current_msa_filepath = run_tmpdir / "previous_msa.fa"
+        with open(current_msa_filepath, "w") as current_msa_handler:
+            SeqIO.write(current_alignment, current_msa_handler, "fasta")
+
         new_sequences_filepath = self._create_new_sequences_file(run_tmpdir, new_sequences)
-        new_msa = run_tmpdir / f"updated_msa_{uuid.uuid4()}.fa"
+        new_msa = run_tmpdir / f"updated_msa.fa"
 
         # run
         args = " ".join(
@@ -109,7 +117,7 @@ class MAFFT(MSAAligner):
                 "1",
                 "--add",
                 str(new_sequences_filepath),
-                str(previous_alignment),
+                str(current_msa_filepath),
                 ">",
                 str(new_msa),
             ]
@@ -118,8 +126,11 @@ class MAFFT(MSAAligner):
         env["TMPDIR"] = str(run_tmpdir)
         self._run_aligner(args, env)
 
+        # load the updated alignment
+        updated_alignment = load_alignment_file(str(new_msa), "fasta")
+
         # clean up
         self._cleanup_run(run_tmpdir)
 
-        return new_msa
+        return updated_alignment
 
