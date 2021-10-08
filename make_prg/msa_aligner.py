@@ -24,51 +24,33 @@ class MSAAligner(ABC):
             raise NotAValidExecutableError(f"Given MSA executable {executable} does not work or is invalid")
         self._executable = executable
 
-    def _set_tmpdir(self, temp_prefix: Path) -> None:
-        tmpdir = temp_prefix / f"temp.MSA.{uuid.uuid4()}"
-        if tmpdir.exists():
-            raise TempDirAlreadyExistsError(f"{str(tmpdir)} already exists, cannot be created.")
-        tmpdir.mkdir(parents=True)
+    def _set_tmpdir(self, tmpdir: Path) -> None:
+        tmpdir.mkdir(parents=True, exist_ok=True)
         self._tmpdir = tmpdir
 
-    def __init__(self, executable: str, temp_prefix: Path = Path("."), env=None):
+    def __init__(self, executable: str, tmpdir: Path = Path(".")):
         self._set_executable(executable)
-        self._set_tmpdir(temp_prefix)
-        self._env = env
+        self._set_tmpdir(tmpdir)
 
     @abstractmethod
     def get_updated_alignment(self, previous_alignment: Path, new_sequences: List[str]) -> Path:
         pass
-
-    def _create_new_sequences_file(self, new_sequences: List[str]) -> Path:
-        new_sequences_filepath = self._tmpdir / f"new_sequences_{uuid.uuid4()}.fa"
-        with open(new_sequences_filepath, "w") as new_sequences_handler:
-            for index_new_seq, new_seq in enumerate(new_sequences):
-                print(
-                    f">Denovo_path_{index_new_seq}_random_id_{uuid.uuid4()}",
-                    file=new_sequences_handler,
-                )
-                print(new_seq, file=new_sequences_handler)
-        return new_sequences_filepath
 
     @abstractmethod
     @classmethod
     def get_aligner_name(cls):
         pass
 
-    def run_aligner(self, args: str, remove_temp_dir_after_running: bool = True):
+    def _run_aligner(self, args: str, env=None):
         start = time.time()
         process = subprocess.Popen(
             args,
             stderr=subprocess.PIPE,
             encoding="utf-8",
             shell=True,
-            env=self._env,
+            env=env,
         )
         exit_code = process.wait()
-
-        if remove_temp_dir_after_running:
-            shutil.rmtree(self._tmpdir)
 
         if exit_code != 0:
             raise RuntimeError(
@@ -79,20 +61,45 @@ class MSAAligner(ABC):
         runtime = stop - start
         logger.debug(f"{self.__class__.get_aligner_name()} runtime for arguments {args} in seconds: {runtime:.3f}")
 
+    @staticmethod
+    def _create_new_sequences_file(directory: Path, new_sequences: List[str]) -> Path:
+        new_sequences_filepath = directory / f"new_sequences_{uuid.uuid4()}.fa"
+        with open(new_sequences_filepath, "w") as new_sequences_handler:
+            for index_new_seq, new_seq in enumerate(new_sequences):
+                print(
+                    f">Denovo_path_{index_new_seq}_random_id_{uuid.uuid4()}",
+                    file=new_sequences_handler,
+                )
+                print(new_seq, file=new_sequences_handler)
+        return new_sequences_filepath
+
 
 class MAFFT(MSAAligner):
-    def __init__(self, executable: str, temp_prefix: Path = Path(".")):
-        env = os.environ
-        super().__init__(executable, temp_prefix, env)
+    def __init__(self, executable: str, tmpdir: Path = Path(".")):
+        super().__init__(executable, tmpdir)
 
     @classmethod
     def get_aligner_name(cls):
         return "MAFFT"
 
-    def get_updated_alignment(self, previous_alignment: Path, new_sequences: List[str]) -> Path:
-        new_sequences_filepath = self._create_new_sequences_file(new_sequences)
-        new_msa = self._tmpdir / f"updated_msa_{uuid.uuid4()}.fa"
+    def _prepare_run_tmpdir(self) -> Path:
+        run_tmpdir = self._tmpdir / f"temp.MSA.{uuid.uuid4()}"
+        if run_tmpdir.exists():
+            raise TempDirAlreadyExistsError(f"{str(run_tmpdir)} already exists, cannot be created, "
+                                            f"this is very unlikely.")
+        run_tmpdir.mkdir(parents=True)
+        return run_tmpdir
 
+    def _cleanup_run(self, run_tmpdir) -> None:
+        shutil.rmtree(run_tmpdir)
+
+    def get_updated_alignment(self, previous_alignment: Path, new_sequences: List[str]) -> Path:
+        # setup
+        run_tmpdir = self._prepare_run_tmpdir()
+        new_sequences_filepath = self._create_new_sequences_file(run_tmpdir, new_sequences)
+        new_msa = run_tmpdir / f"updated_msa_{uuid.uuid4()}.fa"
+
+        # run
         args = " ".join(
             [
                 self._executable,
@@ -107,8 +114,12 @@ class MAFFT(MSAAligner):
                 str(new_msa),
             ]
         )
-        self._env["TMPDIR"] = str(self._tmpdir)
-        self.run_aligner(args, remove_temp_dir_after_running=True)
+        env = os.environ
+        env["TMPDIR"] = str(run_tmpdir)
+        self._run_aligner(args, env)
+
+        # clean up
+        self._cleanup_run(run_tmpdir)
 
         return new_msa
 
