@@ -7,6 +7,7 @@ from loguru import logger
 from make_prg import io_utils, prg_builder
 from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
 from make_prg.utils import output_files_already_exist
+from make_prg.drawer import RecursiveTreeDrawer
 
 
 def register_parser(subparsers):
@@ -75,6 +76,13 @@ def register_parser(subparsers):
             "match. Default: {}".format(MIN_MATCH_LEN)
         ),
     )
+    subparser_msa.add_argument(
+        "--output_graphs",
+        dest="output_graphs",
+        action="store_true",
+        default=False,
+        help="Outputs the recursive tree and the PRG graphical representation",
+    )
     subparser_msa.set_defaults(func=run)
 
     return subparser_msa
@@ -104,13 +112,16 @@ def process_MSA(msa_filepath: Path):
             msa_file=msa_filepath,
             alignment_format=options.alignment_format,
             max_nesting=options.max_nesting,
-            min_match_length=options.min_match_length,
+            min_match_length=options.min_match_length
         )
         prg = builder.build_prg()
         logger.info(f"Write PRG file to {prefix}.prg.fa")
         io_utils.write_prg(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
-        builder.output_graph(f"{prefix}.png")
+
+        if options.output_graphs:
+            recursive_tree_drawer = RecursiveTreeDrawer(builder.root)
+            recursive_tree_drawer.output_graph(f"{prefix}.recursion_tree.png")
 
         # TODO: add back GFA writing
         # print_with_time(f"Write GFA file to {prefix}.gfa")

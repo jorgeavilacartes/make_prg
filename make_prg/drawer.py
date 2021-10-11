@@ -1,0 +1,49 @@
+from make_prg.recursion_tree import RecursiveTreeNode, SingleClusterNode
+import networkx as nx
+import matplotlib.pyplot as plt
+
+
+class RecursiveTreeDrawer:
+    def __init__(self, root: RecursiveTreeNode):
+        self._graph: nx.DiGraph = self._build_recursive_tree_graph(root)
+
+    @staticmethod
+    def _build_recursive_tree_graph(root: RecursiveTreeNode) -> nx.DiGraph:
+        graph = nx.DiGraph()
+        RecursiveTreeDrawer._preorder_visit(root, graph)
+        return graph
+
+    @staticmethod
+    def _preorder_visit(node: RecursiveTreeNode, graph: nx.DiGraph):
+        RecursiveTreeDrawer._visit(node, graph)
+        for child in node.children:
+            RecursiveTreeDrawer._preorder_visit(child, graph)
+
+    @staticmethod
+    def _visit(node: RecursiveTreeNode, graph: nx.DiGraph):
+        node_attributes = {}
+        if node.is_leaf():
+            node_is_SingleClusterNode = isinstance(node, SingleClusterNode)
+            assert node_is_SingleClusterNode, "Error, a leaf is not a SingleClusterNode"
+            prg_as_list = []
+            node._get_prg(prg_as_list)
+            node_attributes["label"] = "".join(prg_as_list)
+        else:
+            node_attributes["label"] = str(node.id)
+        graph.add_node(node, **node_attributes)
+
+        if node.parent is not None:
+            graph.add_edge(node.parent, node)
+
+    def output_graph(self, filename):
+        # nesting_level_to_node_ids = defaultdict(list)
+        # for node in self._graph.nodes:
+        #     nesting_level_to_node_ids[node.nesting_level].append(node.id)
+        plt.figure(figsize=(20, 10))
+        a_graph = nx.drawing.nx_agraph.to_agraph(self._graph)
+
+        # for nesting_level, nodes in nesting_level_to_node_ids.items():
+        #     a_graph.add_subgraph(nodes, rank="same")
+        a_graph.layout(prog="dot")
+        a_graph.draw(filename)
+        a_graph.draw(f"{filename}.dot")
