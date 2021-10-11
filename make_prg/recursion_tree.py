@@ -1,4 +1,4 @@
-from typing import List, Set
+from typing import List, Set, Optional
 from loguru import logger
 
 from make_prg.from_msa import MSA
@@ -19,7 +19,7 @@ from Bio.AlignIO import MultipleSeqAlignment
 
 
 class RecursiveTreeNode(ABC):
-    def __init__(self, nesting_level: int, alignment: MultipleSeqAlignment, parent: "RecursiveTreeNode",
+    def __init__(self, nesting_level: int, alignment: MultipleSeqAlignment, parent: Optional["RecursiveTreeNode"],
                  prg_builder: PrgBuilder):
         # set the basic attributes
         self.nesting_level: int = nesting_level
