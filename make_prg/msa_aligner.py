@@ -39,7 +39,6 @@ class MSAAligner(ABC):
     def get_updated_alignment(self, current_alignment: MultipleSeqAlignment, new_sequences: Set[str]) -> MultipleSeqAlignment:
         pass
 
-    @abstractmethod
     @classmethod
     def get_aligner_name(cls) -> str:
         pass

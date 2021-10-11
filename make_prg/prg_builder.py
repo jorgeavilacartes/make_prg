@@ -1,8 +1,7 @@
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional
 from make_prg.io_utils import load_alignment_file
 import pickle
 from pathlib import Path
-from collections import defaultdict
 from make_prg.msa_aligner import MSAAligner
 from make_prg.recursion_tree import SingleClusterNode, RecursiveTreeNode
 
@@ -21,19 +20,19 @@ class PrgBuilder(object):
         alignment_format: str,
         max_nesting: int,
         min_match_length: int,
-        aligner: MSAAligner,
+        aligner: Optional[MSAAligner] = None,
     ):
         self.locus_name: str = locus_name
         self.max_nesting: int = max_nesting
         self.min_match_length: int = min_match_length
-        self.aligner: MSAAligner = aligner
+        self.aligner: Optional[MSAAligner] = aligner
         self.next_node_id: int = 0
         self._site_num: int = 5
         self.leaves_index: Dict[Tuple[int, int], RecursiveTreeNode] = {}
 
         alignment = load_alignment_file(str(msa_file), alignment_format)
-        self._root: RecursiveTreeNode = SingleClusterNode(
-            nesting_level=1,
+        self.root: RecursiveTreeNode = SingleClusterNode(
+            nesting_level=0,
             alignment=alignment,
             parent=None,
             prg_builder=self
@@ -42,7 +41,7 @@ class PrgBuilder(object):
     def build_prg(self) -> str:
         self._site_num = 5
         prg_as_list = []
-        self._root.preorder_traversal_to_build_prg(prg_as_list)
+        self.root.preorder_traversal_to_build_prg(prg_as_list)
         prg = "".join(prg_as_list)
         return prg
 

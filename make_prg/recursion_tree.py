@@ -10,7 +10,6 @@ from make_prg.seq_utils import (
     NONMATCH,
 )
 from make_prg.from_msa.interval_partition import IntervalPartitioner
-from make_prg.prg_builder import PrgBuilder
 from abc import ABC, abstractmethod
 import copy
 import numpy as np
@@ -20,11 +19,11 @@ from Bio.AlignIO import MultipleSeqAlignment
 
 class RecursiveTreeNode(ABC):
     def __init__(self, nesting_level: int, alignment: MultipleSeqAlignment, parent: Optional["RecursiveTreeNode"],
-                 prg_builder: PrgBuilder):
+                 prg_builder: "PrgBuilder"):
         # set the basic attributes
         self.nesting_level: int = nesting_level
         self.parent: "RecursiveTreeNode" = parent
-        self.prg_builder: PrgBuilder = prg_builder
+        self.prg_builder: "PrgBuilder" = prg_builder
 
         self.new_sequences: Set[str] = set()
         self.id: int = self.prg_builder.get_next_node_id()
@@ -32,7 +31,7 @@ class RecursiveTreeNode(ABC):
         self._set_derived_helper_attributes()
 
         # generate recursion tree
-        self._children: List["RecursiveTreeNode"] = self._get_children()
+        self.children: List["RecursiveTreeNode"] = self._get_children()
 
     @staticmethod
     def _remove_gaps(alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
@@ -75,6 +74,9 @@ class RecursiveTreeNode(ABC):
     def batch_update(self):
         pass
 
+    def is_leaf(self):
+        return len(self.children) == 0
+
 
 class MultiClusterNode(RecursiveTreeNode):
     def _set_derived_helper_attributes(self):
@@ -100,9 +102,9 @@ class MultiClusterNode(RecursiveTreeNode):
         site_num = self.prg_builder.get_next_site_num()
         prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
 
-        for child_index, child in enumerate(self._children):
+        for child_index, child in enumerate(self.children):
             site_num_to_separate_alleles = (
-                (site_num + 1) if (child_index < len(self._children) - 1) else site_num
+                (site_num + 1) if (child_index < len(self.children) - 1) else site_num
             )
             child.preorder_traversal_to_build_prg(prg_as_list, delim_char)
             prg_as_list.extend(
@@ -181,11 +183,11 @@ class SingleClusterNode(RecursiveTreeNode):
     ##################################################################################
     # traversal methods
     def preorder_traversal_to_build_prg(self, prg_as_list: List["str"], delim_char=" "):
-        is_leaf_node = len(self._children) == 0
+        is_leaf_node = self.is_leaf()
         if is_leaf_node:
             self._get_prg(prg_as_list, delim_char)
         else:
-            for child in self._children:
+            for child in self.children:
                 child.preorder_traversal_to_build_prg(prg_as_list, delim_char)
     ##################################################################################
 
@@ -252,6 +254,10 @@ class SingleClusterNode(RecursiveTreeNode):
             f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}..."
         )
 
+        an_aligner_was_given = self.prg_builder.aligner is None
+        # this is an assertion as it is the dev responsibility to ensure an aligner is given if updates are to be done
+        assert an_aligner_was_given, "Cannot make updates without an Multiple Sequence Aligner."
+
         self.alignment = self.prg_builder.aligner.get_updated_alignment(
             current_alignment=self.alignment,
             new_sequences=self.new_sequences
@@ -264,5 +270,5 @@ class SingleClusterNode(RecursiveTreeNode):
         self.new_sequences = set()
 
         # regenerate recursion tree
-        self._children = self._get_children()
+        self.children = self._get_children()
     ##################################################################################
