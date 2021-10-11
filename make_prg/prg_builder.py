@@ -17,7 +17,6 @@ class LeafNotFoundException(Exception):
 class PrgBuilder(object):
     """
     Prg builder based from a multiple sequence alignment.
-    Note min_match_length must be strictly greater than max_nesting + 1. TODO: why?
     """
     def __init__(
         self,

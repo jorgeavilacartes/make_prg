@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import uuid
 import shutil
 from pathlib import Path
-from typing import List
+from typing import List, Set
 import time
 import subprocess
 from loguru import logger
@@ -21,27 +21,27 @@ class NotAValidExecutableError(Exception):
 
 
 class MSAAligner(ABC):
-    def _set_executable(self, executable: str) -> None:
+    def _set_executable(self, executable: str):
         is_valid_executable = shutil.which(executable) is not None
         if not is_valid_executable:
             raise NotAValidExecutableError(f"Given MSA executable {executable} does not work or is invalid")
-        self._executable = executable
+        self._executable: str = executable
 
-    def _set_tmpdir(self, tmpdir: Path) -> None:
+    def _set_tmpdir(self, tmpdir: Path):
         tmpdir.mkdir(parents=True, exist_ok=True)
-        self._tmpdir = tmpdir
+        self._tmpdir: Path = tmpdir
 
     def __init__(self, executable: str, tmpdir: Path = Path(".")):
         self._set_executable(executable)
         self._set_tmpdir(tmpdir)
 
     @abstractmethod
-    def get_updated_alignment(self, current_alignment: MultipleSeqAlignment, new_sequences: List[str]) -> MultipleSeqAlignment:
+    def get_updated_alignment(self, current_alignment: MultipleSeqAlignment, new_sequences: Set[str]) -> MultipleSeqAlignment:
         pass
 
     @abstractmethod
     @classmethod
-    def get_aligner_name(cls):
+    def get_aligner_name(cls) -> str:
         pass
 
     def _run_aligner(self, args: str, env=None):
@@ -65,7 +65,7 @@ class MSAAligner(ABC):
         logger.debug(f"{self.__class__.get_aligner_name()} runtime for arguments {args} in seconds: {runtime:.3f}")
 
     @staticmethod
-    def _create_new_sequences_file(directory: Path, new_sequences: List[str]) -> Path:
+    def _create_new_sequences_file(directory: Path, new_sequences: Set[str]) -> Path:
         new_sequences_filepath = directory / f"new_sequences.fa"
         with open(new_sequences_filepath, "w") as new_sequences_handler:
             for index_new_seq, new_seq in enumerate(new_sequences):
@@ -78,11 +78,8 @@ class MSAAligner(ABC):
 
 
 class MAFFT(MSAAligner):
-    def __init__(self, executable: str, tmpdir: Path = Path(".")):
-        super().__init__(executable, tmpdir)
-
     @classmethod
-    def get_aligner_name(cls):
+    def get_aligner_name(cls) -> str:
         return "MAFFT"
 
     def _prepare_run_tmpdir(self) -> Path:
@@ -93,10 +90,10 @@ class MAFFT(MSAAligner):
         run_tmpdir.mkdir(parents=True)
         return run_tmpdir
 
-    def _cleanup_run(self, run_tmpdir) -> None:
+    def _cleanup_run(self, run_tmpdir: Path):
         shutil.rmtree(run_tmpdir)
 
-    def get_updated_alignment(self, current_alignment: MultipleSeqAlignment, new_sequences: List[str]) -> MultipleSeqAlignment:
+    def get_updated_alignment(self, current_alignment: MultipleSeqAlignment, new_sequences: Set[str]) -> MultipleSeqAlignment:
         # setup
         run_tmpdir = self._prepare_run_tmpdir()
 
@@ -133,4 +130,3 @@ class MAFFT(MSAAligner):
         self._cleanup_run(run_tmpdir)
 
         return updated_alignment
-
