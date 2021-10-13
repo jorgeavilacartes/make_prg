@@ -1,5 +1,6 @@
 from typing import Generator, Sequence, Tuple
 import itertools
+from Bio import pairwise2
 
 from loguru import logger
 
@@ -86,3 +87,33 @@ def get_interval_seqs(interval_alignment: MSA):
         logger.warning("Using these sequences anyway, and should be ignored downstream")
         return callback_seqs
     return expanded_seqs
+
+
+def align(ref: str, alt: str, match_score=2, mismatch_score=-1, gap_open_score=-4, gap_extend_score=-2) \
+        -> Tuple[str, str]:
+    alignment = pairwise2.align.globalms(
+        ref, alt, match_score, mismatch_score, gap_open_score, gap_extend_score
+    )
+    empty_alignment = len(alignment) == 0
+    if empty_alignment:
+        #  this usually happens if ref or alt are empty, let's check
+        ref_is_empty = len(ref) == 0
+        alt_is_empty = len(alt) == 0
+
+        # only one should be empty
+        both_are_empty = ref_is_empty and alt_is_empty
+        assert not both_are_empty
+        both_are_not_empty = (not ref_is_empty) and (not alt_is_empty)
+        assert not both_are_not_empty
+
+        if ref_is_empty:
+            return GAP * len(alt), alt
+        elif alt_is_empty:
+            return ref, GAP * len(ref)
+        else:
+            assert True, "Unreachable code"  # just to be sure
+    else:
+        alignment = alignment[
+            0
+        ]  # get the first alignment - we might have several equally good ones
+        return alignment.seqA, alignment.seqB

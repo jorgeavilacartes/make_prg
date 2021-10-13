@@ -6,7 +6,7 @@ from pathlib import Path
 from loguru import logger
 
 from make_prg import io_utils
-from make_prg.denovo_paths_reader import DenovoPathsDB
+from make_prg.denovo_variants import DenovoVariantsDB
 from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
 from make_prg.utils import output_files_already_exist
 
@@ -151,7 +151,7 @@ def run(options):
     prg_builder_collection = PrgBuilderCollection.deserialize(options.update_DS)
     prg_builder_collection.to_absolute_paths_wrt_given_parent(Path(options.update_DS).parent)
     logger.info(f"Reading {options.denovo_paths}...")
-    denovo_paths_db = DenovoPathsDB(options.denovo_paths)
+    denovo_paths_db = DenovoVariantsDB(options.denovo_paths)
 
     output_dir = Path(options.output_prefix).parent
     os.makedirs(output_dir, exist_ok=True)
