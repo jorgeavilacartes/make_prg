@@ -95,9 +95,8 @@ class PrgBuilderCollection:
     @staticmethod
     def deserialize(filepath: [Path, str]) -> "PrgBuilderCollection":
         with open(filepath, "rb") as filehandler:
-            return pickle.load(filehandler)
-
-    def to_absolute_paths_wrt_given_parent(self, parent: Path):
-        for locus_name, pickle_file in self.locus_name_to_pickle_files.items():
-            absolute_filepath = parent / pickle_file
-            self.locus_name_to_pickle_files[locus_name] = str(absolute_filepath)
+            prg_builder_collection = pickle.load(filehandler)
+        parent = Path(filepath).parent
+        for locus_name, pickle_file in prg_builder_collection.locus_name_to_pickle_files.items():
+            absolute_filepath = (parent / pickle_file).resolve()
+            prg_builder_collection.locus_name_to_pickle_files[locus_name] = str(absolute_filepath)

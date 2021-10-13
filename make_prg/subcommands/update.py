@@ -149,7 +149,6 @@ def run(options):
     # NB: don't use logging, it causes deadlocks: https://pythonspeed.com/articles/python-multiprocessing/
     logger.info("Reading update data structures...")
     prg_builder_collection = PrgBuilderCollection.deserialize(options.update_DS)
-    prg_builder_collection.to_absolute_paths_wrt_given_parent(Path(options.update_DS).parent)
     logger.info(f"Reading {options.denovo_paths}...")
     denovo_paths_db = DenovoVariantsDB(options.denovo_paths)
 
