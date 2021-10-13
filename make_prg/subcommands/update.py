@@ -15,7 +15,7 @@ def register_parser(subparsers):
     subparser_update_prg = subparsers.add_parser(
         "update",
         usage="make_prg update",
-        help="Update PRGs given new sequences output by pandora.",
+        help="Update PRGs given new sequences.",
     )
     subparser_update_prg.add_argument(
         "-u",
@@ -34,7 +34,7 @@ def register_parser(subparsers):
         type=str,
         required=True,
         help=(
-            "Filepath containing denovo sequences output by pandora. Should point to a denovo_paths.txt file."
+            "Filepath containing denovo sequences. Should point to a denovo_paths.txt file."
         ),
     )
     subparser_update_prg.add_argument(
@@ -55,7 +55,7 @@ def register_parser(subparsers):
     )
     subparser_update_prg.add_argument(
         "--mafft",
-        help="Path to MAFFT executable. By default, it is assumed to be on PATH",
+        help="Path to MAFFT executable. By default, it is assumed to be on $PATH",
         default="mafft",
     )
     subparser_update_prg.add_argument(
