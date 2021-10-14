@@ -5,6 +5,7 @@ from pathlib import Path
 from make_prg.msa_aligner import MSAAligner
 from make_prg.recursion_tree import SingleClusterNode, RecursiveTreeNode
 
+
 class LeafNotFoundException(Exception):
     pass
 
@@ -26,9 +27,9 @@ class PrgBuilder(object):
         self.max_nesting: int = max_nesting
         self.min_match_length: int = min_match_length
         self.aligner: Optional[MSAAligner] = aligner
-        self.next_node_id: int = 0
+        self._next_node_id: int = 0
         self._site_num: int = 5
-        self.leaves_index: Dict[Tuple[int, int], RecursiveTreeNode] = {}
+        self._leaves_index: Dict[Tuple[int, int], RecursiveTreeNode] = {}
 
         alignment = load_alignment_file(str(msa_file), alignment_format)
         self.root: RecursiveTreeNode = SingleClusterNode(
@@ -46,21 +47,22 @@ class PrgBuilder(object):
         return prg
 
     def get_next_site_num(self) -> int:
-        previous_site_num = self._site_num
+        site_num = self._site_num
         self._site_num += 2
-        return previous_site_num
+        return site_num
 
     def get_next_node_id(self) -> int:
-        self.next_node_id += 1
-        return self.next_node_id - 1
+        self._next_node_id += 1
+        return self._next_node_id - 1
 
     def update_leaves_index(self, start_index: int, end_index: int, node: RecursiveTreeNode):
         interval = (start_index, end_index)
-        self.leaves_index[interval] = node
+        self._leaves_index[interval] = node
 
     def get_node_given_interval(self, interval: Tuple[int, int]) -> RecursiveTreeNode:
         # TODO: move this back to assert once is solved
-        interval_is_indexed = interval in self.leaves_index
+        # TODO: should it really be an assert?
+        interval_is_indexed = interval in self._leaves_index
         if not interval_is_indexed:
             raise LeafNotFoundException(
                 f"Queried interval {interval} does not exist in leaves index for locus {self.locus_name}"
@@ -69,7 +71,7 @@ class PrgBuilder(object):
         # assert interval in self.leaves_index, \
         #     f"Fatal error: Queried interval {interval} does not exist in leaves index for locus {self.locus_name}"
 
-        return self.leaves_index[interval]
+        return self._leaves_index[interval]
 
     def serialize(self, filepath: [Path, str]):
         with open(filepath, "wb") as filehandler:
@@ -85,8 +87,8 @@ class PrgBuilderCollection:
     """
     Represent a collection of PrgBuilder, to be serialised and deserialised
     """
-    def __init__(self, locus_name_to_pickle_files: Dict[str, str]):
-        self.locus_name_to_pickle_files: Dict[str, str] = locus_name_to_pickle_files
+    def __init__(self, locus_name_to_pickle_filepaths: Dict[str, str]):
+        self.locus_name_to_pickle_files: Dict[str, str] = locus_name_to_pickle_filepaths
 
     def serialize(self, filepath: [Path, str]):
         with open(filepath, "wb") as filehandler:
