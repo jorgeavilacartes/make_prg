@@ -134,17 +134,10 @@ class DenovoVariant:
         return str(self)
 
 
-class MLPathNodeWithVariantApplied:
-    """
-    Class just to hold data for the DenovoVariant.get_nodes_with_variant_applied() return
-    """
-    def __init__(self, ml_path_node: MLPathNode, variant: DenovoVariant, mutated_node_sequence: str):
-        variant_has_been_applied = ml_path_node.sequence != mutated_node_sequence
-        assert variant_has_been_applied
-        self.key: Tuple[int, int] = ml_path_node.key
-        self.ml_path_node: MLPathNode = ml_path_node
-        self.variant: DenovoVariant = variant
-        self.mutated_node_sequence: str = mutated_node_sequence
+class UpdateData:
+    def __init__(self, ml_path_node_key: Tuple[int, int], new_node_sequence: str):
+        self.ml_path_node_key: Tuple[int, int] = ml_path_node_key
+        self.new_node_sequence: str = new_node_sequence
 
 
 class DenovoLocusInfo:
@@ -172,27 +165,23 @@ class DenovoLocusInfo:
 
         return ml_path_nodes
 
-    def get_nodes_with_variant_applied(self) -> List[MLPathNodeWithVariantApplied]:
+    def get_update_data(self) -> List[UpdateData]:
         """
-        Get ML path nodes with the variants applied.
-        @return: all nodes with variant applied
+        Get a list of updates to be done to ML path nodes
         """
-        nodes_with_variant_applied = []
+        update_data_list = []
         for variant in self.variants:
             ml_path_nodes = self._get_ml_path_nodes_spanning_variant(variant)
             split_variants = variant.split_variant(ml_path_nodes)
 
             for split_variant, ml_path_node in zip(split_variants, ml_path_nodes):
-                node_with_mutated_variant = MLPathNodeWithVariantApplied(
-                    ml_path_node=ml_path_node,
-                    variant=split_variant,
-                    mutated_node_sequence=split_variant.get_mutated_sequence(
-                        ml_path_node
-                    ),
+                update_data = UpdateData(
+                    ml_path_node_key=ml_path_node.key,
+                    new_node_sequence=split_variant.get_mutated_sequence(ml_path_node)
                 )
-                nodes_with_variant_applied.append(node_with_mutated_variant)
+                update_data_list.append(update_data)
 
-        return nodes_with_variant_applied
+        return update_data_list
 
 
 class DenovoVariantsDB:
@@ -315,23 +304,20 @@ class DenovoVariantsDB:
             return self._get_locus_name_to_denovo_loci_core(filehandler)
 
     @staticmethod
-    def _get_locus_name_to_variant_nodes_with_mutation(
+    def _get_locus_name_to_update_data(
             locus_name_to_denovo_loci: Dict[str, List[DenovoLocusInfo]])\
-            -> Dict[str, List[MLPathNodeWithVariantApplied]]:
-
-        locus_name_to_variant_nodes_with_mutation = defaultdict(list)
+            -> Dict[str, List[UpdateData]]:
+        locus_name_to_update_data = defaultdict(list)
         for locus_name, denovo_loci in locus_name_to_denovo_loci.items():
             for denovo_locus in denovo_loci:
-                nodes_with_variant_applied = denovo_locus.get_nodes_with_variant_applied()
-                locus_name_to_variant_nodes_with_mutation[locus_name].extend(
-                    nodes_with_variant_applied
-                )
-        return locus_name_to_variant_nodes_with_mutation
+                update_data = denovo_locus.get_update_data()
+                locus_name_to_update_data[locus_name].extend(update_data)
+        return locus_name_to_update_data
 
     def __init__(self, filepath: str):
         self.filepath: Path = Path(filepath)
         locus_name_to_denovo_loci = self._get_locus_name_to_denovo_loci()
-        self.locus_name_to_variant_nodes_with_mutation = self._get_locus_name_to_variant_nodes_with_mutation(
+        self.locus_name_to_update_data = self._get_locus_name_to_update_data(
             locus_name_to_denovo_loci
         )
 

@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 from loguru import logger
 from make_prg import io_utils
-from make_prg.denovo_variants import DenovoVariantsDB, MLPathNodeWithVariantApplied
+from make_prg.denovo_variants import DenovoVariantsDB, UpdateData
 from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
 from make_prg.utils import output_files_already_exist
 from make_prg.msa_aligner import MAFFT, MSAAligner
@@ -67,7 +67,7 @@ def register_parser(subparsers):
     return subparser_update_prg
 
 
-def get_stats_on_variants(stats_files: str) -> Tuple[int, int]:
+def get_stats_on_variants(stats_files: List[str]) -> Tuple[int, int]:
     nb_of_variants_successfully_applied = 0
     nb_of_variants_that_failed_to_be_applied = 0
     for stat_file in stats_files:
@@ -87,7 +87,7 @@ def get_stats_on_variants(stats_files: str) -> Tuple[int, int]:
 def update(
     locus_name: str,
     prg_builder_pickle_filepath: Path,
-    variant_nodes_with_mutation: List[MLPathNodeWithVariantApplied],
+    update_data_list: List[UpdateData],
     msa_aligner: MSAAligner,
     temp_dir: Path
 ):
@@ -97,30 +97,30 @@ def update(
     nb_of_variants_sucessfully_updated = 0
     nb_of_variants_with_failed_update = 0
 
-    we_have_variants = len(variant_nodes_with_mutation) > 0
+    we_have_variants = len(update_data_list) > 0
     if we_have_variants:
         logger.debug(f"Updating {locus_name} ...")
 
         leaves_to_update = set()
-        for variant_node_with_mutation in variant_nodes_with_mutation:
+        for update_data in update_data_list:
             try:
                 prg_builder_tree_node = prg_builder_for_locus.get_node_given_interval(
-                    variant_node_with_mutation.key
+                    update_data.ml_path_node_key
                 )
                 prg_builder_tree_node.add_seq_to_batch_update(
-                    variant_node_with_mutation.mutated_node_sequence
+                    update_data.new_node_sequence
                 )
                 leaves_to_update.add(prg_builder_tree_node)
                 nb_of_variants_sucessfully_updated += 1
             except LeafNotFoundException as exc:
-                logger.debug(f"Failed finding leaf: {exc}")
+                logger.warning(f"Failed finding leaf: {exc}")
                 nb_of_variants_with_failed_update += 1
 
         # update the changed leaves
         for leaf in leaves_to_update:
             leaf.batch_update()
         logger.debug(
-            f"Updated {locus_name}: {len(variant_nodes_with_mutation)} denovo sequences added!"
+            f"Updated {locus_name}: {nb_of_variants_sucessfully_updated} denovo sequences added!"
         )
     else:
         logger.debug(f"{locus_name} has no new variants, no update needed")
@@ -170,16 +170,12 @@ def run(options):
     ) in (
         prg_builder_collection.locus_name_to_pickle_filepaths.items()
     ):  # we do for all PRGs as those that don't have denovo variants will be generated also
-        variant_nodes_with_mutation = (
-            denovo_variants_db.locus_name_to_variant_nodes_with_mutation.get(
-                locus_name, []
-            )
-        )
+        update_data = denovo_variants_db.locus_name_to_update_data.get(locus_name, [])
         multithreaded_input.append(
             (
                 locus_name,
                 Path(prg_builder_pickle_filepath),
-                variant_nodes_with_mutation,
+                update_data,
                 mafft_aligner,
                 temp_path
             )
