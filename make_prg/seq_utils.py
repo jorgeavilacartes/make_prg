@@ -1,10 +1,12 @@
 from typing import Generator, Sequence, Tuple
 import itertools
 from Bio import pairwise2
-
 from loguru import logger
-
 from make_prg.from_msa import MSA
+import copy
+import numpy as np
+from Bio.Seq import Seq
+
 
 NONMATCH = "*"
 GAP = "-"
@@ -117,3 +119,45 @@ def align(ref: str, alt: str, match_score=2, mismatch_score=-1, gap_open_score=-
             0
         ]  # get the first alignment - we might have several equally good ones
         return alignment.seqA, alignment.seqB
+
+
+def remove_gaps_from_MSA(alignment: MSA) -> MSA:
+    """
+    Return a gapless alignment. This code is long and a bit convoluted because it is optimised (it was too slow if
+    done in the most intuitive way).
+    """
+    alignment_as_array = np.array([list(rec) for rec in alignment], str, order="F")
+    gapless_sequences = [[] for _ in range(len(alignment))]
+    for column_index in range(alignment.get_alignment_length()):
+        column_bases = alignment_as_array[:, column_index]
+        column_bases_deduplicated = list(set(column_bases))
+        just_gaps = column_bases_deduplicated == [GAP]
+        if not just_gaps:
+            for gapless_sequence, base in zip(gapless_sequences, column_bases):
+                gapless_sequence.append(base)
+
+    gapless_records = []
+    for gapless_sequence, previous_record in zip(gapless_sequences, alignment):
+        new_record = copy.deepcopy(previous_record)
+        new_record.seq = Seq("".join(gapless_sequence))
+        gapless_records.append(new_record)
+
+    gapless_alignment = MSA(gapless_records)
+    return gapless_alignment
+
+
+def get_consensus_from_MSA(alignment: MSA) -> str:
+    """Produces a 'consensus string' from an MSA: at each position of the
+    MSA, the string has a base if all aligned sequences agree, and a "*" if not.
+    IUPAC ambiguous bases result in non-consensus and are later expanded in the prg.
+    N results in consensus at that position unless they are all N."""
+    consensus_string_as_list = []
+    for i in range(alignment.get_alignment_length()):
+        column = set([record.seq[i] for record in alignment])
+        column = column.difference({"N"})
+        if len(ambiguous_bases.intersection(column)) > 0 or len(column) != 1:
+            consensus_string_as_list.append(NONMATCH)
+        else:
+            consensus_string_as_list.append(column.pop())
+    consensus_string = "".join(consensus_string_as_list)
+    return consensus_string

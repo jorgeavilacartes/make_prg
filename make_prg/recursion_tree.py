@@ -1,65 +1,33 @@
 from typing import List, Set, Optional
 from loguru import logger
-
 from make_prg.from_msa import MSA
 from make_prg.from_msa.cluster_sequences import kmeans_cluster_seqs_in_interval
 from make_prg.seq_utils import (
-    ambiguous_bases,
     remove_duplicates,  # TODO: quantify and remove dups
     get_interval_seqs,
-    NONMATCH,
+    remove_gaps_from_MSA,
+    get_consensus_from_MSA
 )
 from make_prg.from_msa.interval_partition import IntervalPartitioner
 from abc import ABC, abstractmethod
-import copy
-import numpy as np
-from Bio.Seq import Seq
-from Bio.AlignIO import MultipleSeqAlignment
 
 
 class RecursiveTreeNode(ABC):
-    def __init__(self, nesting_level: int, alignment: MultipleSeqAlignment, parent: Optional["RecursiveTreeNode"],
+    def __init__(self, nesting_level: int, alignment: MSA, parent: Optional["RecursiveTreeNode"],
                  prg_builder: "PrgBuilder"):
-        # set the basic attributes
         self.nesting_level: int = nesting_level
+        self.alignment: MSA = remove_gaps_from_MSA(alignment)
         self.parent: "RecursiveTreeNode" = parent
         self.prg_builder: "PrgBuilder" = prg_builder
-
-        self.new_sequences: Set[str] = set()
         self.id: int = self.prg_builder.get_next_node_id()
-        self.alignment: MultipleSeqAlignment = self._remove_gaps(alignment)
-        self._set_derived_helper_attributes()
+        self.new_sequences: Set[str] = set()
 
         # generate recursion tree
+        self._init_pre_recursion_attributes()
         self.children: List["RecursiveTreeNode"] = self._get_children()
 
-    @staticmethod
-    def _remove_gaps(alignment: MultipleSeqAlignment) -> MultipleSeqAlignment:
-        """
-        Return a gapless alignment. This code is long and a bit convoluted because it is optimised (it was too slow if
-        done in the most intuitive way).
-        """
-        alignment_as_array = np.array([list(rec) for rec in alignment], str, order="F")
-        gapless_sequences = [[] for _ in range(len(alignment))]
-        for column_index in range(alignment.get_alignment_length()):
-            column_bases = alignment_as_array[:, column_index]
-            column_bases_deduplicated = list(set(column_bases))
-            just_gaps = column_bases_deduplicated == ["-"]
-            if not just_gaps:
-                for gapless_sequence, base in zip(gapless_sequences, column_bases):
-                    gapless_sequence.append(base)
-
-        gapless_records = []
-        for gapless_sequence, previous_record in zip(gapless_sequences, alignment):
-            new_record = copy.deepcopy(previous_record)
-            new_record.seq = Seq("".join(gapless_sequence))
-            gapless_records.append(new_record)
-
-        gapless_alignment = MultipleSeqAlignment(gapless_records)
-        return gapless_alignment
-
     @abstractmethod
-    def _set_derived_helper_attributes(self):
+    def _init_pre_recursion_attributes(self):
         pass
 
     @abstractmethod
@@ -67,20 +35,16 @@ class RecursiveTreeNode(ABC):
         pass
 
     @abstractmethod
-    def preorder_traversal_to_build_prg(self, prg_as_list: List[str], delim_char=" "):
+    def preorder_traversal_to_build_prg(self, prg_as_list: List[str], delim_char: str = " "):
         pass
 
-    @abstractmethod
-    def batch_update(self):
-        pass
-
-    def is_leaf(self):
+    def is_leaf(self) -> bool:
         return len(self.children) == 0
 
 
 class MultiClusterNode(RecursiveTreeNode):
-    def _set_derived_helper_attributes(self):
-        pass  # nothing to set here
+    def _init_pre_recursion_attributes(self):
+        pass  # nothing to init here
 
     def _get_children(self) -> List["RecursiveTreeNode"]:
         # each child is a PrgBuilderSingleClusterNode for each cluster subalignment
@@ -98,7 +62,7 @@ class MultiClusterNode(RecursiveTreeNode):
 
     ##################################################################################
     # traversal methods
-    def preorder_traversal_to_build_prg(self, prg_as_list: List[str], delim_char=" "):
+    def preorder_traversal_to_build_prg(self, prg_as_list: List[str], delim_char: str = " "):
         site_num = self.prg_builder.get_next_site_num()
         prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
 
@@ -113,8 +77,8 @@ class MultiClusterNode(RecursiveTreeNode):
     ##################################################################################
 
     #####################################################################################################
-    #  Clustering methods
-    def _get_subalignments_by_clustering(self):
+    #  clustering methods
+    def _get_subalignments_by_clustering(self) -> List[MSA]:
         id_lists = kmeans_cluster_seqs_in_interval(
             self.alignment,
             self.prg_builder.min_match_length,
@@ -124,20 +88,17 @@ class MultiClusterNode(RecursiveTreeNode):
         ]
         return list_sub_alignments
 
-    def _get_sub_alignment_by_list_id(self, id_list: List[str]):
+    def _get_sub_alignment_by_list_id(self, id_list: List[str]) -> MSA:
         list_records = [record for record in self.alignment if record.id in id_list]
         sub_alignment = MSA(list_records)
         return sub_alignment
     #####################################################################################################
 
-    def batch_update(self):
-        assert False, "Update was called on a non-leaf node"  # is an assertion because this a dev error
-
 
 class SingleClusterNode(RecursiveTreeNode):
-    def _set_derived_helper_attributes(self):
-        self.consensus = self._get_consensus()
-        self.length = len(self.consensus)
+    def _init_pre_recursion_attributes(self):
+        self.consensus: str = get_consensus_from_MSA(self.alignment)
+        self.length: int = len(self.consensus)
         (
             self.match_intervals,
             self.non_match_intervals,
@@ -165,7 +126,8 @@ class SingleClusterNode(RecursiveTreeNode):
                 # all seqs are not necessarily exactly the same: some can have 'N'
                 # thus still process all of them, to get the one with no 'N'.
                 seqs = get_interval_seqs(sub_alignment)
-                assert len(seqs) == 1, "Got >1 filtered sequences in match interval"
+                only_one_sequence_in_match_interval = len(seqs) == 1
+                assert only_one_sequence_in_match_interval, "Got >1 filtered sequences in match interval"
                 subclass = SingleClusterNode
             else:
                 subclass = MultiClusterNode
@@ -180,35 +142,7 @@ class SingleClusterNode(RecursiveTreeNode):
 
         return children
 
-    ##################################################################################
-    # traversal methods
-    def preorder_traversal_to_build_prg(self, prg_as_list: List["str"], delim_char=" "):
-        is_leaf_node = self.is_leaf()
-        if is_leaf_node:
-            self._get_prg(prg_as_list, delim_char)
-        else:
-            for child in self.children:
-                child.preorder_traversal_to_build_prg(prg_as_list, delim_char)
-    ##################################################################################
-
-    ##################################################################################
-    # helpers
-    def _get_consensus(self) -> str:
-        """Produces a 'consensus string' from an MSA: at each position of the
-        MSA, the string has a base if all aligned sequences agree, and a "*" if not.
-        IUPAC ambiguous bases result in non-consensus and are later expanded in the prg.
-        N results in consensus at that position unless they are all N."""
-        consensus_string = ""
-        for i in range(self.alignment.get_alignment_length()):
-            column = set([record.seq[i] for record in self.alignment])
-            column = column.difference({"N"})
-            if len(ambiguous_bases.intersection(column)) > 0 or len(column) != 1:
-                consensus_string += NONMATCH
-            else:
-                consensus_string += column.pop()
-        return consensus_string
-
-    def _get_prg(self, prg_as_list: List[str], delim_char=" "):
+    def _get_prg(self, prg_as_list: List[str], delim_char: str = " "):
         for interval in self.all_intervals:
             sub_alignment = self.alignment[:, interval.start:interval.stop + 1]
             seqs = get_interval_seqs(sub_alignment)
@@ -236,6 +170,15 @@ class SingleClusterNode(RecursiveTreeNode):
                     prg_as_list.extend(
                         f"{delim_char}{site_num_for_this_seq}{delim_char}"
                     )
+
+    ##################################################################################
+    # traversal methods
+    def preorder_traversal_to_build_prg(self, prg_as_list: List["str"], delim_char: str = " "):
+        if self.is_leaf():
+            self._get_prg(prg_as_list, delim_char)
+        else:
+            for child in self.children:
+                child.preorder_traversal_to_build_prg(prg_as_list, delim_char)
     ##################################################################################
 
     ##################################################################################
@@ -254,7 +197,7 @@ class SingleClusterNode(RecursiveTreeNode):
             f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}..."
         )
 
-        an_aligner_was_given = self.prg_builder.aligner is None
+        an_aligner_was_given = self.prg_builder.aligner is not None
         # this is an assertion as it is the dev responsibility to ensure an aligner is given if updates are to be done
         assert an_aligner_was_given, "Cannot make updates without an Multiple Sequence Aligner."
 
@@ -263,12 +206,10 @@ class SingleClusterNode(RecursiveTreeNode):
             new_sequences=self.new_sequences
         )
 
-        # update the other fields
-        self._set_derived_helper_attributes()
-
         # reset the new sequences
         self.new_sequences = set()
 
         # regenerate recursion tree
+        self._init_pre_recursion_attributes()
         self.children = self._get_children()
     ##################################################################################
