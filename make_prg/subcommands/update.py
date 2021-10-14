@@ -162,7 +162,7 @@ def run(options):
     os.makedirs(output_dir, exist_ok=True)
 
     # update all PRGs with denovo sequences
-    logger.debug(f"Using {options.threads} threads to update PRGs...")
+    logger.info(f"Using {options.threads} threads to update PRGs...")
     multithreaded_input = []
     for (
         locus_name,
@@ -211,7 +211,7 @@ def run(options):
 
     # remove temp files if needed
     if not options.keep_temp and temp_path.exists():
-        logger.debug("Removing temp files...")
+        logger.info("Removing temp files...")
         shutil.rmtree(temp_path)
 
     logger.success("All done!")

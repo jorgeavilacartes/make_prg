@@ -136,21 +136,23 @@ def process_MSA(msa_filepath: Path):
 def run(cl_options):
     global options
     options = cl_options
-    input_files = get_all_input_files(options.input)
 
+    logger.info("Getting input files...")
+    input_files = get_all_input_files(options.input)
     there_is_no_input_files = len(input_files) == 0
     if there_is_no_input_files:
-        logger.warning(f"no input files found at {options.input}")
+        logger.warning(f"No input files found at {options.input}")
 
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
     # NB: don't use logging, it causes deadlocks: https://pythonspeed.com/articles/python-multiprocessing/
-    logger.debug(f"Using {options.threads} threads to generate PRGs...")
+    logger.info(f"Using {options.threads} threads to generate PRGs...")
     with multiprocessing.Pool(options.threads) as pool:
         pool.map(process_MSA, input_files, chunksize=1)
     logger.success(f"All PRGs generated!")
 
+    logger.info("Concatenating files from several threads into single final files...")
     # get all files that were generated
     prg_files = []
     locus_name_to_pickle_files = {}
@@ -171,13 +173,13 @@ def run(cl_options):
                         locus_name_to_pickle_files[locus_name] = str(relative_path)
 
     # concatenate the prg.fa output files
-    logger.debug("Concatenating files from several threads into single final files...")
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
     # cleanup
     for prg_file in prg_files:
         prg_file.unlink()
 
     # create and serialise the PRG Builder collection
+    logger.info("Serialising update data structure...")
     prg_builder_collection = prg_builder.PrgBuilderCollection(locus_name_to_pickle_files)
     prg_builder_collection.serialize(f"{options.output_prefix}.update_DS")
 
