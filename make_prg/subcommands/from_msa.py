@@ -1,9 +1,8 @@
+from typing import List
 import multiprocessing
 import os
 from pathlib import Path
-
 from loguru import logger
-
 from make_prg import io_utils, prg_builder
 from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
 from make_prg.utils import output_files_already_exist
@@ -88,7 +87,7 @@ def register_parser(subparsers):
     return subparser_msa
 
 
-def get_all_input_files(input_dir):
+def get_all_input_files(input_dir: str) -> List[Path]:
     input_dir = Path(input_dir)
     all_files = [
         Path(path).absolute() for path in input_dir.iterdir() if path.is_file()
@@ -114,8 +113,9 @@ def process_MSA(msa_filepath: Path):
             max_nesting=options.max_nesting,
             min_match_length=options.min_match_length
         )
-        prg = builder.build_prg()
+
         logger.info(f"Write PRG file to {prefix}.prg.fa")
+        prg = builder.build_prg()
         io_utils.write_prg(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
 
@@ -173,6 +173,9 @@ def run(cl_options):
     # concatenate the prg.fa output files
     logger.debug("Concatenating files from several threads into single final files...")
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
+    # cleanup
+    for prg_file in prg_files:
+        prg_file.unlink()
 
     # create and serialise the PRG Builder collection
     prg_builder_collection = prg_builder.PrgBuilderCollection(locus_name_to_pickle_files)

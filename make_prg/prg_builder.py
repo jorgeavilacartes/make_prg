@@ -27,9 +27,9 @@ class PrgBuilder(object):
         self.max_nesting: int = max_nesting
         self.min_match_length: int = min_match_length
         self.aligner: Optional[MSAAligner] = aligner
-        self._next_node_id: int = 0
-        self._site_num: int = 5
-        self._leaves_index: Dict[Tuple[int, int], RecursiveTreeNode] = {}
+        self.next_node_id: int = 0
+        self.site_num: int = 5
+        self.leaves_index: Dict[Tuple[int, int], SingleClusterNode] = {}
 
         alignment = load_alignment_file(str(msa_file), alignment_format)
         self.root: RecursiveTreeNode = SingleClusterNode(
@@ -40,29 +40,29 @@ class PrgBuilder(object):
         )
 
     def build_prg(self) -> str:
-        self._site_num = 5
+        self.site_num = 5
         prg_as_list = []
         self.root.preorder_traversal_to_build_prg(prg_as_list)
         prg = "".join(prg_as_list)
         return prg
 
     def get_next_site_num(self) -> int:
-        site_num = self._site_num
-        self._site_num += 2
+        site_num = self.site_num
+        self.site_num += 2
         return site_num
 
     def get_next_node_id(self) -> int:
-        self._next_node_id += 1
-        return self._next_node_id - 1
+        self.next_node_id += 1
+        return self.next_node_id - 1
 
-    def update_leaves_index(self, start_index: int, end_index: int, node: RecursiveTreeNode):
+    def update_leaves_index(self, start_index: int, end_index: int, node: SingleClusterNode):
         interval = (start_index, end_index)
-        self._leaves_index[interval] = node
+        self.leaves_index[interval] = node
 
-    def get_node_given_interval(self, interval: Tuple[int, int]) -> RecursiveTreeNode:
+    def get_node_given_interval(self, interval: Tuple[int, int]) -> SingleClusterNode:
         # TODO: move this back to assert once is solved
         # TODO: should it really be an assert?
-        interval_is_indexed = interval in self._leaves_index
+        interval_is_indexed = interval in self.leaves_index
         if not interval_is_indexed:
             raise LeafNotFoundException(
                 f"Queried interval {interval} does not exist in leaves index for locus {self.locus_name}"
@@ -71,7 +71,7 @@ class PrgBuilder(object):
         # assert interval in self.leaves_index, \
         #     f"Fatal error: Queried interval {interval} does not exist in leaves index for locus {self.locus_name}"
 
-        return self._leaves_index[interval]
+        return self.leaves_index[interval]
 
     def serialize(self, filepath: [Path, str]):
         with open(filepath, "wb") as filehandler:
@@ -88,7 +88,7 @@ class PrgBuilderCollection:
     Represent a collection of PrgBuilder, to be serialised and deserialised
     """
     def __init__(self, locus_name_to_pickle_filepaths: Dict[str, str]):
-        self.locus_name_to_pickle_files: Dict[str, str] = locus_name_to_pickle_filepaths
+        self.locus_name_to_pickle_filepaths: Dict[str, str] = locus_name_to_pickle_filepaths
 
     def serialize(self, filepath: [Path, str]):
         with open(filepath, "wb") as filehandler:
@@ -99,6 +99,7 @@ class PrgBuilderCollection:
         with open(filepath, "rb") as filehandler:
             prg_builder_collection = pickle.load(filehandler)
         parent = Path(filepath).parent
-        for locus_name, pickle_file in prg_builder_collection.locus_name_to_pickle_files.items():
+        for locus_name, pickle_file in prg_builder_collection.locus_name_to_pickle_filepaths.items():
             absolute_filepath = (parent / pickle_file).resolve()
-            prg_builder_collection.locus_name_to_pickle_files[locus_name] = str(absolute_filepath)
+            prg_builder_collection.locus_name_to_pickle_filepaths[locus_name] = str(absolute_filepath)
+        return prg_builder_collection

@@ -4,7 +4,7 @@ import re
 from loguru import logger
 from collections import Counter
 from make_prg.seq_utils import align, GAP
-from make_prg.MLPath import MLPathNode, MLPath
+from make_prg.MLPath import MLPathNode, MLPath, EmptyMLPathSequence
 from pathlib import Path
 
 
@@ -134,6 +134,19 @@ class DenovoVariant:
         return str(self)
 
 
+class MLPathNodeWithVariantApplied:
+    """
+    Class just to hold data for the DenovoVariant.get_nodes_with_variant_applied() return
+    """
+    def __init__(self, ml_path_node: MLPathNode, variant: DenovoVariant, mutated_node_sequence: str):
+        variant_has_been_applied = ml_path_node.sequence != mutated_node_sequence
+        assert variant_has_been_applied
+        self.key: Tuple[int, int] = ml_path_node.key
+        self.ml_path_node: MLPathNode = ml_path_node
+        self.variant: DenovoVariant = variant
+        self.mutated_node_sequence: str = mutated_node_sequence
+
+
 class DenovoLocusInfo:
     def __init__(
         self, sample: str, locus: str, ml_path: MLPath, variants: List[DenovoVariant]
@@ -142,15 +155,6 @@ class DenovoLocusInfo:
         self.locus: str = locus
         self.ml_path: MLPath = ml_path
         self.variants: List[DenovoVariant] = variants
-
-    class MLPathNodeWithVariantApplied:
-        def __init__(self, ml_path_node: MLPathNode, variant: DenovoVariant, mutated_node_sequence: str):
-            variant_has_been_applied = ml_path_node.sequence != mutated_node_sequence
-            assert variant_has_been_applied
-            self.key: Tuple[int, int] = ml_path_node.key
-            self.ml_path_node: MLPathNode = ml_path_node
-            self.variant: DenovoVariant = variant
-            self.mutated_node_sequence: str = mutated_node_sequence
 
     def _get_ml_path_nodes_spanning_variant(self, variant: DenovoVariant) -> List[MLPathNode]:
         if variant.is_insertion_event():
@@ -179,7 +183,7 @@ class DenovoLocusInfo:
             split_variants = variant.split_variant(ml_path_nodes)
 
             for split_variant, ml_path_node in zip(split_variants, ml_path_nodes):
-                node_with_mutated_variant = DenovoLocusInfo.MLPathNodeWithVariantApplied(
+                node_with_mutated_variant = MLPathNodeWithVariantApplied(
                     ml_path_node=ml_path_node,
                     variant=split_variant,
                     mutated_node_sequence=split_variant.get_mutated_sequence(
@@ -230,12 +234,11 @@ class DenovoVariantsDB:
 
             # TODO: fix pandora to give us non-inclusive end intervals instead
             # TODO: is this fixed? I think it is
-            end_index = int(matches.group(2))
+            end_index = int(matches.group(2)) + 1
             sequence = matches.group(3)
         except Exception as exc:
             assert False, f"Failed matching ML path regex to line: {line}\n" \
                           f"Exception: {str(exc)}"
-        assert start_index < end_index
 
         ml_path_node = MLPathNode(key=(start_index, end_index), sequence=sequence)
         return ml_path_node
@@ -245,8 +248,14 @@ class DenovoVariantsDB:
         nb_of_nodes_in_ml_path = cls._read_nb_of_nodes_in_ml_path(filehandler)
         ml_path = []
         for _ in range(nb_of_nodes_in_ml_path):
-            ml_path_node = cls._read_MLPathNode(filehandler)
-            ml_path.append(ml_path_node)
+            try:
+                ml_path_node = cls._read_MLPathNode(filehandler)
+                ml_path.append(ml_path_node)
+            except EmptyMLPathSequence:
+                # if the ML path node has empty sequence, it has empty interval, so we just ignore it,
+                # as it is not amenable to updates
+                pass
+
         return MLPath(ml_path)
 
     @staticmethod
@@ -308,7 +317,7 @@ class DenovoVariantsDB:
     @staticmethod
     def _get_locus_name_to_variant_nodes_with_mutation(
             locus_name_to_denovo_loci: Dict[str, List[DenovoLocusInfo]])\
-            -> Dict[str, List[DenovoLocusInfo.MLPathNodeWithVariantApplied]]:
+            -> Dict[str, List[MLPathNodeWithVariantApplied]]:
 
         locus_name_to_variant_nodes_with_mutation = defaultdict(list)
         for locus_name, denovo_loci in locus_name_to_denovo_loci.items():
@@ -328,7 +337,4 @@ class DenovoVariantsDB:
 
     # Example:
     # (0 [0, 110) ATGCAGATACGTGAACAGGGCCGCAAAATTCAGTGCATCCGCACCGTGTACGACAAGGCCATTGGCCGGGGTCGGCAGACGGTCATTGCCACACTGGCCCGCTATACGAC)
-    ml_path_regex = re.compile(r"\(\d+ \[(\d+), (\d+)\) ([ACGT]+)\)")
-    # TODO: in theory we could have empty ML node sequence, check if it happens in practice
-    # TODO: this adds annoying edge cases
-    # ml_path_regex = re.compile(r"\(\d+ \[(\d+), (\d+)\) ([ACGT]+)\)")
+    ml_path_regex = re.compile(r"\(\d+ \[(\d+), (\d+)\) ([ACGT]*)\)")

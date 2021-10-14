@@ -1,14 +1,14 @@
+from typing import List, Tuple
 import multiprocessing
 import os
 import shutil
 from pathlib import Path
-
 from loguru import logger
-
 from make_prg import io_utils
-from make_prg.denovo_variants import DenovoVariantsDB
+from make_prg.denovo_variants import DenovoVariantsDB, MLPathNodeWithVariantApplied
 from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
 from make_prg.utils import output_files_already_exist
+from make_prg.msa_aligner import MAFFT, MSAAligner
 
 
 def register_parser(subparsers):
@@ -67,7 +67,7 @@ def register_parser(subparsers):
     return subparser_update_prg
 
 
-def get_stats_on_variants(stats_files):
+def get_stats_on_variants(stats_files: str) -> Tuple[int, int]:
     nb_of_variants_successfully_applied = 0
     nb_of_variants_that_failed_to_be_applied = 0
     for stat_file in stats_files:
@@ -85,13 +85,15 @@ def get_stats_on_variants(stats_files):
 
 
 def update(
-    locus_name,
-    prg_builder_pickle_filepath,
-    variant_nodes_with_mutation,
-    temp_dir,
-    mafft: str,
+    locus_name: str,
+    prg_builder_pickle_filepath: Path,
+    variant_nodes_with_mutation: List[MLPathNodeWithVariantApplied],
+    msa_aligner: MSAAligner,
+    temp_dir: Path
 ):
     prg_builder_for_locus = PrgBuilder.deserialize(prg_builder_pickle_filepath)
+    prg_builder_for_locus.aligner = msa_aligner
+
     nb_of_variants_sucessfully_updated = 0
     nb_of_variants_with_failed_update = 0
 
@@ -116,7 +118,7 @@ def update(
 
         # update the changed leaves
         for leaf in leaves_to_update:
-            leaf.batch_update(temp_dir, mafft=mafft)
+            leaf.batch_update()
         logger.debug(
             f"Updated {locus_name}: {len(variant_nodes_with_mutation)} denovo sequences added!"
         )
@@ -127,10 +129,10 @@ def update(
     locus_prefix = temp_dir / locus_name / locus_name
     locus_prefix_parent = locus_prefix.parent
     os.makedirs(locus_prefix_parent, exist_ok=True)
-    prg = prg_builder_for_locus.build_prg()
-    logger.info(f"Write PRG file to {locus_prefix}.prg.fa")
-    io_utils.write_prg(str(locus_prefix), prg)
 
+    logger.info(f"Write PRG file to {locus_prefix}.prg.fa")
+    prg = prg_builder_for_locus.build_prg()
+    io_utils.write_prg(str(locus_prefix), prg)
     with open(f"{locus_prefix}.stats", "w") as stats_filehandler:
         print(
             f"{locus_name} {nb_of_variants_sucessfully_updated} {nb_of_variants_with_failed_update}",
@@ -146,16 +148,18 @@ def run(options):
     if output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
-    # NB: don't use logging, it causes deadlocks: https://pythonspeed.com/articles/python-multiprocessing/
+    # read input data
+    logger.info("Checking Multiple Sequence Aligner...")
+    temp_path = Path(options.output_prefix + "_tmp")
+    os.makedirs(temp_path, exist_ok=True)
+    mafft_aligner = MAFFT(executable=options.mafft, tmpdir=temp_path)
     logger.info("Reading update data structures...")
     prg_builder_collection = PrgBuilderCollection.deserialize(options.update_DS)
     logger.info(f"Reading {options.denovo_paths}...")
-    denovo_paths_db = DenovoVariantsDB(options.denovo_paths)
+    denovo_variants_db = DenovoVariantsDB(options.denovo_paths)
 
     output_dir = Path(options.output_prefix).parent
     os.makedirs(output_dir, exist_ok=True)
-    temp_path = Path(options.output_prefix + "_tmp")
-    os.makedirs(temp_path, exist_ok=True)
 
     # update all PRGs with denovo sequences
     logger.debug(f"Using {options.threads} threads to update PRGs...")
@@ -164,20 +168,20 @@ def run(options):
         locus_name,
         prg_builder_pickle_filepath,
     ) in (
-        prg_builder_collection.locus_name_to_pickle_files.items()
+        prg_builder_collection.locus_name_to_pickle_filepaths.items()
     ):  # we do for all PRGs as those that don't have denovo variants will be generated also
         variant_nodes_with_mutation = (
-            denovo_paths_db.locus_name_to_variant_nodes_with_mutation.get(
+            denovo_variants_db.locus_name_to_variant_nodes_with_mutation.get(
                 locus_name, []
             )
         )
         multithreaded_input.append(
             (
                 locus_name,
-                prg_builder_pickle_filepath,
+                Path(prg_builder_pickle_filepath),
                 variant_nodes_with_mutation,
-                temp_path,
-                options.mafft,
+                mafft_aligner,
+                temp_path
             )
         )
 
@@ -186,17 +190,17 @@ def run(options):
     logger.success(f"All PRGs updated!")
 
     # concatenate output PRGs
-    logger.info("Concatenating files from several threads into single, final file...")
+    logger.info("Concatenating files from several threads into a single file...")
     prg_files = [
         f"{temp_path}/{locus_name}/{locus_name}.prg.fa"
-        for locus_name in prg_builder_collection.locus_name_to_pickle_files.keys()
+        for locus_name in prg_builder_collection.locus_name_to_pickle_filepaths.keys()
     ]
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
 
     # sum up stats files and output stats
     stats_files = [
         f"{temp_path}/{locus_name}/{locus_name}.stats"
-        for locus_name in prg_builder_collection.locus_name_to_pickle_files.keys()
+        for locus_name in prg_builder_collection.locus_name_to_pickle_filepaths.keys()
     ]
     (
         nb_of_variants_successfully_applied,

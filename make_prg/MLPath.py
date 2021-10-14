@@ -6,22 +6,30 @@ class MLPathError(Exception):
     pass
 
 
+class EmptyMLPathSequence(Exception):
+    pass
+
+
 class MLPathNode:
     def __init__(self, key: Tuple[int, int], sequence: str):
         self.key: Tuple[int, int] = key
         self._set_sequence(sequence)
+        self._check_is_a_valid_node()
 
         # these are set by class MLPath during indexing
         self.start_index_in_linear_path: Optional[int] = None
         self.end_index_in_linear_path: Optional[int] = None
 
     def _set_sequence(self, sequence: str):
-        # TODO: in theory we could have empty ML node sequence, check if it happens in practice
-        # TODO: this adds annoying edge cases
         empty_ML_path_sequence = len(sequence) == 0
         if empty_ML_path_sequence:
-            raise MLPathError(f"Found a ML path node ({self.key}) with empty sequence")
+            raise EmptyMLPathSequence(f"Found a ML path node ({self.key}) with empty sequence")
         self.sequence: str = sequence
+
+    def _check_is_a_valid_node(self) -> bool:
+        interval_size = self.key[1] - self.key[0]
+        sequence_size = len(self.sequence)
+        return interval_size == sequence_size
 
     def __str__(self):
         return f"{self.key} {self.sequence} {self.start_index_in_linear_path} {self.end_index_in_linear_path}"

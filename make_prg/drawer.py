@@ -36,14 +36,7 @@ class RecursiveTreeDrawer:
             graph.add_edge(node.parent, node)
 
     def output_graph(self, filename):
-        # nesting_level_to_node_ids = defaultdict(list)
-        # for node in self._graph.nodes:
-        #     nesting_level_to_node_ids[node.nesting_level].append(node.id)
         plt.figure(figsize=(20, 10))
         a_graph = nx.drawing.nx_agraph.to_agraph(self._graph)
-
-        # for nesting_level, nodes in nesting_level_to_node_ids.items():
-        #     a_graph.add_subgraph(nodes, rank="same")
         a_graph.layout(prog="dot")
         a_graph.draw(filename)
-        a_graph.draw(f"{filename}.dot")
