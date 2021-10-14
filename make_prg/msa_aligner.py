@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import uuid
 import shutil
 from pathlib import Path
-from typing import List, Set
+from typing import Set
 import time
 import subprocess
 from loguru import logger
