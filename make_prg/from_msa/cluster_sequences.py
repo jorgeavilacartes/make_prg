@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 
 from make_prg.from_msa import MSA
-from make_prg.seq_utils import ungap
+from make_prg.utils.seq_utils import ungap
 
 Sequence = str
 Sequences = List[str]

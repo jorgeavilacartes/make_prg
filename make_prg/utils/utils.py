@@ -1,6 +1,7 @@
 from pathlib import Path
 
-
+# TODO: change this to just 2 files
+# TODO: change output
 def output_files_already_exist(output_prefix):
     return (
         Path(output_prefix + "_prgs").exists()

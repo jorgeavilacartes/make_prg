@@ -1,8 +1,8 @@
 from typing import Tuple, Dict, Optional
-from make_prg.io_utils import load_alignment_file
+from make_prg.utils.io_utils import load_alignment_file
 import pickle
 from pathlib import Path
-from make_prg.msa_aligner import MSAAligner
+from make_prg.utils.msa_aligner import MSAAligner
 from make_prg.recursion_tree import SingleClusterNode, RecursiveTreeNode
 
 

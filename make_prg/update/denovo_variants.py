@@ -3,8 +3,8 @@ from collections import defaultdict, deque
 import re
 from loguru import logger
 from collections import Counter
-from make_prg.seq_utils import align, GAP
-from make_prg.MLPath import MLPathNode, MLPath, EmptyMLPathSequence
+from make_prg.utils.seq_utils import align, GAP
+from make_prg.update.MLPath import MLPathNode, MLPath, EmptyMLPathSequence
 from pathlib import Path
 
 

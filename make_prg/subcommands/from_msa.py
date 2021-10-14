@@ -3,10 +3,11 @@ import multiprocessing
 import os
 from pathlib import Path
 from loguru import logger
-from make_prg import io_utils, prg_builder
+from make_prg import prg_builder
 from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
-from make_prg.utils import output_files_already_exist
-from make_prg.drawer import RecursiveTreeDrawer
+from make_prg.utils import io_utils
+from make_prg.utils.utils import output_files_already_exist
+from make_prg.utils.drawer import RecursiveTreeDrawer
 
 
 def register_parser(subparsers):

@@ -4,11 +4,11 @@ import os
 import shutil
 from pathlib import Path
 from loguru import logger
-from make_prg import io_utils
-from make_prg.denovo_variants import DenovoVariantsDB, UpdateData
+from make_prg.utils import io_utils
+from make_prg.update.denovo_variants import DenovoVariantsDB, UpdateData
 from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
-from make_prg.utils import output_files_already_exist
-from make_prg.msa_aligner import MAFFT, MSAAligner
+from make_prg.utils.utils import output_files_already_exist
+from make_prg.utils.msa_aligner import MAFFT, MSAAligner
 
 
 def register_parser(subparsers):

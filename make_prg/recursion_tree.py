@@ -2,7 +2,7 @@ from typing import List, Set, Optional
 from loguru import logger
 from make_prg.from_msa import MSA
 from make_prg.from_msa.cluster_sequences import kmeans_cluster_seqs_in_interval
-from make_prg.seq_utils import (
+from make_prg.utils.seq_utils import (
     remove_duplicates,  # TODO: quantify and remove dups
     get_interval_seqs,
     remove_gaps_from_MSA,

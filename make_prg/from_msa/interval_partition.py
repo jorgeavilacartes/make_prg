@@ -7,7 +7,7 @@ from typing import List, Tuple, Optional
 
 from make_prg.from_msa import MSA
 
-from make_prg.seq_utils import get_interval_seqs, is_non_match, has_empty_sequence
+from make_prg.utils.seq_utils import get_interval_seqs, is_non_match, has_empty_sequence
 
 
 class PartitioningError(Exception):

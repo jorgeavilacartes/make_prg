@@ -8,7 +8,6 @@ import os
 from loguru import logger
 
 from make_prg.from_msa import MSA
-from make_prg.prg_encoder import PrgEncoder, PRG_Ints
 
 
 def load_alignment_file(msa_file: str, alignment_format: str) -> MSA:

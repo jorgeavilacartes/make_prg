@@ -9,7 +9,7 @@ from loguru import logger
 import os
 from Bio.AlignIO import MultipleSeqAlignment
 from Bio import SeqIO
-from make_prg.io_utils import load_alignment_file
+from make_prg.utils.io_utils import load_alignment_file
 
 
 class TempDirAlreadyExistsError(Exception):
@@ -31,7 +31,7 @@ class MSAAligner(ABC):
         tmpdir.mkdir(parents=True, exist_ok=True)
         self._tmpdir: Path = tmpdir
 
-    def __init__(self, executable: str, tmpdir: Path = Path(".")):
+    def __init__(self, executable: str, tmpdir: Path = Path("..")):
         self._set_executable(executable)
         self._set_tmpdir(tmpdir)
 
