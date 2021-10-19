@@ -17,15 +17,23 @@ def register_parser(subparsers):
         usage="make_prg update",
         help="Update PRGs given new sequences.",
     )
+
+    def check_if_is_zip_file(argument: str):
+        argument = Path(argument)
+        is_zip_file = argument.suffix == ".zip"
+        if not is_zip_file:
+            subparser_update_prg.error(f"{argument} is not a zip file.")
+        return argument
     subparser_update_prg.add_argument(
         "-u",
         "--update_DS",
         action="store",
-        type=str,
+        type=lambda argument: check_if_is_zip_file(argument),
         required=True,
         help=(
-            "Filepath to the update data structures. Should point to a file *.update_DS."
+            "Filepath to the update data structures (a *.update_DS.zip file created through make_prg from_msa)."
         ),
+
     )
     subparser_update_prg.add_argument(
         "-d",
@@ -58,10 +66,6 @@ def register_parser(subparsers):
         help="Path to MAFFT executable. By default, it is assumed to be on $PATH",
         default="mafft",
     )
-    subparser_update_prg.add_argument(
-        "--keep_temp", action="store_true", default=False, help="Keep temp files."
-    )
-
     subparser_update_prg.set_defaults(func=run)
 
     return subparser_update_prg
@@ -86,12 +90,11 @@ def get_stats_on_variants(stats_files: List[str]) -> Tuple[int, int]:
 
 def update(
     locus_name: str,
-    prg_builder_pickle_filepath: Path,
+    prg_builder_for_locus: PrgBuilder,
     update_data_list: List[UpdateData],
     msa_aligner: MSAAligner,
     temp_dir: Path
 ):
-    prg_builder_for_locus = PrgBuilder.deserialize(prg_builder_pickle_filepath)
     prg_builder_for_locus.aligner = msa_aligner
 
     nb_of_variants_sucessfully_updated = 0
@@ -153,65 +156,67 @@ def run(options):
     temp_path = Path(options.output_prefix + "_tmp")
     os.makedirs(temp_path, exist_ok=True)
     mafft_aligner = MAFFT(executable=options.mafft, tmpdir=temp_path)
-    logger.info("Reading update data structures...")
-    prg_builder_collection = PrgBuilderCollection.deserialize(options.update_DS)
-    logger.info(f"Reading {options.denovo_paths}...")
-    denovo_variants_db = DenovoVariantsDB(options.denovo_paths)
 
-    output_dir = Path(options.output_prefix).parent
-    os.makedirs(output_dir, exist_ok=True)
+    prg_builder_collection = None
+    try:
+        logger.info("Reading update data structures...")
+        prg_builder_collection = PrgBuilderCollection(options.update_DS)
+        prg_builder_collection.load()
+        logger.info(f"Reading {options.denovo_paths}...")
+        denovo_variants_db = DenovoVariantsDB(options.denovo_paths)
 
-    # update all PRGs with denovo sequences
-    logger.info(f"Using {options.threads} threads to update PRGs...")
-    multithreaded_input = []
-    for (
-        locus_name,
-        prg_builder_pickle_filepath,
-    ) in (
-        prg_builder_collection.locus_name_to_pickle_filepaths.items()
-    ):  # we do for all PRGs as those that don't have denovo variants will be generated also
-        update_data = denovo_variants_db.locus_name_to_update_data.get(locus_name, [])
-        multithreaded_input.append(
-            (
-                locus_name,
-                Path(prg_builder_pickle_filepath),
-                update_data,
-                mafft_aligner,
-                temp_path
+        output_dir = Path(options.output_prefix).parent
+        os.makedirs(output_dir, exist_ok=True)
+
+        # update all PRGs with denovo sequences
+        logger.info(f"Using {options.threads} threads to update PRGs...")
+        multithreaded_input = []
+        for locus_name in prg_builder_collection.get_loci_names():
+            # we do for all PRGs as those that don't have denovo variants will be generated also
+            update_data = denovo_variants_db.locus_name_to_update_data.get(locus_name, [])
+            multithreaded_input.append(
+                (
+                    locus_name,
+                    prg_builder_collection.get_PrgBuilder(locus_name),
+                    update_data,
+                    mafft_aligner,
+                    temp_path
+                )
             )
+
+        with multiprocessing.Pool(options.threads, maxtasksperchild=1) as pool:
+            pool.starmap(update, multithreaded_input, chunksize=1)
+        logger.success(f"All PRGs updated!")
+
+        # concatenate output PRGs
+        logger.info("Concatenating files from several threads into a single file...")
+        prg_files = [
+            Path(f"{temp_path}/{locus_name}/{locus_name}.prg.fa")
+            for locus_name in prg_builder_collection.get_loci_names()
+        ]
+        io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
+
+        # sum up stats files and output stats
+        stats_files = [
+            f"{temp_path}/{locus_name}/{locus_name}.stats"
+            for locus_name in prg_builder_collection.get_loci_names()
+        ]
+        (
+            nb_of_variants_successfully_applied,
+            nb_of_variants_that_failed_to_be_applied,
+        ) = get_stats_on_variants(stats_files)
+        logger.success(
+            f"Number of variants successfully applied: {nb_of_variants_successfully_applied}"
+        )
+        logger.warning(
+            f"Number of variants that failed to be applied: {nb_of_variants_that_failed_to_be_applied}"
         )
 
-    with multiprocessing.Pool(options.threads, maxtasksperchild=1) as pool:
-        pool.starmap(update, multithreaded_input, chunksize=1)
-    logger.success(f"All PRGs updated!")
-
-    # concatenate output PRGs
-    logger.info("Concatenating files from several threads into a single file...")
-    prg_files = [
-        f"{temp_path}/{locus_name}/{locus_name}.prg.fa"
-        for locus_name in prg_builder_collection.locus_name_to_pickle_filepaths.keys()
-    ]
-    io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
-
-    # sum up stats files and output stats
-    stats_files = [
-        f"{temp_path}/{locus_name}/{locus_name}.stats"
-        for locus_name in prg_builder_collection.locus_name_to_pickle_filepaths.keys()
-    ]
-    (
-        nb_of_variants_successfully_applied,
-        nb_of_variants_that_failed_to_be_applied,
-    ) = get_stats_on_variants(stats_files)
-    logger.success(
-        f"Number of variants successfully applied: {nb_of_variants_successfully_applied}"
-    )
-    logger.warning(
-        f"Number of variants that failed to be applied: {nb_of_variants_that_failed_to_be_applied}"
-    )
-
-    # remove temp files if needed
-    if not options.keep_temp and temp_path.exists():
+        # remove temp files
         logger.info("Removing temp files...")
         shutil.rmtree(temp_path)
 
-    logger.success("All done!")
+        logger.success("All done!")
+    finally:
+        if prg_builder_collection is not None:
+            prg_builder_collection.close()

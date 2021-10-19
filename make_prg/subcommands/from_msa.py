@@ -81,7 +81,7 @@ def register_parser(subparsers):
         dest="output_graphs",
         action="store_true",
         default=False,
-        help="Outputs the recursive tree and the PRG graphical representation",
+        help="Outputs the recursive tree and the PRG graphical representation (for development use only)",
     )
     subparser_msa.set_defaults(func=run)
 
@@ -106,6 +106,10 @@ def process_MSA(msa_filepath: Path):
     os.makedirs(workdir, exist_ok=True)
     prefix = str(workdir / msa_name)
 
+    if options.output_graphs:
+        debug_graphs_dir = Path(options.output_prefix + "_debug_graphs")
+        os.makedirs(debug_graphs_dir, exist_ok=True)
+
     try:
         builder = prg_builder.PrgBuilder(
             locus_name=locus_name,
@@ -115,14 +119,14 @@ def process_MSA(msa_filepath: Path):
             min_match_length=options.min_match_length
         )
 
-        logger.info(f"Write PRG file to {prefix}.prg.fa")
+        logger.info(f"Writing output files of locus {msa_name}")
         prg = builder.build_prg()
         io_utils.write_prg(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
 
         if options.output_graphs:
             recursive_tree_drawer = RecursiveTreeDrawer(builder.root)
-            recursive_tree_drawer.output_graph(f"{prefix}.recursion_tree.png")
+            recursive_tree_drawer.output_graph(debug_graphs_dir / f"{msa_name}.recursion_tree.png")
 
         # TODO: add back GFA writing
         # print_with_time(f"Write GFA file to {prefix}.gfa")
@@ -168,10 +172,7 @@ def run(cl_options):
                         prg_files.append(file)
                     elif file.name.endswith(".pickle"):
                         locus_name = file.with_suffix("").with_suffix("").name
-                        relative_path = file.relative_to(
-                            Path(options.output_prefix).parent
-                        )
-                        locus_name_to_pickle_files[locus_name] = str(relative_path)
+                        locus_name_to_pickle_files[locus_name] = file
 
     # concatenate the prg.fa output files
     io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
@@ -181,7 +182,13 @@ def run(cl_options):
 
     # create and serialise the PRG Builder collection
     logger.info("Serialising update data structure...")
-    prg_builder_collection = prg_builder.PrgBuilderCollection(locus_name_to_pickle_files)
-    prg_builder_collection.serialize(f"{options.output_prefix}.update_DS")
+    prg_builder_collection = prg_builder.PrgBuilderCollection(Path(f"{options.output_prefix}.update_DS.zip"))
+    prg_builder_collection.save(locus_name_to_pickle_files)
+
+    # cleanup
+    for pickle_file in locus_name_to_pickle_files.values():
+        pickle_file.unlink()
+    io_utils.remove_empty_folders(options.output_prefix + "_prgs")
+
 
     logger.success("All done!")

@@ -1,7 +1,8 @@
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict, Optional, List
 from make_prg.utils.io_utils import load_alignment_file
 import pickle
 from pathlib import Path
+from zipfile import ZipFile
 from make_prg.utils.msa_aligner import MSAAligner
 from make_prg.recursion_tree import SingleClusterNode, RecursiveTreeNode
 
@@ -78,28 +79,34 @@ class PrgBuilder(object):
             pickle.dump(self, filehandler)
 
     @staticmethod
-    def deserialize(filepath: [Path, str]) -> "PrgBuilder":
-        with open(filepath, "rb") as filehandler:
-            return pickle.load(filehandler)
+    def deserialize(bytes_from_zip) -> "PrgBuilder":
+        return pickle.loads(bytes_from_zip)
 
 
 class PrgBuilderCollection:
     """
-    Represent a collection of PrgBuilder, to be serialised and deserialised
+    Represent a collection of PrgBuilder, to be saved to and loaded from a zip file
     """
-    def __init__(self, locus_name_to_pickle_filepaths: Dict[str, str]):
-        self.locus_name_to_pickle_filepaths: Dict[str, str] = locus_name_to_pickle_filepaths
+    def __init__(self, zip_filepath: Path):
+        is_a_zip_file = zip_filepath.suffix == ".zip"
+        assert is_a_zip_file, "PrgBuilderCollection initialised without a .zip filepath"
+        self._zip_filepath: Path = zip_filepath
+        self._zip_file: Optional[ZipFile] = None
 
-    def serialize(self, filepath: [Path, str]):
-        with open(filepath, "wb") as filehandler:
-            pickle.dump(self, filehandler)
+    def save(self, locus_name_to_pickle_filepaths: Dict[str, Path]):
+        with ZipFile(self._zip_filepath, "w") as zip_file:
+            for locus, pickle_filepath in locus_name_to_pickle_filepaths.items():
+                zip_file.write(pickle_filepath, locus)
 
-    @staticmethod
-    def deserialize(filepath: [Path, str]) -> "PrgBuilderCollection":
-        with open(filepath, "rb") as filehandler:
-            prg_builder_collection = pickle.load(filehandler)
-        parent = Path(filepath).parent
-        for locus_name, pickle_file in prg_builder_collection.locus_name_to_pickle_filepaths.items():
-            absolute_filepath = (parent / pickle_file).resolve()
-            prg_builder_collection.locus_name_to_pickle_filepaths[locus_name] = str(absolute_filepath)
-        return prg_builder_collection
+    def load(self):
+        self._zip_file = ZipFile(self._zip_filepath)
+
+    def close(self):
+        if self._zip_file is not None:
+            self._zip_file.close()
+
+    def get_loci_names(self) -> List[str]:
+        return self._zip_file.namelist()
+
+    def get_PrgBuilder(self, locus: str) -> PrgBuilder:
+        return PrgBuilder.deserialize(self._zip_file.read(locus))

@@ -56,8 +56,8 @@ class GFA_Output:
         delim = "%s%d%s" % (self.delim_char, site_num, self.delim_char)
         check_string = delim.join(split_strings)
         assert check_string == prg_string, (
-            "Something has gone wrong with the string split for site %d\nsplit_"
-            "strings: %s" % (site_num, split_strings)
+                "Something has gone wrong with the string split for site %d\nsplit_"
+                "strings: %s" % (site_num, split_strings)
         )
         return split_strings
 
@@ -176,3 +176,22 @@ def concatenate_text_files(input_filepaths, output_filepath):
             with fileinput.input(input_filepaths) as fin:
                 for line in fin:
                     fout.write(line)
+
+
+# From https://gist.github.com/jacobtomlinson/9031697
+def remove_empty_folders(path: str, remove_root: bool = True):
+    if not os.path.isdir(path):
+        return
+
+    # remove empty subfolders
+    files = os.listdir(path)
+    if len(files):
+        for f in files:
+            fullpath = os.path.join(path, f)
+            if os.path.isdir(fullpath):
+                remove_empty_folders(fullpath)
+
+    # if folder empty, delete it
+    files = os.listdir(path)
+    if len(files) == 0 and remove_root:
+        os.rmdir(path)

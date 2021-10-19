@@ -1,6 +1,7 @@
 from make_prg.recursion_tree import RecursiveTreeNode, SingleClusterNode
 import networkx as nx
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 
 class RecursiveTreeDrawer:
@@ -35,7 +36,7 @@ class RecursiveTreeDrawer:
         if node.parent is not None:
             graph.add_edge(node.parent, node)
 
-    def output_graph(self, filename):
+    def output_graph(self, filename: Path):
         plt.figure(figsize=(20, 10))
         a_graph = nx.drawing.nx_agraph.to_agraph(self._graph)
         a_graph.layout(prog="dot")
