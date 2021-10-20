@@ -88,13 +88,18 @@ def get_stats_on_variants(stats_files: List[str]) -> Tuple[int, int]:
     return nb_of_variants_successfully_applied, nb_of_variants_that_failed_to_be_applied
 
 
+# TODO: all these arguments are pickled/unpickled for multiprocessing
+# TODO: check if they are memory heavy
 def update(
     locus_name: str,
-    prg_builder_for_locus: PrgBuilder,
+    update_DS_filepath: Path,
     update_data_list: List[UpdateData],
     msa_aligner: MSAAligner,
     temp_dir: Path
 ):
+    prg_builder_collection = PrgBuilderCollection(update_DS_filepath)
+    prg_builder_collection.load()
+    prg_builder_for_locus = prg_builder_collection.get_PrgBuilder(locus_name)
     prg_builder_for_locus.aligner = msa_aligner
 
     nb_of_variants_sucessfully_updated = 0
@@ -177,7 +182,7 @@ def run(options):
             multithreaded_input.append(
                 (
                     locus_name,
-                    prg_builder_collection.get_PrgBuilder(locus_name),
+                    options.update_DS,
                     update_data,
                     mafft_aligner,
                     temp_path
