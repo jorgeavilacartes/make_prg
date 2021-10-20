@@ -2,12 +2,14 @@ import re
 import gzip
 from pathlib import Path
 import fileinput
+import multiprocessing
 from Bio import AlignIO
 import os
-
 from loguru import logger
-
 from make_prg.from_msa import MSA
+from typing import Dict, Optional, List, Tuple
+from collections import defaultdict
+from make_prg import prg_builder
 
 
 def load_alignment_file(msa_file: str, alignment_format: str) -> MSA:
@@ -202,3 +204,99 @@ def output_files_already_exist(output_prefix: str):
         Path(output_prefix + ".prg.fa").exists()
         or Path(output_prefix + ".update_DS.zip").exists()
     )
+
+
+def get_temp_dir_for_multiprocess(root_temp_dir: Path):
+    current_process = multiprocessing.current_process()
+    temp_dir = root_temp_dir / "mp_temp" / current_process.name
+    os.makedirs(temp_dir, exist_ok=True)
+    return temp_dir
+
+
+def clear_temp_extensions(filename: str) -> str:
+    while True:
+        file_should_be_cleared = filename.endswith(".fa") or filename.endswith(".prg") or \
+                                 filename.endswith(".pickle") or filename.endswith(".stats")
+        if file_should_be_cleared:
+            filename = Path(filename).with_suffix("").name
+        else:
+            return filename
+
+
+# get all files that were generated
+class PRG_Pickle_Stats:
+    def __init__(self, PRG: Optional[Path] = None, pickle: Optional[Path] = None, stats: Optional[Path] = None):
+        self.PRG: Optional[Path] = PRG
+        self.pickle: Optional[Path] = pickle
+        self.stats: Optional[Path] = stats
+
+
+def get_locus_to_prg_pickle_stats(threads: int, temp_root: Path) -> Dict[str, PRG_Pickle_Stats]:
+    locus_to_prg_pickle_stats = defaultdict(PRG_Pickle_Stats)
+    for process_num in range(1, threads + 1):
+        workdir = temp_root / f"ForkPoolWorker-{process_num}"
+        if workdir.exists():
+            for file in workdir.iterdir():
+                if file.is_file():
+                    locus_name = clear_temp_extensions(file.name)
+                    if file.name.endswith(".prg.fa"):
+                        locus_to_prg_pickle_stats[locus_name].PRG = file
+                    elif file.name.endswith(".pickle"):
+                        locus_to_prg_pickle_stats[locus_name].pickle = file
+                    elif file.name.endswith(".stats"):
+                        locus_to_prg_pickle_stats[locus_name].stats = file
+    return locus_to_prg_pickle_stats
+
+
+def get_stats_on_variants(stats_files: List[Path]) -> Tuple[int, int]:
+    nb_of_variants_successfully_applied = 0
+    nb_of_variants_that_failed_to_be_applied = 0
+    for stat_file in stats_files:
+        with open(stat_file) as stat_file_fh:
+            line_split = stat_file_fh.readline().strip().split()
+            nb_of_variants_successfully_applied_for_this_locus = int(line_split[1])
+            nb_of_variants_successfully_applied += (
+                nb_of_variants_successfully_applied_for_this_locus
+            )
+            nb_of_variants_that_failed_to_be_applied_for_this_locus = int(line_split[2])
+            nb_of_variants_that_failed_to_be_applied += (
+                nb_of_variants_that_failed_to_be_applied_for_this_locus
+            )
+    return nb_of_variants_successfully_applied, nb_of_variants_that_failed_to_be_applied
+
+
+def create_final_files(threads: int, output_prefix: str, output_stats: bool = False):
+    logger.info("Concatenating files from several threads into single final files...")
+    locus_to_prg_pickle_stats = get_locus_to_prg_pickle_stats(threads, Path(output_prefix) / "mp_temp")
+
+    prg_files = [prg_pickle_stats.PRG for prg_pickle_stats in locus_to_prg_pickle_stats.values()]
+    concatenate_text_files(prg_files, output_prefix + ".prg.fa")
+
+    # create and serialise the PRG Builder collection
+    logger.info("Serialising update data structure...")
+    prg_builder_collection = prg_builder.PrgBuilderCollection(Path(f"{output_prefix}.update_DS.zip"))
+    prg_builder_collection.save(locus_to_prg_pickle_stats)
+
+    # sum up stats files and output stats
+    if output_stats:
+        stats_files = [prg_pickle_stats.stats for prg_pickle_stats in locus_to_prg_pickle_stats.values()]
+        (
+            nb_of_variants_successfully_applied,
+            nb_of_variants_that_failed_to_be_applied,
+        ) = get_stats_on_variants(stats_files)
+        logger.success(
+            f"Number of variants successfully applied: {nb_of_variants_successfully_applied}"
+        )
+        logger.warning(
+            f"Number of variants that failed to be applied: {nb_of_variants_that_failed_to_be_applied}"
+        )
+
+    # cleanup
+    for prg_pickle_stats_files in locus_to_prg_pickle_stats.values():
+        if prg_pickle_stats_files.PRG:
+            prg_pickle_stats_files.PRG.unlink(missing_ok=True)
+        if prg_pickle_stats_files.pickle:
+            prg_pickle_stats_files.pickle.unlink(missing_ok=True)
+        if prg_pickle_stats_files.stats:
+            prg_pickle_stats_files.stats.unlink(missing_ok=True)
+    remove_empty_folders(output_prefix)

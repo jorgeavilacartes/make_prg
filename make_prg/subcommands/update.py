@@ -70,23 +70,6 @@ def register_parser(subparsers):
     return subparser_update_prg
 
 
-def get_stats_on_variants(stats_files: List[str]) -> Tuple[int, int]:
-    nb_of_variants_successfully_applied = 0
-    nb_of_variants_that_failed_to_be_applied = 0
-    for stat_file in stats_files:
-        with open(stat_file) as stat_file_fh:
-            line_split = stat_file_fh.readline().strip().split()
-            nb_of_variants_successfully_applied_for_this_locus = int(line_split[1])
-            nb_of_variants_successfully_applied += (
-                nb_of_variants_successfully_applied_for_this_locus
-            )
-            nb_of_variants_that_failed_to_be_applied_for_this_locus = int(line_split[2])
-            nb_of_variants_that_failed_to_be_applied += (
-                nb_of_variants_that_failed_to_be_applied_for_this_locus
-            )
-    return nb_of_variants_successfully_applied, nb_of_variants_that_failed_to_be_applied
-
-
 # TODO: all these arguments are pickled/unpickled for multiprocessing
 # TODO: check if they are memory heavy
 def update(
@@ -133,13 +116,13 @@ def update(
         logger.debug(f"{locus_name} has no new variants, no update needed")
 
     # regenerate PRG
-    locus_prefix = temp_dir / locus_name / locus_name
-    locus_prefix_parent = locus_prefix.parent
-    os.makedirs(locus_prefix_parent, exist_ok=True)
+    temp_dir = io_utils.get_temp_dir_for_multiprocess(Path(output_prefix))
+    locus_prefix = temp_dir / locus_name
 
-    logger.info(f"Write PRG file to {locus_prefix}.prg.fa")
+    logger.info(f"Writing output files of locus {locus_name}")
     prg = prg_builder_for_locus.build_prg()
     io_utils.write_prg(str(locus_prefix), prg)
+    prg_builder_for_locus.serialize(f"{locus_prefix}.pickle")
     with open(f"{locus_prefix}.stats", "w") as stats_filehandler:
         print(
             f"{locus_name} {nb_of_variants_sucessfully_updated} {nb_of_variants_with_failed_update}",
@@ -156,9 +139,8 @@ def run(options):
 
     # read input data
     logger.info("Checking Multiple Sequence Aligner...")
-    temp_path = Path(options.output_prefix + "_tmp")
-    os.makedirs(temp_path, exist_ok=True)
-    mafft_aligner = MAFFT(executable=options.mafft, tmpdir=temp_path)
+    msa_temp_path = Path(options.output_prefix) / "msa_temp"
+    mafft_aligner = MAFFT(executable=options.mafft, tmpdir=msa_temp_path)
 
     prg_builder_collection = None
     try:
@@ -187,37 +169,11 @@ def run(options):
                 )
             )
 
-        with multiprocessing.Pool(options.threads, maxtasksperchild=1) as pool:
+        with multiprocessing.Pool(options.threads) as pool:
             pool.starmap(update, multithreaded_input, chunksize=1)
         logger.success(f"All PRGs updated!")
 
-        # concatenate output PRGs
-        logger.info("Concatenating files from several threads into a single file...")
-        prg_files = [
-            Path(f"{temp_path}/{locus_name}/{locus_name}.prg.fa")
-            for locus_name in prg_builder_collection.get_loci_names()
-        ]
-        io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
-
-        # sum up stats files and output stats
-        stats_files = [
-            f"{temp_path}/{locus_name}/{locus_name}.stats"
-            for locus_name in prg_builder_collection.get_loci_names()
-        ]
-        (
-            nb_of_variants_successfully_applied,
-            nb_of_variants_that_failed_to_be_applied,
-        ) = get_stats_on_variants(stats_files)
-        logger.success(
-            f"Number of variants successfully applied: {nb_of_variants_successfully_applied}"
-        )
-        logger.warning(
-            f"Number of variants that failed to be applied: {nb_of_variants_that_failed_to_be_applied}"
-        )
-
-        # remove temp files
-        logger.info("Removing temp files...")
-        shutil.rmtree(temp_path)
+        io_utils.create_final_files(options.threads, options.output_prefix, output_stats=True)
 
         logger.success("All done!")
     finally:

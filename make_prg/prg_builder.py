@@ -93,10 +93,10 @@ class PrgBuilderCollection:
         self._zip_filepath: Path = zip_filepath
         self._zip_file: Optional[ZipFile] = None
 
-    def save(self, locus_name_to_pickle_filepaths: Dict[str, Path]):
+    def save(self, locus_to_prg_pickle_stats: Dict[str, PRG_Pickle_Stats]):
         with ZipFile(self._zip_filepath, "w") as zip_file:
-            for locus, pickle_filepath in locus_name_to_pickle_filepaths.items():
-                zip_file.write(pickle_filepath, locus)
+            for locus, prg_pickle_stats in locus_to_prg_pickle_stats.items():
+                zip_file.write(prg_pickle_stats.pickle, locus)
 
     def load(self):
         self._zip_file = ZipFile(self._zip_filepath)

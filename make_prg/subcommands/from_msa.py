@@ -99,15 +99,10 @@ def process_MSA(msa_filepath: Path):
     logger.info(f"Generating PRG for {msa_filepath}...")
     msa_name = msa_filepath.name
     locus_name = msa_filepath.with_suffix("").name
-    current_process = multiprocessing.current_process()
 
-    workdir = Path(options.output_prefix + "_prgs") / current_process.name
-    os.makedirs(workdir, exist_ok=True)
-    prefix = str(workdir / msa_name)
+    temp_dir = io_utils.get_temp_dir_for_multiprocess(Path(options.output_prefix))
+    prefix = str(temp_dir / msa_name)
 
-    if options.output_graphs:
-        debug_graphs_dir = Path(options.output_prefix + "_debug_graphs")
-        os.makedirs(debug_graphs_dir, exist_ok=True)
 
     try:
         builder = prg_builder.PrgBuilder(
@@ -156,38 +151,5 @@ def run(cl_options):
         pool.map(process_MSA, input_files, chunksize=1)
     logger.success(f"All PRGs generated!")
 
-    logger.info("Concatenating files from several threads into single final files...")
-    # get all files that were generated
-    prg_files = []
-    locus_name_to_pickle_files = {}
-    for process_num in range(1, options.threads + 1):
-        workdir = (
-            Path(options.output_prefix + "_prgs") / f"ForkPoolWorker-{process_num}"
-        )
-        if workdir.exists():
-            for file in workdir.iterdir():
-                if file.is_file():
-                    if file.name.endswith(".prg.fa"):
-                        prg_files.append(file)
-                    elif file.name.endswith(".pickle"):
-                        locus_name = file.with_suffix("").with_suffix("").name
-                        locus_name_to_pickle_files[locus_name] = file
-
-    # concatenate the prg.fa output files
-    io_utils.concatenate_text_files(prg_files, options.output_prefix + ".prg.fa")
-    # cleanup
-    for prg_file in prg_files:
-        prg_file.unlink()
-
-    # create and serialise the PRG Builder collection
-    logger.info("Serialising update data structure...")
-    prg_builder_collection = prg_builder.PrgBuilderCollection(Path(f"{options.output_prefix}.update_DS.zip"))
-    prg_builder_collection.save(locus_name_to_pickle_files)
-
-    # cleanup
-    for pickle_file in locus_name_to_pickle_files.values():
-        pickle_file.unlink()
-    io_utils.remove_empty_folders(options.output_prefix + "_prgs")
-
-
+    io_utils.create_final_files(options.threads, options.output_prefix)
     logger.success("All done!")
