@@ -6,7 +6,6 @@ from loguru import logger
 from make_prg import prg_builder
 from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
 from make_prg.utils import io_utils
-from make_prg.utils.utils import output_files_already_exist
 from make_prg.utils.drawer import RecursiveTreeDrawer
 
 
@@ -148,7 +147,7 @@ def run(cl_options):
     if there_is_no_input_files:
         logger.warning(f"No input files found at {options.input}")
 
-    if output_files_already_exist(options.output_prefix):
+    if io_utils.output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
     # NB: don't use logging, it causes deadlocks: https://pythonspeed.com/articles/python-multiprocessing/

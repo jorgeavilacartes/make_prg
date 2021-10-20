@@ -195,3 +195,10 @@ def remove_empty_folders(path: str, remove_root: bool = True):
     files = os.listdir(path)
     if len(files) == 0 and remove_root:
         os.rmdir(path)
+
+
+def output_files_already_exist(output_prefix: str):
+    return (
+        Path(output_prefix + ".prg.fa").exists()
+        or Path(output_prefix + ".update_DS.zip").exists()
+    )

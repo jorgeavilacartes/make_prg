@@ -7,7 +7,6 @@ from loguru import logger
 from make_prg.utils import io_utils
 from make_prg.update.denovo_variants import DenovoVariantsDB, UpdateData
 from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
-from make_prg.utils.utils import output_files_already_exist
 from make_prg.utils.msa_aligner import MAFFT, MSAAligner
 
 
@@ -151,9 +150,8 @@ def update(
     # PRGs on top of already updated PRGs
     # TODO: change this?
 
-
 def run(options):
-    if output_files_already_exist(options.output_prefix):
+    if io_utils.output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
     # read input data
