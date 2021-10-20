@@ -1,12 +1,10 @@
 from typing import List
 import multiprocessing
-import os
 from pathlib import Path
 from loguru import logger
 from make_prg import prg_builder
 from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
 from make_prg.utils import io_utils
-from make_prg.utils.drawer import RecursiveTreeDrawer
 
 
 def register_parser(subparsers):
@@ -117,10 +115,8 @@ def process_MSA(msa_filepath: Path):
         prg = builder.build_prg()
         io_utils.write_prg(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
-
         if options.output_graphs:
-            recursive_tree_drawer = RecursiveTreeDrawer(builder.root)
-            recursive_tree_drawer.output_graph(debug_graphs_dir / f"{msa_name}.recursion_tree.png")
+            builder.output_debug_graphs(Path(options.output_prefix + "_debug_graphs"))
 
         # TODO: add back GFA writing
         # print_with_time(f"Write GFA file to {prefix}.gfa")

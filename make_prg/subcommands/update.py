@@ -1,12 +1,11 @@
-from typing import List, Tuple
+from typing import List
 import multiprocessing
 import os
-import shutil
 from pathlib import Path
 from loguru import logger
 from make_prg.utils import io_utils
 from make_prg.update.denovo_variants import DenovoVariantsDB, UpdateData
-from make_prg.prg_builder import PrgBuilderCollection, PrgBuilder, LeafNotFoundException
+from make_prg.prg_builder import PrgBuilderCollection, LeafNotFoundException
 from make_prg.utils.msa_aligner import MAFFT, MSAAligner
 
 
@@ -65,6 +64,13 @@ def register_parser(subparsers):
         help="Path to MAFFT executable. By default, it is assumed to be on $PATH",
         default="mafft",
     )
+    subparser_update_prg.add_argument(
+        "--output_graphs",
+        dest="output_graphs",
+        action="store_true",
+        default=False,
+        help="Outputs the recursive tree and the PRG graphical representation (for development use only)",
+    )
     subparser_update_prg.set_defaults(func=run)
 
     return subparser_update_prg
@@ -77,7 +83,8 @@ def update(
     update_DS_filepath: Path,
     update_data_list: List[UpdateData],
     msa_aligner: MSAAligner,
-    temp_dir: Path
+    output_prefix: str,
+    output_graphs: bool
 ):
     prg_builder_collection = PrgBuilderCollection(update_DS_filepath)
     prg_builder_collection.load()
@@ -128,10 +135,9 @@ def update(
             f"{locus_name} {nb_of_variants_sucessfully_updated} {nb_of_variants_with_failed_update}",
             file=stats_filehandler,
         )
+    if output_graphs:
+        prg_builder_for_locus.output_debug_graphs(Path(output_prefix + "_debug_graphs"))
 
-    # Note: we intentionally do not regenerate updateable data structure here because we don't want to update
-    # PRGs on top of already updated PRGs
-    # TODO: change this?
 
 def run(options):
     if io_utils.output_files_already_exist(options.output_prefix):
@@ -165,7 +171,8 @@ def run(options):
                     options.update_DS,
                     update_data,
                     mafft_aligner,
-                    temp_path
+                    options.output_prefix,
+                    options.output_graphs
                 )
             )
 

@@ -1,10 +1,12 @@
 from typing import Tuple, Dict, Optional, List
-from make_prg.utils.io_utils import load_alignment_file
+from make_prg.utils.io_utils import load_alignment_file, PRG_Pickle_Stats
 import pickle
 from pathlib import Path
 from zipfile import ZipFile
 from make_prg.utils.msa_aligner import MSAAligner
 from make_prg.recursion_tree import SingleClusterNode, RecursiveTreeNode
+from make_prg.utils.drawer import RecursiveTreeDrawer
+import os
 
 
 class LeafNotFoundException(Exception):
@@ -81,6 +83,11 @@ class PrgBuilder(object):
     @staticmethod
     def deserialize(bytes_from_zip) -> "PrgBuilder":
         return pickle.loads(bytes_from_zip)
+
+    def output_debug_graphs(self, debug_graphs_dir):
+        os.makedirs(debug_graphs_dir, exist_ok=True)
+        recursive_tree_drawer = RecursiveTreeDrawer(self.root)
+        recursive_tree_drawer.output_graph(debug_graphs_dir / f"{self.locus_name}.recursion_tree.png")
 
 
 class PrgBuilderCollection:
