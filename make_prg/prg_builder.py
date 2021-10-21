@@ -6,6 +6,7 @@ from zipfile import ZipFile
 from make_prg.utils.msa_aligner import MSAAligner
 from make_prg.recursion_tree import SingleClusterNode, RecursiveTreeNode
 from make_prg.utils.drawer import RecursiveTreeDrawer
+from make_prg.utils.prg_encoder import PrgEncoder, PRG_Ints
 import os
 
 
@@ -83,6 +84,23 @@ class PrgBuilder(object):
     @staticmethod
     def deserialize(bytes_from_zip) -> "PrgBuilder":
         return pickle.loads(bytes_from_zip)
+
+    @staticmethod
+    def write_prg(output_prefix: str, prg_string: str):
+        """
+        Writes the prg to outfile.
+        Writes it as a human readable string, and also as an integer vector
+        """
+        sample = Path(output_prefix).with_suffix("").name
+        prg_filename = Path(output_prefix + ".prg.fa")
+        with prg_filename.open("w") as prg:
+            print(f">{sample}\n{prg_string}", file=prg)
+
+        prg_ints_fpath = Path(output_prefix + ".bin")
+        prg_encoder = PrgEncoder()
+        prg_ints: PRG_Ints = prg_encoder.encode(prg_string)
+        with prg_ints_fpath.open("wb") as ostream:
+            prg_encoder.write(prg_ints, ostream)
 
     def output_debug_graphs(self, debug_graphs_dir):
         os.makedirs(debug_graphs_dir, exist_ok=True)

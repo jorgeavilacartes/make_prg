@@ -3,7 +3,7 @@ import multiprocessing
 import os
 from pathlib import Path
 from loguru import logger
-from make_prg.utils import io_utils
+from make_prg.utils import io_utils, gfa
 from make_prg.update.denovo_variants import DenovoVariantsDB, UpdateData
 from make_prg.prg_builder import PrgBuilderZipDatabase, LeafNotFoundException
 from make_prg.utils.msa_aligner import MAFFT, MSAAligner
@@ -128,8 +128,8 @@ def update(
 
     logger.info(f"Writing output files of locus {locus_name}")
     prg = prg_builder_for_locus.build_prg()
-    io_utils.write_prg(str(locus_prefix), prg)
-    io_utils.write_gfa(str(locus_prefix), prg)
+    prg_builder_for_locus.write_prg(str(locus_prefix), prg)
+    gfa.GFA_Output.write_gfa(str(locus_prefix), prg)
     prg_builder_for_locus.serialize(f"{locus_prefix}.pickle")
     with open(f"{locus_prefix}.stats", "w") as stats_filehandler:
         print(

@@ -4,7 +4,7 @@ from pathlib import Path
 from loguru import logger
 from make_prg import prg_builder
 from make_prg.from_msa import NESTING_LVL, MIN_MATCH_LEN
-from make_prg.utils import io_utils
+from make_prg.utils import io_utils, gfa
 
 
 def register_parser(subparsers):
@@ -112,8 +112,8 @@ def process_MSA(msa_filepath: Path):
 
         logger.info(f"Writing output files of locus {msa_name}")
         prg = builder.build_prg()
-        io_utils.write_prg(prefix, prg)
-        io_utils.write_gfa(prefix, prg)
+        builder.write_prg(prefix, prg)
+        gfa.GFA_Output.write_gfa(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
         if options.output_graphs:
             builder.output_debug_graphs(Path(options.output_prefix + "_debug_graphs"))
