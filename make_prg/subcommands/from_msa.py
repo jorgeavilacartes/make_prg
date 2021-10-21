@@ -138,7 +138,6 @@ def run(cl_options):
     if io_utils.output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
-    # NB: don't use logging, it causes deadlocks: https://pythonspeed.com/articles/python-multiprocessing/
     logger.info(f"Using {options.threads} threads to generate PRGs...")
     with multiprocessing.Pool(options.threads) as pool:
         pool.map(process_MSA, input_files, chunksize=1)
