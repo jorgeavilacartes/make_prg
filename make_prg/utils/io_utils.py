@@ -10,6 +10,7 @@ from make_prg.from_msa import MSA
 from typing import Dict, Optional, List, Tuple
 from collections import defaultdict
 from make_prg import prg_builder
+from make_prg.utils.prg_encoder import PrgEncoder, PRG_Ints
 
 
 def load_alignment_file(msa_file: str, alignment_format: str) -> MSA:
@@ -157,13 +158,11 @@ def write_prg(output_prefix: str, prg_string: str):
     with prg_filename.open("w") as prg:
         print(f">{sample}\n{prg_string}", file=prg)
 
-    # TODO: add this back
-    # prg_ints_fpath = Path(output_prefix + ".bin")
-    # prg_encoder = PrgEncoder()
-    # prg_ints: PRG_Ints = prg_encoder.encode(prg_string)
-    #
-    # with prg_ints_fpath.open("wb") as ostream:
-    #     prg_encoder.write(prg_ints, ostream)
+    prg_ints_fpath = Path(output_prefix + ".bin")
+    prg_encoder = PrgEncoder()
+    prg_ints: PRG_Ints = prg_encoder.encode(prg_string)
+    with prg_ints_fpath.open("wb") as ostream:
+        prg_encoder.write(prg_ints, ostream)
 
 
 def concatenate_text_files(input_filepaths, output_filepath):
@@ -203,6 +202,7 @@ def output_files_already_exist(output_prefix: str):
     return (
         Path(output_prefix + ".prg.fa").exists()
         or Path(output_prefix + ".update_DS.zip").exists()
+        or Path(output_prefix + ".prg.bin.zip").exists()
     )
 
 
@@ -213,39 +213,55 @@ def get_temp_dir_for_multiprocess(root_temp_dir: Path):
     return temp_dir
 
 
-def clear_temp_extensions(filename: str) -> str:
-    while True:
-        file_should_be_cleared = filename.endswith(".fa") or filename.endswith(".prg") or \
-                                 filename.endswith(".pickle") or filename.endswith(".stats")
-        if file_should_be_cleared:
-            filename = Path(filename).with_suffix("").name
-        else:
-            return filename
-
-
 # get all files that were generated
-class PRG_Pickle_Stats:
-    def __init__(self, PRG: Optional[Path] = None, pickle: Optional[Path] = None, stats: Optional[Path] = None):
+class SetOutputFiles:
+    def __init__(self, PRG: Optional[Path] = None, binary_PRG: Optional[Path] = None,
+                 pickle: Optional[Path] = None, stats: Optional[Path] = None):
         self.PRG: Optional[Path] = PRG
+        self.binary_PRG: Optional[Path] = binary_PRG
         self.pickle: Optional[Path] = pickle
         self.stats: Optional[Path] = stats
 
+    @staticmethod
+    def clear_temp_extensions(filename: str) -> str:
+        while True:
+            file_should_be_cleared = filename.endswith(".fa") or filename.endswith(".prg") or \
+                                     filename.endswith(".pickle") or filename.endswith(".stats") or \
+                                     filename.endswith(".bin")
+            if file_should_be_cleared:
+                filename = Path(filename).with_suffix("").name
+            else:
+                return filename
 
-def get_locus_to_prg_pickle_stats(threads: int, temp_root: Path) -> Dict[str, PRG_Pickle_Stats]:
-    locus_to_prg_pickle_stats = defaultdict(PRG_Pickle_Stats)
+    @staticmethod
+    def _delete_file(filepath: Optional[Path]):
+        if filepath is not None:
+            filepath.unlink(missing_ok=True)
+
+    def delete_files(self):
+        self._delete_file(self.PRG)
+        self._delete_file(self.binary_PRG)
+        self._delete_file(self.pickle)
+        self._delete_file(self.stats)
+
+
+def get_locus_to_set_of_output_files(threads: int, temp_root: Path) -> Dict[str, SetOutputFiles]:
+    locus_to_set_of_output_files = defaultdict(SetOutputFiles)
     for process_num in range(1, threads + 1):
         workdir = temp_root / f"ForkPoolWorker-{process_num}"
         if workdir.exists():
             for file in workdir.iterdir():
                 if file.is_file():
-                    locus_name = clear_temp_extensions(file.name)
+                    locus_name = SetOutputFiles.clear_temp_extensions(file.name)
                     if file.name.endswith(".prg.fa"):
-                        locus_to_prg_pickle_stats[locus_name].PRG = file
+                        locus_to_set_of_output_files[locus_name].PRG = file
+                    elif file.name.endswith(".bin"):
+                        locus_to_set_of_output_files[locus_name].binary_PRG = file
                     elif file.name.endswith(".pickle"):
-                        locus_to_prg_pickle_stats[locus_name].pickle = file
+                        locus_to_set_of_output_files[locus_name].pickle = file
                     elif file.name.endswith(".stats"):
-                        locus_to_prg_pickle_stats[locus_name].stats = file
-    return locus_to_prg_pickle_stats
+                        locus_to_set_of_output_files[locus_name].stats = file
+    return locus_to_set_of_output_files
 
 
 def get_stats_on_variants(stats_files: List[Path]) -> Tuple[int, int]:
@@ -267,19 +283,29 @@ def get_stats_on_variants(stats_files: List[Path]) -> Tuple[int, int]:
 
 def create_final_files(threads: int, output_prefix: str, output_stats: bool = False):
     logger.info("Concatenating files from several threads into single final files...")
-    locus_to_prg_pickle_stats = get_locus_to_prg_pickle_stats(threads, Path(output_prefix) / "mp_temp")
 
-    prg_files = [prg_pickle_stats.PRG for prg_pickle_stats in locus_to_prg_pickle_stats.values()]
+    logger.info("Creating FASTA file of PRGs...")
+    locus_to_set_of_output_files = get_locus_to_set_of_output_files(threads, Path(output_prefix) / "mp_temp")
+
+    prg_files = [output_files.PRG for output_files in locus_to_set_of_output_files.values()]
     concatenate_text_files(prg_files, output_prefix + ".prg.fa")
 
-    # create and serialise the PRG Builder collection
-    logger.info("Serialising update data structure...")
-    prg_builder_collection = prg_builder.PrgBuilderCollection(Path(f"{output_prefix}.update_DS.zip"))
-    prg_builder_collection.save(locus_to_prg_pickle_stats)
+    # zip all PRG Builders
+    logger.info("Creating zip of update data structures...")
+    prg_builder_zip_db = prg_builder.PrgBuilderZipDatabase(Path(f"{output_prefix}.update_DS.zip"))
+    locus_to_prg_builder_pickle_path = {locus: output_files.pickle
+                                        for locus, output_files in locus_to_set_of_output_files.items()}
+    prg_builder_zip_db.save(locus_to_prg_builder_pickle_path)
+
+    # zip all encoded PRGs
+    logger.info("Creating zip of encoded PRGs...")
+    encoded_PRG_paths = [output_files.binary_PRG for output_files in locus_to_set_of_output_files.values()]
+    PrgEncoder.zip_set_of_encoded_PRGs(Path(f"{output_prefix}.prg.bin.zip"), encoded_PRG_paths)
 
     # sum up stats files and output stats
     if output_stats:
-        stats_files = [prg_pickle_stats.stats for prg_pickle_stats in locus_to_prg_pickle_stats.values()]
+        logger.info("Computing stats on updates...")
+        stats_files = [output_files.stats for output_files in locus_to_set_of_output_files.values()]
         (
             nb_of_variants_successfully_applied,
             nb_of_variants_that_failed_to_be_applied,
@@ -292,11 +318,6 @@ def create_final_files(threads: int, output_prefix: str, output_stats: bool = Fa
         )
 
     # cleanup
-    for prg_pickle_stats_files in locus_to_prg_pickle_stats.values():
-        if prg_pickle_stats_files.PRG:
-            prg_pickle_stats_files.PRG.unlink(missing_ok=True)
-        if prg_pickle_stats_files.pickle:
-            prg_pickle_stats_files.pickle.unlink(missing_ok=True)
-        if prg_pickle_stats_files.stats:
-            prg_pickle_stats_files.stats.unlink(missing_ok=True)
+    for output_files in locus_to_set_of_output_files.values():
+        output_files.delete_files()
     remove_empty_folders(output_prefix)

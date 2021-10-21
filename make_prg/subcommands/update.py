@@ -5,7 +5,7 @@ from pathlib import Path
 from loguru import logger
 from make_prg.utils import io_utils
 from make_prg.update.denovo_variants import DenovoVariantsDB, UpdateData
-from make_prg.prg_builder import PrgBuilderCollection, LeafNotFoundException
+from make_prg.prg_builder import PrgBuilderZipDatabase, LeafNotFoundException
 from make_prg.utils.msa_aligner import MAFFT, MSAAligner
 
 
@@ -86,9 +86,9 @@ def update(
     output_prefix: str,
     output_graphs: bool
 ):
-    prg_builder_collection = PrgBuilderCollection(update_DS_filepath)
-    prg_builder_collection.load()
-    prg_builder_for_locus = prg_builder_collection.get_PrgBuilder(locus_name)
+    prg_builder_zip_db = PrgBuilderZipDatabase(update_DS_filepath)
+    prg_builder_zip_db.load()
+    prg_builder_for_locus = prg_builder_zip_db.get_PrgBuilder(locus_name)
     prg_builder_for_locus.aligner = msa_aligner
 
     nb_of_variants_sucessfully_updated = 0
@@ -148,11 +148,11 @@ def run(options):
     msa_temp_path = Path(options.output_prefix) / "msa_temp"
     mafft_aligner = MAFFT(executable=options.mafft, tmpdir=msa_temp_path)
 
-    prg_builder_collection = None
+    prg_builder_zip_db = None
     try:
         logger.info("Reading update data structures...")
-        prg_builder_collection = PrgBuilderCollection(options.update_DS)
-        prg_builder_collection.load()
+        prg_builder_zip_db = PrgBuilderZipDatabase(options.update_DS)
+        prg_builder_zip_db.load()
         logger.info(f"Reading {options.denovo_paths}...")
         denovo_variants_db = DenovoVariantsDB(options.denovo_paths)
 
@@ -162,7 +162,7 @@ def run(options):
         # update all PRGs with denovo sequences
         logger.info(f"Using {options.threads} threads to update PRGs...")
         multithreaded_input = []
-        for locus_name in prg_builder_collection.get_loci_names():
+        for locus_name in prg_builder_zip_db.get_loci_names():
             # we do for all PRGs as those that don't have denovo variants will be generated also
             update_data = denovo_variants_db.locus_name_to_update_data.get(locus_name, [])
             multithreaded_input.append(
@@ -181,8 +181,7 @@ def run(options):
         logger.success(f"All PRGs updated!")
 
         io_utils.create_final_files(options.threads, options.output_prefix, output_stats=True)
-
         logger.success("All done!")
     finally:
-        if prg_builder_collection is not None:
-            prg_builder_collection.close()
+        if prg_builder_zip_db is not None:
+            prg_builder_zip_db.close()

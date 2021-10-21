@@ -1,5 +1,5 @@
 from typing import Tuple, Dict, Optional, List
-from make_prg.utils.io_utils import load_alignment_file, PRG_Pickle_Stats
+from make_prg.utils.io_utils import load_alignment_file, SetOutputFiles
 import pickle
 from pathlib import Path
 from zipfile import ZipFile
@@ -90,20 +90,20 @@ class PrgBuilder(object):
         recursive_tree_drawer.output_graph(debug_graphs_dir / f"{self.locus_name}.recursion_tree.png")
 
 
-class PrgBuilderCollection:
+class PrgBuilderZipDatabase:
     """
-    Represent a collection of PrgBuilder, to be saved to and loaded from a zip file
+    Represent a collection of PrgBuilders, to be saved to and loaded from a zip file
     """
     def __init__(self, zip_filepath: Path):
         is_a_zip_file = zip_filepath.suffix == ".zip"
-        assert is_a_zip_file, "PrgBuilderCollection initialised without a .zip filepath"
+        assert is_a_zip_file, "PrgBuilderZipDatabase initialised without a .zip filepath"
         self._zip_filepath: Path = zip_filepath
         self._zip_file: Optional[ZipFile] = None
 
-    def save(self, locus_to_prg_pickle_stats: Dict[str, PRG_Pickle_Stats]):
+    def save(self, locus_to_prg_builder_pickle_path: Dict[str, Path]):
         with ZipFile(self._zip_filepath, "w") as zip_file:
-            for locus, prg_pickle_stats in locus_to_prg_pickle_stats.items():
-                zip_file.write(prg_pickle_stats.pickle, locus)
+            for locus, prg_builder_pickle_path in locus_to_prg_builder_pickle_path.items():
+                zip_file.write(prg_builder_pickle_path, locus)
 
     def load(self):
         self._zip_file = ZipFile(self._zip_filepath)
