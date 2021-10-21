@@ -1,6 +1,4 @@
 from typing import Dict, List, BinaryIO
-from pathlib import Path
-from zipfile import ZipFile
 
 
 class ConversionError(Exception):
@@ -75,11 +73,3 @@ class PrgEncoder:
             raise EncodeError("Unit {} contains invalid characters".format(unit))
 
         return output
-
-    @staticmethod
-    def zip_set_of_encoded_PRGs(zip_filepath: Path, encoded_PRG_paths: List[Path]):
-        is_a_zip_file = zip_filepath.suffix == ".zip"
-        assert is_a_zip_file, "PrgEncoder.zip_set_of_encoded_PRGs() was not given a .zip filepath"
-        with ZipFile(zip_filepath, "w") as zip_file:
-            for encoded_PRG_path in encoded_PRG_paths:
-                zip_file.write(encoded_PRG_path, encoded_PRG_path.name)

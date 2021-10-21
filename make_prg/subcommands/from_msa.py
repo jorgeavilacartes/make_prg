@@ -101,7 +101,6 @@ def process_MSA(msa_filepath: Path):
     temp_dir = io_utils.get_temp_dir_for_multiprocess(Path(options.output_prefix))
     prefix = str(temp_dir / msa_name)
 
-
     try:
         builder = prg_builder.PrgBuilder(
             locus_name=locus_name,
@@ -114,13 +113,11 @@ def process_MSA(msa_filepath: Path):
         logger.info(f"Writing output files of locus {msa_name}")
         prg = builder.build_prg()
         io_utils.write_prg(prefix, prg)
+        io_utils.write_gfa(prefix, prg)
         builder.serialize(f"{prefix}.pickle")
         if options.output_graphs:
             builder.output_debug_graphs(Path(options.output_prefix + "_debug_graphs"))
 
-        # TODO: add back GFA writing
-        # print_with_time(f"Write GFA file to {prefix}.gfa")
-        # io_utils.write_gfa(f"{prefix}.gfa", aseq.prg)
     except ValueError as value_error:
         if "No records found in handle" in value_error.args[0]:
             logger.warning(f"No records found in MSA {msa_filepath}, skipping...")

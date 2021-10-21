@@ -1,5 +1,5 @@
 from typing import Tuple, Dict, Optional, List
-from make_prg.utils.io_utils import load_alignment_file, SetOutputFiles
+from make_prg.utils.io_utils import load_alignment_file, zip_set_of_files
 import pickle
 from pathlib import Path
 from zipfile import ZipFile
@@ -101,9 +101,7 @@ class PrgBuilderZipDatabase:
         self._zip_file: Optional[ZipFile] = None
 
     def save(self, locus_to_prg_builder_pickle_path: Dict[str, Path]):
-        with ZipFile(self._zip_filepath, "w") as zip_file:
-            for locus, prg_builder_pickle_path in locus_to_prg_builder_pickle_path.items():
-                zip_file.write(prg_builder_pickle_path, locus)
+        zip_set_of_files(self._zip_filepath, locus_to_prg_builder_pickle_path)
 
     def load(self):
         self._zip_file = ZipFile(self._zip_filepath)

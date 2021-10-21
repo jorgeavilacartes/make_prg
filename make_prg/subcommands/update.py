@@ -129,6 +129,7 @@ def update(
     logger.info(f"Writing output files of locus {locus_name}")
     prg = prg_builder_for_locus.build_prg()
     io_utils.write_prg(str(locus_prefix), prg)
+    io_utils.write_gfa(str(locus_prefix), prg)
     prg_builder_for_locus.serialize(f"{locus_prefix}.pickle")
     with open(f"{locus_prefix}.stats", "w") as stats_filehandler:
         print(

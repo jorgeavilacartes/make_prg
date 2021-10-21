@@ -11,6 +11,8 @@ from typing import Dict, Optional, List, Tuple
 from collections import defaultdict
 from make_prg import prg_builder
 from make_prg.utils.prg_encoder import PrgEncoder, PRG_Ints
+from pathlib import Path
+from zipfile import ZipFile
 
 
 def load_alignment_file(msa_file: str, alignment_format: str) -> MSA:
@@ -129,15 +131,13 @@ class GFA_Output:
         return return_id
 
 
-def write_gfa(outfile, prg_string):
+def write_gfa(prefix, prg_string):
     """
     Writes a gfa file from prg string.
     """
-    with open(outfile, "w") as f:
+    with open(f"{prefix}.gfa", "w") as f:
         # initialize gfa_string, id and site, then update string with the prg
         gfa_string = "H\tVN:Z:1.0\tbn:Z:--linear --singlearr\n"
-        gfa_id = 0
-        gfa_site = 5
         gfa_obj = GFA_Output(gfa_string)
         gfa_obj.build_gfa_string(prg_string=prg_string)
         f.write(gfa_obj.gfa_string)
@@ -216,9 +216,11 @@ def get_temp_dir_for_multiprocess(root_temp_dir: Path):
 # get all files that were generated
 class SetOutputFiles:
     def __init__(self, PRG: Optional[Path] = None, binary_PRG: Optional[Path] = None,
-                 pickle: Optional[Path] = None, stats: Optional[Path] = None):
+                 gfa: Optional[Path] = None, pickle: Optional[Path] = None,
+                 stats: Optional[Path] = None):
         self.PRG: Optional[Path] = PRG
         self.binary_PRG: Optional[Path] = binary_PRG
+        self.gfa: Optional[Path] = gfa
         self.pickle: Optional[Path] = pickle
         self.stats: Optional[Path] = stats
 
@@ -227,7 +229,7 @@ class SetOutputFiles:
         while True:
             file_should_be_cleared = filename.endswith(".fa") or filename.endswith(".prg") or \
                                      filename.endswith(".pickle") or filename.endswith(".stats") or \
-                                     filename.endswith(".bin")
+                                     filename.endswith(".bin") or filename.endswith(".gfa")
             if file_should_be_cleared:
                 filename = Path(filename).with_suffix("").name
             else:
@@ -241,6 +243,7 @@ class SetOutputFiles:
     def delete_files(self):
         self._delete_file(self.PRG)
         self._delete_file(self.binary_PRG)
+        self._delete_file(self.gfa)
         self._delete_file(self.pickle)
         self._delete_file(self.stats)
 
@@ -257,6 +260,8 @@ def get_locus_to_set_of_output_files(threads: int, temp_root: Path) -> Dict[str,
                         locus_to_set_of_output_files[locus_name].PRG = file
                     elif file.name.endswith(".bin"):
                         locus_to_set_of_output_files[locus_name].binary_PRG = file
+                    elif file.name.endswith(".gfa"):
+                        locus_to_set_of_output_files[locus_name].gfa = file
                     elif file.name.endswith(".pickle"):
                         locus_to_set_of_output_files[locus_name].pickle = file
                     elif file.name.endswith(".stats"):
@@ -281,6 +286,14 @@ def get_stats_on_variants(stats_files: List[Path]) -> Tuple[int, int]:
     return nb_of_variants_successfully_applied, nb_of_variants_that_failed_to_be_applied
 
 
+def zip_set_of_files(zip_filepath: Path, filename_to_filepath: Dict[str, Path]):
+    is_a_zip_file = zip_filepath.suffix == ".zip"
+    assert is_a_zip_file, "zip_set_of_files() was not given a .zip filepath"
+    with ZipFile(zip_filepath, "w") as zip_file:
+        for filename, filepath in filename_to_filepath.items():
+            zip_file.write(filepath, filename)
+
+
 def create_final_files(threads: int, output_prefix: str, output_stats: bool = False):
     logger.info("Concatenating files from several threads into single final files...")
 
@@ -299,8 +312,15 @@ def create_final_files(threads: int, output_prefix: str, output_stats: bool = Fa
 
     # zip all encoded PRGs
     logger.info("Creating zip of encoded PRGs...")
-    encoded_PRG_paths = [output_files.binary_PRG for output_files in locus_to_set_of_output_files.values()]
-    PrgEncoder.zip_set_of_encoded_PRGs(Path(f"{output_prefix}.prg.bin.zip"), encoded_PRG_paths)
+    filename_to_encoded_PRG_paths = {output_files.binary_PRG.name: output_files.binary_PRG
+                                     for output_files in locus_to_set_of_output_files.values()}
+    zip_set_of_files(Path(f"{output_prefix}.prg.bin.zip"), filename_to_encoded_PRG_paths)
+
+    # zip all GFAs
+    logger.info("Creating zip of GFAs...")
+    filename_to_gfa_paths = {output_files.gfa.name: output_files.gfa
+                             for output_files in locus_to_set_of_output_files.values()}
+    zip_set_of_files(Path(f"{output_prefix}.prg.gfa.zip"), filename_to_gfa_paths)
 
     # sum up stats files and output stats
     if output_stats:
