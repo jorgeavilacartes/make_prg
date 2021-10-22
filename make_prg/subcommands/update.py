@@ -16,20 +16,22 @@ def register_parser(subparsers):
         help="Update PRGs given new sequences.",
     )
 
-    def check_if_is_zip_file(argument: str):
+    def check_if_is_update_file(argument: str):
         argument = Path(argument)
         is_zip_file = argument.suffix == ".zip"
-        if not is_zip_file:
-            subparser_update_prg.error(f"{argument} is not a zip file.")
+        is_update_DS = argument.suffix == ".update_DS"
+        if not is_zip_file and not is_update_DS:
+            subparser_update_prg.error(f"{argument} is not a update_DS nor a zip file.")
         return argument
     subparser_update_prg.add_argument(
         "-u",
         "--update_DS",
         action="store",
-        type=lambda argument: check_if_is_zip_file(argument),
+        type=lambda argument: check_if_is_update_file(argument),
         required=True,
         help=(
-            "Filepath to the update data structures (a *.update_DS.zip file created through make_prg from_msa)."
+            "Filepath to the update data structures (a *.update_DS or *.update_DS.zip file created "
+            "by make_prg from_msa)"
         ),
 
     )
@@ -40,7 +42,7 @@ def register_parser(subparsers):
         type=str,
         required=True,
         help=(
-            "Filepath containing denovo sequences. Should point to a denovo_paths.txt file."
+            "Filepath containing denovo sequences. Should point to a denovo_paths.txt file"
         ),
     )
     subparser_update_prg.add_argument(
@@ -49,7 +51,7 @@ def register_parser(subparsers):
         action="store",
         type=str,
         required=True,
-        help="Output prefix: prefix for the output files",
+        help="Prefix for the output files",
     )
     subparser_update_prg.add_argument(
         "-t",
@@ -57,7 +59,7 @@ def register_parser(subparsers):
         action="store",
         type=int,
         default=1,
-        help="Number of threads",
+        help="Number of threads (default 1)",
     )
     subparser_update_prg.add_argument(
         "--mafft",
@@ -69,7 +71,7 @@ def register_parser(subparsers):
         dest="output_graphs",
         action="store_true",
         default=False,
-        help="Outputs the recursive tree and the PRG graphical representation (for development use only)",
+        help="Outputs the recursive tree graphical representation (for development use only)",
     )
     subparser_update_prg.set_defaults(func=run)
 

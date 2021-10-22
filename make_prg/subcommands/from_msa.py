@@ -11,7 +11,7 @@ def register_parser(subparsers):
     subparser_msa = subparsers.add_parser(
         "from_msa",
         usage="make_prg from_msa",
-        help="Make PRG from multiple sequence alignment dir",
+        help="Make PRG from multiple sequence alignment",
     )
     subparser_msa.add_argument(
         "-i",
@@ -20,9 +20,10 @@ def register_parser(subparsers):
         type=str,
         required=True,
         help=(
-            "Input dir: all files in this will try to be read as the supported alignment_format. "
-            "If not aligned in fasta alignment_format, use -f to input the "
-            "alignment_format type"
+            "Input data. If it is a file, will be read as the supported alignment_format (see "
+            "parameter --alignment_format). A single PRG, GFA and update data structures will "
+            "be created for the given MSA. If it is a dir, will process all files in the dir. "
+            "Multiple PRGs, GFAs and update data structures will be created, one for each MSA"
         ),
     )
     subparser_msa.add_argument(
@@ -31,7 +32,7 @@ def register_parser(subparsers):
         action="store",
         type=str,
         required=True,
-        help=("Output prefix: prefix for the output files"),
+        help=("Prefix for the output files"),
     )
     subparser_msa.add_argument(
         "-t",
@@ -39,7 +40,7 @@ def register_parser(subparsers):
         action="store",
         type=int,
         default=1,
-        help="Number of threads",
+        help="Number of threads (default 1)",
     )
     subparser_msa.add_argument(
         "-f",
@@ -78,7 +79,7 @@ def register_parser(subparsers):
         dest="output_graphs",
         action="store_true",
         default=False,
-        help="Outputs the recursive tree and the PRG graphical representation (for development use only)",
+        help="Outputs the recursive tree graphical representation (for development use only)",
     )
     subparser_msa.set_defaults(func=run)
 
