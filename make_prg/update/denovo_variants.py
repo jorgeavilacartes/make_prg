@@ -222,7 +222,6 @@ class DenovoVariantsDB:
             start_index = int(matches.group(1))
 
             # TODO: fix pandora to give us non-inclusive end intervals instead
-            # TODO: is this fixed? I think it is
             end_index = int(matches.group(2)) + 1
             sequence = matches.group(3)
         except Exception as exc:
