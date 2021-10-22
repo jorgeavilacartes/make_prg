@@ -86,11 +86,17 @@ def register_parser(subparsers):
     return subparser_msa
 
 
-def get_all_input_files(input_dir: str) -> List[Path]:
-    input_dir = Path(input_dir)
-    all_files = [
-        Path(path).absolute() for path in input_dir.iterdir() if path.is_file()
-    ]
+def get_all_input_files(input_path: str) -> List[Path]:
+    input_path = Path(input_path)
+    if not input_path.exists():
+        raise FileNotFoundError(f"{input_path} does not exist")
+
+    if input_path.is_file():
+        all_files = [input_path]
+    else:
+        all_files = [
+            Path(path).absolute() for path in input_path.iterdir() if path.is_file()
+        ]
     return all_files
 
 
@@ -132,9 +138,16 @@ def run(cl_options):
 
     logger.info("Getting input files...")
     input_files = get_all_input_files(options.input)
+
     there_is_no_input_files = len(input_files) == 0
     if there_is_no_input_files:
-        logger.warning(f"No input files found at {options.input}")
+        raise FileNotFoundError(f"No input files found in {options.input}")
+
+    is_a_single_file = len(input_files) == 1
+    if is_a_single_file:
+        logger.info("A single file was given as input, single outputs will be produced")
+    else:
+        logger.info("Multiple files were given as input, multiple outputs will be produced")
 
     if io_utils.output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
@@ -144,5 +157,6 @@ def run(cl_options):
         pool.map(process_MSA, input_files, chunksize=1)
     logger.success(f"All PRGs generated!")
 
-    io_utils.create_final_files(options.threads, options.output_prefix)
+    io_utils.create_final_files(options.threads, options.output_prefix,
+                                is_a_single_MSA=is_a_single_file)
     logger.success("All done!")

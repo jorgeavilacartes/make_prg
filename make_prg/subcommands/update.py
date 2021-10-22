@@ -30,7 +30,7 @@ def register_parser(subparsers):
         type=lambda argument: check_if_is_update_file(argument),
         required=True,
         help=(
-            "Filepath to the update data structures (a *.update_DS or *.update_DS.zip file created "
+            "Filepath to the update data structures (a *.update_DS.zip file created "
             "by make_prg from_msa)"
         ),
 
@@ -183,7 +183,9 @@ def run(options):
             pool.starmap(update, multithreaded_input, chunksize=1)
         logger.success(f"All PRGs updated!")
 
-        io_utils.create_final_files(options.threads, options.output_prefix, output_stats=True)
+        is_a_single_MSA = prg_builder_zip_db.get_number_of_loci() == 1
+        io_utils.create_final_files(options.threads, options.output_prefix,
+                                    is_a_single_MSA=is_a_single_MSA, output_stats=True)
         logger.success("All done!")
     finally:
         if prg_builder_zip_db is not None:

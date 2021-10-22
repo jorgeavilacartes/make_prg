@@ -128,6 +128,9 @@ class PrgBuilderZipDatabase:
         if self._zip_file is not None:
             self._zip_file.close()
 
+    def get_number_of_loci(self) -> int:
+        return len(self.get_loci_names())
+
     def get_loci_names(self) -> List[str]:
         return self._zip_file.namelist()
 

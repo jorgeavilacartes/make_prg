@@ -1,6 +1,7 @@
 import gzip
 import fileinput
 import multiprocessing
+import shutil
 from Bio import AlignIO
 import os
 from loguru import logger
@@ -29,14 +30,9 @@ def concatenate_text_files(input_filepaths, output_filepath):
     output_filepath_parent_dir = Path(output_filepath).parent
     os.makedirs(output_filepath_parent_dir, exist_ok=True)
 
-    with open(output_filepath, "w") as fout:
-        empty_input = len(input_filepaths) == 0
-        if empty_input:
-            return
-        else:
-            with fileinput.input(input_filepaths) as fin:
-                for line in fin:
-                    fout.write(line)
+    with open(output_filepath, "w") as fout, fileinput.input(input_filepaths) as fin:
+        for line in fin:
+            fout.write(line)
 
 
 # From https://gist.github.com/jacobtomlinson/9031697
@@ -62,7 +58,10 @@ def output_files_already_exist(output_prefix: str):
     return (
         Path(output_prefix + ".prg.fa").exists()
         or Path(output_prefix + ".update_DS.zip").exists()
+        or Path(output_prefix + ".prg.bin").exists()
         or Path(output_prefix + ".prg.bin.zip").exists()
+        or Path(output_prefix + ".prg.gfa").exists()
+        or Path(output_prefix + ".prg.gfa.zip").exists()
     )
 
 
@@ -156,7 +155,7 @@ def get_stats_on_variants(stats_files: List[Path]) -> Tuple[int, int]:
     return nb_of_variants_successfully_applied, nb_of_variants_that_failed_to_be_applied
 
 
-def create_final_files(threads: int, output_prefix: str, output_stats: bool = False):
+def create_final_files(threads: int, output_prefix: str, is_a_single_MSA: bool, output_stats: bool = False):
     logger.info("Concatenating files from several threads into single final files...")
 
     logger.info("Creating FASTA file of PRGs...")
@@ -167,23 +166,29 @@ def create_final_files(threads: int, output_prefix: str, output_stats: bool = Fa
     concatenate_text_files(prg_files, output_prefix + ".prg.fa")
 
     # zip all PRG Builders
-    logger.info("Creating zip of update data structures...")
+    logger.info("Creating update data structures...")
     prg_builder_zip_db = prg_builder.PrgBuilderZipDatabase(Path(f"{output_prefix}.update_DS.zip"))
     locus_to_prg_builder_pickle_path = {locus: output_files.pickle
                                         for locus, output_files in locus_to_set_of_output_files.items()}
     prg_builder_zip_db.save(locus_to_prg_builder_pickle_path)
 
     # zip all encoded PRGs
-    logger.info("Creating zip of encoded PRGs...")
+    logger.info("Creating encoded PRGs...")
     filename_to_encoded_PRG_paths = {output_files.binary_PRG.name: output_files.binary_PRG
                                      for output_files in locus_to_set_of_output_files.values()}
-    zip_set_of_files(Path(f"{output_prefix}.prg.bin.zip"), filename_to_encoded_PRG_paths)
+    if is_a_single_MSA:
+        shutil.copy(list(filename_to_encoded_PRG_paths.values())[0], f"{output_prefix}.prg.bin")
+    else:
+        zip_set_of_files(Path(f"{output_prefix}.prg.bin.zip"), filename_to_encoded_PRG_paths)
 
     # zip all GFAs
-    logger.info("Creating zip of GFAs...")
+    logger.info("Creating GFAs...")
     filename_to_gfa_paths = {output_files.gfa.name: output_files.gfa
                              for output_files in locus_to_set_of_output_files.values()}
-    zip_set_of_files(Path(f"{output_prefix}.prg.gfa.zip"), filename_to_gfa_paths)
+    if is_a_single_MSA:
+        shutil.copy(list(filename_to_gfa_paths.values())[0], f"{output_prefix}.prg.gfa")
+    else:
+        zip_set_of_files(Path(f"{output_prefix}.prg.gfa.zip"), filename_to_gfa_paths)
 
     # sum up stats files and output stats
     if output_stats:
