@@ -6,6 +6,7 @@ from collections import Counter
 from make_prg.utils.seq_utils import align, GAP
 from make_prg.update.MLPath import MLPathNode, MLPath, EmptyMLPathSequence
 from pathlib import Path
+from itertools import groupby
 
 
 class DenovoError(Exception):
@@ -37,6 +38,13 @@ class DenovoVariant:
         sequence_is_composed_of_ACGT_only = all([base in "ACGT" for base in seq])
         if not sequence_is_composed_of_ACGT_only:
             raise DenovoError(f"Found a non-ACGT seq ({seq}) in a denovo variant")
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return (self.start_index_in_linear_path, self.end_index_in_linear_path, self.ref, self.alt) == \
+                   (other.start_index_in_linear_path, other.end_index_in_linear_path, other.ref, other.alt)
+        else:
+            return False
 
     def get_mutated_sequence(self, node: MLPathNode) -> str:
         node_is_compatible_with_this_variant = \
@@ -71,7 +79,8 @@ class DenovoVariant:
         split_variants = []
         current_index_in_linear_path = self.start_index_in_linear_path
         ml_path_node_to_count = Counter(ml_path_nodes_it_goes_through)
-        for ml_path_node in ml_path_nodes_it_goes_through:
+        deduplicated_ml_path_nodes_it_goes_through = [x[0] for x in groupby(ml_path_nodes_it_goes_through)]
+        for ml_path_node_index, ml_path_node in enumerate(deduplicated_ml_path_nodes_it_goes_through):
             sub_ref = []
             sub_alt = []
             nb_of_bases_to_consume = ml_path_node_to_count[ml_path_node]
@@ -88,10 +97,19 @@ class DenovoVariant:
                 if alt_base != GAP:
                     sub_alt.append(alt_base)
 
-            split_variant = DenovoVariant(
-                current_start_in_linear_path, "".join(sub_ref), "".join(sub_alt)
-            )
-            split_variants.append(split_variant)
+            is_last_node = ml_path_node_index == len(deduplicated_ml_path_nodes_it_goes_through) - 1
+            there_are_remaining_alt_bases = is_last_node and nb_of_bases_to_consume==0 and len(alt_alignment)>0
+            if there_are_remaining_alt_bases:
+                sub_alt.extend([alt_base for alt_base in alt_alignment if alt_base != GAP])
+
+            sub_ref_seq = "".join(sub_ref)
+            sub_alt_seq = "".join(sub_alt)
+            sub_ref_and_alt_are_different = sub_ref_seq != sub_alt_seq
+            if sub_ref_and_alt_are_different:
+                split_variant = DenovoVariant(
+                    current_start_in_linear_path, sub_ref_seq, sub_alt_seq
+                )
+                split_variants.append(split_variant)
 
         return split_variants
 
@@ -103,10 +121,10 @@ class DenovoVariant:
         @param: ml_path_nodes_it_goes_through: a list of MLPathNode, where the i-th MLPathNode is the node the i-th base
         of the variant goes through
         """
-        nb_of_distinct_ml_path_nodes = len(set(ml_path_nodes_it_goes_through))
-        variant_covers_at_least_one_node = nb_of_distinct_ml_path_nodes > 0
-        assert variant_covers_at_least_one_node
+        each_base_is_covered_by_one_node = len(self.ref) == len(ml_path_nodes_it_goes_through)
+        assert each_base_is_covered_by_one_node, "We have bases uncovered by nodes in split_variant()"
 
+        nb_of_distinct_ml_path_nodes = len(set(ml_path_nodes_it_goes_through))
         variant_goes_through_only_one_leaf = nb_of_distinct_ml_path_nodes == 1
         if variant_goes_through_only_one_leaf:
             split_variants = [self]
@@ -119,9 +137,6 @@ class DenovoVariant:
         split_variants = self._split_variant_at_boundary_alignment(
             ml_path_nodes_it_goes_through, ref_alignment, alt_alignment
         )
-        one_split_per_ML_path_node = len(split_variants) == nb_of_distinct_ml_path_nodes
-        assert one_split_per_ML_path_node
-
         return split_variants
 
     def is_insertion_event(self) -> bool:
