@@ -154,7 +154,9 @@ class DenovoVariant:
         return f"[{self.start_index_in_linear_path}:{self.end_index_in_linear_path}]:'{self.ref}'->'{self.alt}'"
 
     def __repr__(self):
-        return str(self)
+        return f"DenovoVariant(start_index_in_linear_path={self.start_index_in_linear_path}, " \
+               f"ref=\"{self.ref}\", " \
+               f"alt=\"{self.alt}\")"
 
 
 class UpdateData:

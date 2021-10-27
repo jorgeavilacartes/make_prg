@@ -40,7 +40,7 @@ class MLPathNode:
                f"Seq = {self.sequence}"
 
     def __repr__(self):
-        return str(self)
+        return f"MLPathNode(key={self.key}, sequence=\"{self.sequence}\")"
 
 
 class MLPath:

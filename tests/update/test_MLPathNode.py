@@ -32,7 +32,7 @@ class MLPathNodeTest(TestCase):
     def test___repr(self):
         ml_path_node = MLPathNode((5, 9), sequence="ACGT")
 
-        expected = "PRG key = (5, 9); ML seq interval = [None:None]; Seq = ACGT"
+        expected = "MLPathNode(key=(5, 9), sequence=\"ACGT\")"
         actual = repr(ml_path_node)
 
         self.assertEqual(expected, actual)

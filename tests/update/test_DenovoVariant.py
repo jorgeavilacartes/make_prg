@@ -341,6 +341,6 @@ class DenovoVariantTest(TestCase):
         self.assertEqual(expected, actual)
 
     def test___repr(self):
-        expected = "[5:9]:'AACC'->'GT'"
+        expected = "DenovoVariant(start_index_in_linear_path=5, ref=\"AACC\", alt=\"GT\")"
         actual = repr(self.sample_denovo_variant)
         self.assertEqual(expected, actual)
