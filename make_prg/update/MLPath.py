@@ -35,7 +35,9 @@ class MLPathNode:
             raise MLPathError(f"{self} is not a valid node")
 
     def __str__(self):
-        return f"{self.key} {self.sequence} {self.start_index_in_linear_path} {self.end_index_in_linear_path}"
+        return f"PRG key = {self.key}; " \
+               f"ML seq interval = [{self.start_index_in_linear_path}:{self.end_index_in_linear_path}]; " \
+               f"Seq = {self.sequence}"
 
     def __repr__(self):
         return str(self)
