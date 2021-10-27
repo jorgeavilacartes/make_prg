@@ -47,6 +47,10 @@ class DenovoVariant:
             return False
 
     def get_mutated_sequence(self, node: MLPathNode) -> str:
+        """
+        Given a MLPathNode, we get its sequence, and apply this variant to it. The MLPathNode has to be compatible
+        with this variant.
+        """
         node_is_compatible_with_this_variant = \
             node.start_index_in_linear_path <= self.start_index_in_linear_path and \
             self.end_index_in_linear_path <= node.end_index_in_linear_path
@@ -120,6 +124,7 @@ class DenovoVariant:
         Split this variant into a list of sub-variants WRT how it is distributed along the ML path
         @param: ml_path_nodes_it_goes_through: a list of MLPathNode, where the i-th MLPathNode is the node the i-th base
         of the variant goes through
+        @return: List of sub-variants
         """
         each_base_is_covered_by_one_node = len(self.ref) == len(ml_path_nodes_it_goes_through)
         assert each_base_is_covered_by_one_node, "We have bases uncovered by nodes in split_variant()"
@@ -131,7 +136,7 @@ class DenovoVariant:
             return split_variants
 
         # here, variant goes through several leaves
-        alignment = align(self.ref, self.alt)
+        alignment = align(self.ref, self.alt, match_score=2, mismatch_score=-1, gap_open_score=-1, gap_extend_score=-1)
         ref_alignment = deque(alignment[0])
         alt_alignment = deque(alignment[1])
         split_variants = self._split_variant_at_boundary_alignment(
@@ -139,11 +144,14 @@ class DenovoVariant:
         )
         return split_variants
 
-    def is_insertion_event(self) -> bool:
-        return len(self.ref) == 0
+    def is_strict_insertion_event(self) -> bool:
+        """
+        A strict insertion event is when the ref is empty and the alt has some bases
+        """
+        return len(self.ref) == 0 and len(self.alt) > 0
 
     def __str__(self):
-        return f"{self.start_index_in_linear_path} {self.ref} {self.alt}"
+        return f"[{self.start_index_in_linear_path}:{self.end_index_in_linear_path}]:'{self.ref}'->'{self.alt}'"
 
     def __repr__(self):
         return str(self)
@@ -165,7 +173,7 @@ class DenovoLocusInfo:
         self.variants: List[DenovoVariant] = variants
 
     def _get_ml_path_nodes_spanning_variant(self, variant: DenovoVariant) -> List[MLPathNode]:
-        if variant.is_insertion_event():
+        if variant.is_strict_insertion_event():
             # interval is empty
             ml_path_node = self.ml_path.get_node_at_position(variant.start_index_in_linear_path)
             ml_path_nodes = [ml_path_node]
