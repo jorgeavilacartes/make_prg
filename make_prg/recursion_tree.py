@@ -151,7 +151,7 @@ class SingleClusterNode(RecursiveTreeNode):
             if single_seq:
                 start_index = len(prg_as_list)
                 prg_as_list.extend(seqs[0])
-                end_index = len(prg_as_list) + 1
+                end_index = len(prg_as_list)
                 self.prg_builder.update_leaves_index(start_index, end_index, node=self)
             else:
                 # Add the variant seqs to the prg

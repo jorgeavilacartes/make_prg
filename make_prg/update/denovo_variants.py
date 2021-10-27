@@ -243,9 +243,7 @@ class DenovoVariantsDB:
         try:
             matches = cls.ml_path_regex.search(line)
             start_index = int(matches.group(1))
-
-            # TODO: fix pandora to give us non-inclusive end intervals instead
-            end_index = int(matches.group(2)) + 1
+            end_index = int(matches.group(2))
             sequence = matches.group(3)
         except Exception as exc:
             assert False, f"Failed matching ML path regex to line: {line}\n" \
