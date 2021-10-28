@@ -4,9 +4,9 @@ import re
 from loguru import logger
 from collections import Counter
 from make_prg.utils.seq_utils import align, GAP
-from make_prg.update.MLPath import MLPathNode, MLPath, EmptyMLPathSequence
+from make_prg.update.MLPath import MLPathNode, MLPath, EmptyMLPathSequence, MLPathError
 from pathlib import Path
-from itertools import groupby
+from make_prg.utils.misc import remove_duplicated_consecutive_elems_from_list
 
 
 class DenovoError(Exception):
@@ -83,7 +83,7 @@ class DenovoVariant:
         split_variants = []
         current_index_in_linear_path = self.start_index_in_linear_path
         ml_path_node_to_count = Counter(ml_path_nodes_it_goes_through)
-        deduplicated_ml_path_nodes_it_goes_through = [x[0] for x in groupby(ml_path_nodes_it_goes_through)]
+        deduplicated_ml_path_nodes_it_goes_through = remove_duplicated_consecutive_elems_from_list(ml_path_nodes_it_goes_through)
         for ml_path_node_index, ml_path_node in enumerate(deduplicated_ml_path_nodes_it_goes_through):
             sub_ref = []
             sub_alt = []
@@ -164,6 +164,12 @@ class UpdateData:
         self.ml_path_node_key: Tuple[int, int] = ml_path_node_key
         self.new_node_sequence: str = new_node_sequence
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return (self.ml_path_node_key, self.new_node_sequence) == (other.ml_path_node_key, other.new_node_sequence)
+        else:
+            return False
+
 
 class DenovoLocusInfo:
     def __init__(
@@ -175,12 +181,26 @@ class DenovoLocusInfo:
         self.variants: List[DenovoVariant] = variants
 
     def _get_ml_path_nodes_spanning_variant(self, variant: DenovoVariant) -> List[MLPathNode]:
+        """
+        Given a variant, return a list of MLPathNodes spanning the variant.
+        For each base of the ref of variant, we have one MLPathNode, so if we have a ref == "ACGT", the list will
+        contain 4 MLPathNodes.
+        """
         if variant.is_strict_insertion_event():
-            # interval is empty
-            ml_path_node = self.ml_path.get_node_at_position(variant.start_index_in_linear_path)
+            # interval/ref is empty, search for the start index
+            try:
+                ml_path_node = self.ml_path.get_node_at_position(variant.start_index_in_linear_path)
+            except MLPathError as ml_path_error:
+                # this might happen when the insertion is after the last base of the last node
+                is_in_the_last_insertion_position = variant.start_index_in_linear_path == self.ml_path.get_last_insertion_pos()
+                if is_in_the_last_insertion_position:
+                    ml_path_node = self.ml_path.get_last_node()
+                else:
+                    # this is indeed an error
+                    raise ml_path_error
             ml_path_nodes = [ml_path_node]
         else:
-            # we have a real interval
+            # we have a real interval / ref is not empty
             ml_path_nodes = []
             for position_in_linear_path in range(
                     variant.start_index_in_linear_path, variant.end_index_in_linear_path
@@ -192,14 +212,15 @@ class DenovoLocusInfo:
 
     def get_update_data(self) -> List[UpdateData]:
         """
-        Get a list of updates to be done to ML path nodes
+        Get a list of updates to be done to MLPathNodes to update the PRG
         """
         update_data_list = []
         for variant in self.variants:
             ml_path_nodes = self._get_ml_path_nodes_spanning_variant(variant)
             split_variants = variant.split_variant(ml_path_nodes)
+            deduplicated_ml_path_nodes = remove_duplicated_consecutive_elems_from_list(ml_path_nodes)
 
-            for split_variant, ml_path_node in zip(split_variants, ml_path_nodes):
+            for split_variant, ml_path_node in zip(split_variants, deduplicated_ml_path_nodes):
                 update_data = UpdateData(
                     ml_path_node_key=ml_path_node.key,
                     new_node_sequence=split_variant.get_mutated_sequence(ml_path_node)
