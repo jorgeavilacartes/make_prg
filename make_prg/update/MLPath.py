@@ -40,6 +40,9 @@ class MLPathNode:
         else:
             return False
 
+    def __hash__(self):
+        return hash((self.key, self.sequence))
+
     def __str__(self):
         return f"PRG key = {self.key}; " \
                f"ML seq interval = [{self.start_index_in_linear_path}:{self.end_index_in_linear_path}]; " \
@@ -89,7 +92,7 @@ class MLPath:
         assert not two_or_more_nodes_overlap_this_position, f"2+ nodes overlap at position {position}, " \
                                                             f"this ML path ({self}) probably has an indexing bug."
         no_nodes_overlap_this_position = len(nodes) == 0
-        if not no_nodes_overlap_this_position:
+        if no_nodes_overlap_this_position:
             # this is an assertion, as this can be an input error (e.g. a badly formed denovo_paths.txt file)
             raise MLPathError(f"No nodes overlap this ML path ({self}) at position {position}, "
                               f"is the denovo_paths.txt given as input correct?")
