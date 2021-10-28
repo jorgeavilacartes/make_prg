@@ -73,19 +73,16 @@ class MLPath:
             ml_path_node.end_index_in_linear_path = end_index_in_linear_path
             start_index_in_linear_path = end_index_in_linear_path
 
-    def _last_insertion_pos(self):
+    def get_last_insertion_pos(self) -> int:
         """
-        This position is not indexed, but can be one where we can insert a sequence in the last node
+        This position is not indexed, but can be where we insert a sequence after the last base of the last node
         """
         return self._ml_path_nodes[-1].end_index_in_linear_path
 
-    def get_node_at_position(self, position: int) -> MLPathNode:
-        is_an_insertion_in_the_last_position_of_the_last_node = position == self._last_insertion_pos()
-        if is_an_insertion_in_the_last_position_of_the_last_node:
-            last_node = self._ml_path_nodes[-1]
-            return last_node
+    def get_last_node(self) -> MLPathNode:
+        return self._ml_path_nodes[-1]
 
-        # now to the common case
+    def get_node_at_position(self, position: int) -> MLPathNode:
         nodes = self._ml_path_index[position]
 
         two_or_more_nodes_overlap_this_position = len(nodes) >= 2
@@ -93,7 +90,7 @@ class MLPath:
                                                             f"this ML path ({self}) probably has an indexing bug."
         no_nodes_overlap_this_position = len(nodes) == 0
         if no_nodes_overlap_this_position:
-            # this is an assertion, as this can be an input error (e.g. a badly formed denovo_paths.txt file)
+            # this is an exception, as this can be an input error (e.g. a badly formed denovo_paths.txt file)
             raise MLPathError(f"No nodes overlap this ML path ({self}) at position {position}, "
                               f"is the denovo_paths.txt given as input correct?")
 
