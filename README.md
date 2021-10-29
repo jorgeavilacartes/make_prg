@@ -103,7 +103,7 @@ optional arguments:
                         Alignment format of MSA, must be a biopython AlignIO input alignment_format. See http://biopython.org/wiki/AlignIO. Default: fasta
   --max_nesting MAX_NESTING
                         Maximum number of levels to use for nesting. Default: 5
-  --min_match_length MIN_MATCH_LENGTH
+  -L MIN_MATCH_LENGTH, --min_match_length MIN_MATCH_LENGTH
                         Minimum number of consecutive characters which must be identical for a match. Default: 7
   -v, --verbose         Increase output verbosity
 ```
@@ -130,3 +130,4 @@ optional arguments:
 ```
 
 [pandora]: https://github.com/rmcolq/pandora
+

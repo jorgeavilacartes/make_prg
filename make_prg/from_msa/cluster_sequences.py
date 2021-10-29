@@ -1,23 +1,46 @@
-from collections import defaultdict
-from typing import List, Dict, Iterator, Union
+import logging
+from collections import Counter, defaultdict
+from typing import List, Dict, Iterator, Union, Optional
 from itertools import starmap, repeat, chain
-from collections import Counter
-import time
 
 import numpy as np
 from sklearn.cluster import KMeans
 
 from make_prg.from_msa import MSA
-from make_prg.utils.seq_utils import ungap
+from make_prg.seq_utils import ungap, Sequence, Sequences
 
-Sequence = str
-Sequences = List[str]
 IDs = List[str]
 SeqToIDs = Dict[Sequence, IDs]
 SeqToSeqs = Dict[Sequence, Sequences]
 ClusteredIDs = List[IDs]
 ClusteredSeqs = List[Sequences]
 KmerIDs = Dict[Sequence, int]
+
+
+class ClusteringResult(object):
+    """
+    Stores the result of clustering as a ClusteredIDs object.
+    If clustering was not meaningful (e.g. one sequence per cluster),
+    returns a set of sequences instead that can be directly used as set of alternative
+    alleles of the variant site under construction.
+    """
+
+    def __init__(
+        self,
+        clustered_ids: Optional[ClusteredIDs],
+        sequences: Optional[Sequences],
+    ):
+        mutually_exclusive = (clustered_ids is None) ^ (sequences is None)
+        assert (
+            mutually_exclusive
+        ), "Input arguments must be mutually exclusively set to 'None'"
+        self.clustered_ids = clustered_ids
+        self.sequences = sequences
+
+    @property
+    def no_clustering(self):
+        return self.clustered_ids is None
+
 
 DISTANCE_THRESHOLD: float = 0.2
 LENGTH_THRESHOLD: int = 5
@@ -120,10 +143,30 @@ def extract_clusters(
             f"Mismatch between number of sequences/ID lists and number of cluster assignments"
         )
     num_clusters = max(cluster_assignment) + 1
+    if set(cluster_assignment) != set(range(num_clusters)):
+        raise ValueError(
+            "Inconsistent cluster numbering (likely reason: more input sequences that clustered data points)"
+        )
     result = [list() for _ in range(num_clusters)]
     for cluster_num, clustered_elem in zip(cluster_assignment, value_pool):
         result[cluster_num].extend(clustered_elem)
     return result
+
+
+def merge_sequences(*seqlists: Sequences, first_seq: str) -> ClusteringResult:
+    first_seq_found = False
+    result = list()
+    for seqlist in seqlists:
+        for sequence in seqlist:
+            if sequence == first_seq:
+                first_seq_found = True
+            else:
+                result.append(sequence)
+    if not first_seq_found:
+        raise ValueError(
+            "Provided sequence argument not found in provided list of sequences"
+        )
+    return ClusteringResult(None, [first_seq] + result)
 
 
 def merge_clusters(clusters: List[ClusteredIDs], first_id: str) -> ClusteredIDs:
@@ -140,9 +183,19 @@ def merge_clusters(clusters: List[ClusteredIDs], first_id: str) -> ClusteredIDs:
 
 
 def kmeans_cluster_seqs_in_interval(
+    interval: List[int],
     alignment: MSA,
     kmer_size: int,
 ) -> ClusteredIDs:
+    """Divide sequences in interval into subgroups of similar sequences.
+    If no meaningful clustering is found, returns the (deduplicated, ungapped)
+    set of input sequences.
+    """
+    logging.debug("Get kmeans partition of interval [%d, %d]", interval[0], interval[1])
+
+    interval_alignment = alignment[:, interval[0] : interval[1] + 1]
+    first_sequence = ungap(str(interval_alignment[0].seq))
+
     # Find unique sequences for clustering, but keep each sequence's IDs
     seq_to_ids: SeqToIDs = defaultdict(list)
     seq_to_gapped_seqs: SeqToSeqs = defaultdict(list)
@@ -159,36 +212,52 @@ def kmeans_cluster_seqs_in_interval(
 
     num_clusters = 1
     num_sequences = len(seq_to_ids)
-    if num_sequences > 2:
-        distinct_sequences = list(seq_to_ids)
-        distinct_kmers = count_distinct_kmers(distinct_sequences, kmer_size)
-        count_matrix = count_kmer_occurrences(distinct_sequences, distinct_kmers)
-        cluster_assignment = [0 for _ in range(len(seq_to_ids))]
-        seqclustering: ClusteredSeqs = extract_clusters(
-            seq_to_gapped_seqs, cluster_assignment
+    too_few_seqs_to_cluster = num_sequences <= 2
+    if too_few_seqs_to_cluster:
+        return merge_sequences(
+            seq_to_ids.keys(), small_seq_to_ids.keys(), first_seq=first_sequence
         )
 
-        while cluster_further(seqclustering):
-            num_clusters += 1
-            if num_clusters > MAX_CLUSTERS:
-                break
-            if num_clusters == num_sequences:
-                break
-            start = time.time()
-            kmeans = KMeans(n_clusters=num_clusters, random_state=2).fit(count_matrix)
-            cluster_assignment = list(kmeans.predict(count_matrix))
-            seqclustering = extract_clusters(seq_to_gapped_seqs, cluster_assignment)
+    distinct_sequences = list(seq_to_ids)
+    distinct_kmers = count_distinct_kmers(distinct_sequences, kmer_size)
+    count_matrix = count_kmer_occurrences(distinct_sequences, distinct_kmers)
+    cluster_assignment = [0 for _ in range(len(seq_to_ids))]
+    seqclustering: ClusteredSeqs = extract_clusters(
+        seq_to_gapped_seqs, cluster_assignment
+    )
 
-    if num_clusters == 1 or num_clusters == num_sequences:
-        cluster_assignment = list(range(num_sequences))
-    id_clustering = []
-    if num_sequences > 0:
-        id_clustering: ClusteredIDs = extract_clusters(seq_to_ids, cluster_assignment)
+    while cluster_further(seqclustering):
+        num_clusters += 1
+        if num_clusters > MAX_CLUSTERS:
+            break
+        if num_clusters == num_sequences:
+            break
+        kmeans = KMeans(n_clusters=num_clusters, random_state=2).fit(count_matrix)
+        prev_cluster_assignment = cluster_assignment
+        cluster_assignment = list(kmeans.predict(count_matrix))
+        num_fitted_clusters = len(set(cluster_assignment))
+        # Below holds when alignments are different, but kmer counts are identical
+        # (due to repeats), making kmeans unable to fit requested number of clusters
+        if num_fitted_clusters < num_clusters:
+            cluster_assignment = prev_cluster_assignment
+            num_clusters -= 1
+            break
+        seqclustering = extract_clusters(seq_to_gapped_seqs, cluster_assignment)
 
-    first_id = alignment[0].id
-    result = merge_clusters([id_clustering, small_seq_to_ids.values()], first_id)
-
-    assert len(alignment) == sum(
-        [len(i) for i in result]
-    ), "Each input sequence should be in a cluster"
-    return result
+    no_clustering = num_clusters == 1 or num_clusters == num_sequences
+    if no_clustering:
+        return merge_sequences(
+            seq_to_ids.keys(), small_seq_to_ids.keys(), first_seq=first_sequence
+        )
+    else:
+        first_id = interval_alignment[0].id
+        clustered_ids: ClusteredIDs = []
+        if num_sequences > 0:
+            clustered_ids = extract_clusters(seq_to_ids, cluster_assignment)
+        clustered_ids = merge_clusters(
+            [clustered_ids, small_seq_to_ids.values()], first_id
+        )
+        assert len(interval_alignment) == sum(
+            [len(i) for i in clustered_ids]
+        ), "Each input sequence should be in a cluster"
+        return ClusteringResult(clustered_ids, None)

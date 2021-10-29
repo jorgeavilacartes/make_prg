@@ -50,20 +50,20 @@ def register_parser(subparsers):
         default="fasta",
         help=(
             "Alignment format of MSA, must be a biopython AlignIO input "
-            "alignment_format. See http://biopython.org/wiki/AlignIO. Default: fasta"
+            "alignment_format. See http://biopython.org/wiki/AlignIO. Default: %(default)s"
         ),
     )
     subparser_msa.add_argument(
+        "-N",
         "--max_nesting",
         dest="max_nesting",
         action="store",
         type=int,
         default=NESTING_LVL,
-        help="Maximum number of levels to use for nesting. Default: {}".format(
-            NESTING_LVL
-        ),
+        help="Maximum number of levels to use for nesting. Default: %(default)s",
     )
     subparser_msa.add_argument(
+        "-L",
         "--min_match_length",
         dest="min_match_length",
         action="store",
@@ -71,7 +71,7 @@ def register_parser(subparsers):
         default=MIN_MATCH_LEN,
         help=(
             "Minimum number of consecutive characters which must be identical for a "
-            "match. Default: {}".format(MIN_MATCH_LEN)
+            "match. Default: %(default)s"
         ),
     )
     subparser_msa.add_argument(
@@ -81,6 +81,14 @@ def register_parser(subparsers):
         default=False,
         help="Outputs the recursive tree graphical representation (for development use only)",
     )
+    subparser_msa.add_argument(
+        "-O",
+        "--output-type",
+        help="p: PRG, b: Binary, g: GFA, a: All. Combinations are allowed i.e., gb: GFA and Binary. Default: %(default)s",
+        default="a",
+        type=OutputType,
+    )
+    subparser_msa.add_argument("--log", help="Path to write log to. Default is stderr")
     subparser_msa.set_defaults(func=run)
 
     return subparser_msa
