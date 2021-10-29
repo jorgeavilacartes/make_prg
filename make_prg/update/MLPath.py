@@ -60,6 +60,12 @@ class MLPath:
         self._ml_path_index: IntervalTree = IntervalTree()
         self._index()
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return (self._ml_path_nodes, self._ml_path_index) == (other._ml_path_nodes, other._ml_path_index)
+        else:
+            return False
+
     def _index(self):
         start_index_in_linear_path = 0
         for ml_path_node_index, ml_path_node in enumerate(self._ml_path_nodes):

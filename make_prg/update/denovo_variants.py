@@ -170,6 +170,9 @@ class UpdateData:
         else:
             return False
 
+    def __repr__(self):
+        return f"UpdateData(ml_path_node_key={self.ml_path_node_key}, new_node_sequence=\"{self.new_node_sequence}\")"
+
 
 class DenovoLocusInfo:
     def __init__(
@@ -298,7 +301,7 @@ class DenovoVariantsDB:
 
     @staticmethod
     def _read_DenovoVariant(filehandler: TextIO) -> DenovoVariant:
-        line = filehandler.readline()[:-1]
+        line = filehandler.readline().strip("\n")
         line_split = line.split("\t")
 
         start_index_in_linear_path = int(line_split[0]) - 1
