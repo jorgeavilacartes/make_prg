@@ -11,7 +11,7 @@ from Bio.Seq import Seq
 NONMATCH = "*"
 GAP = "-"
 Sequence = str
-Sequences = Iterable[str]
+Sequences = List[str]
 
 
 def is_non_match(letter: str):
