@@ -82,9 +82,6 @@ def register_parser(subparsers):
         help="Outputs the recursive tree graphical representation (for development use only)",
     )
 
-    # TODO: fix this
-    subparser_msa.add_argument("--log", help="Path to write log to. Default is stderr")
-
     subparser_msa.set_defaults(func=run)
 
     return subparser_msa

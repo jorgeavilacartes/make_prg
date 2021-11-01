@@ -30,12 +30,14 @@ def main():
             default=False,
             help="Increase output verbosity",
         )
+        par.add_argument("--log", help="Path to write log to. Default is stderr")
 
     args = parser.parse_args()
 
     log_lvl = "DEBUG" if args.verbose else "INFO"
+    log_file = args.log if args.log else sys.stderr
     handlers = [
-        dict(sink=sys.stderr, enqueue=True, level=log_lvl),
+        dict(sink=log_file, enqueue=True, level=log_lvl),
     ]
     logger.configure(handlers=handlers)
 
