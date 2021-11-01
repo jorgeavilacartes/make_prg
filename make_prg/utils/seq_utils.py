@@ -1,4 +1,4 @@
-from typing import Generator, Sequence, Tuple
+from typing import Generator, Tuple, Iterable, List
 import itertools
 from Bio import pairwise2
 from loguru import logger
@@ -10,6 +10,8 @@ from Bio.Seq import Seq
 
 NONMATCH = "*"
 GAP = "-"
+Sequence = str
+Sequences = Iterable[str]
 
 
 def is_non_match(letter: str):
@@ -20,7 +22,7 @@ def is_gap(letter: str):
     return letter == GAP
 
 
-def remove_duplicates(seqs: Sequence) -> Generator:
+def remove_duplicates(seqs: Sequences) -> Generator:
     seen = set()
     for x in seqs:
         if x in seen:
@@ -58,14 +60,38 @@ def ungap(seq: str) -> str:
     return seq.replace("-", "")
 
 
-def get_interval_seqs(interval_alignment: MSA):
+def count(iterable) -> int:
+    return sum(1 for _ in iterable)
+
+
+def get_alignment_seqs(alignment: MSA) -> Generator:
+    for record in alignment:
+        yield str(record.seq)
+
+
+def get_number_of_unique_ungapped_sequences(sub_alignment: MSA) -> int:
+    alignment_seqs = list(get_alignment_seqs(sub_alignment))
+    ungapped_sequences = list(map(ungap, alignment_seqs))
+    deduplicated_ungapped_sequences = list(remove_duplicates(ungapped_sequences))
+    number_of_unique_nongapped_sequences = count(deduplicated_ungapped_sequences)
+    return number_of_unique_nongapped_sequences
+
+
+def get_number_of_unique_gapped_sequences(sub_alignment: MSA) -> int:
+    alignment_seqs = get_alignment_seqs(sub_alignment)
+    deduplicated_gapped_sequences = remove_duplicates(alignment_seqs)
+    number_of_unique_gapped_sequences = count(deduplicated_gapped_sequences)
+    return number_of_unique_gapped_sequences
+
+
+def get_expanded_sequences(alignment: MSA) -> Sequences:
     """
     Replace - with nothing, remove seqs containing N or other non-allowed letters
     and duplicate sequences containing RYKMSW, replacing with AGCT alternatives
 
     The sequences are deliberately returned in the order they are received
     """
-    gapless_seqs = [ungap(str(record.seq)) for record in interval_alignment]
+    gapless_seqs = map(ungap, get_alignment_seqs(alignment))
 
     callback_seqs, expanded_seqs = [], []
     expanded_set = set()

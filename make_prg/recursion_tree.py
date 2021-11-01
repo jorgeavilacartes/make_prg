@@ -1,24 +1,26 @@
 from typing import List, Set, Optional
 from loguru import logger
 from make_prg.from_msa import MSA
-from make_prg.from_msa.cluster_sequences import kmeans_cluster_seqs_in_interval
+from make_prg.from_msa.cluster_sequences import kmeans_cluster_seqs
 from make_prg.utils.seq_utils import (
-    remove_duplicates,  # TODO: quantify and remove dups
-    get_interval_seqs,
+    get_expanded_sequences,
     remove_gaps_from_MSA,
-    get_consensus_from_MSA
+    get_consensus_from_MSA,
+    get_number_of_unique_ungapped_sequences,
+    get_number_of_unique_gapped_sequences
 )
-from make_prg.from_msa.interval_partition import IntervalPartitioner
+from make_prg.from_msa.interval_partition import IntervalPartitioner, Interval
 from abc import ABC, abstractmethod
 
 
 class RecursiveTreeNode(ABC):
     def __init__(self, nesting_level: int, alignment: MSA, parent: Optional["RecursiveTreeNode"],
-                 prg_builder: "PrgBuilder"):
+                 prg_builder: "PrgBuilder", force_no_child: bool = False):
         self.nesting_level: int = nesting_level
         self.alignment: MSA = remove_gaps_from_MSA(alignment)
         self.parent: "RecursiveTreeNode" = parent
         self.prg_builder: "PrgBuilder" = prg_builder
+        self.force_no_child = force_no_child
         self.id: int = self.prg_builder.get_next_node_id()
         self.new_sequences: Set[str] = set()
 
@@ -49,13 +51,15 @@ class MultiClusterNode(RecursiveTreeNode):
     def _get_children(self) -> List["RecursiveTreeNode"]:
         # each child is a PrgBuilderSingleClusterNode for each cluster subalignment
         cluster_subalignments = self._get_subalignments_by_clustering()
+        no_clustering_was_done = len(cluster_subalignments) == 1
         children = []
         for alignment in cluster_subalignments:
             child = SingleClusterNode(
                 nesting_level=self.nesting_level,
                 alignment=alignment,
                 parent=self,
-                prg_builder=self.prg_builder
+                prg_builder=self.prg_builder,
+                force_no_child=no_clustering_was_done
             )
             children.append(child)
         return children
@@ -79,12 +83,12 @@ class MultiClusterNode(RecursiveTreeNode):
     #####################################################################################################
     #  clustering methods
     def _get_subalignments_by_clustering(self) -> List[MSA]:
-        id_lists = kmeans_cluster_seqs_in_interval(
+        clustered_ids = kmeans_cluster_seqs(
             self.alignment,
-            self.prg_builder.min_match_length,
+            self.prg_builder.min_match_length
         )
         list_sub_alignments = [
-            self._get_sub_alignment_by_list_id(id_list) for id_list in id_lists
+            self._get_sub_alignment_by_list_id(clustered_id) for clustered_id in clustered_ids
         ]
         return list_sub_alignments
 
@@ -107,36 +111,79 @@ class SingleClusterNode(RecursiveTreeNode):
             self.consensus, self.prg_builder.min_match_length, self.alignment
         ).get_intervals()
 
-    def _get_children(self) -> List["RecursiveTreeNode"]:
-        # base cases / stop conditions
-        single_match_interval = (len(self.all_intervals) == 1) and (
-            self.all_intervals[0] in self.match_intervals
-        )
-        max_nesting_level_reached = self.nesting_level == self.prg_builder.max_nesting
-        small_variant_site = self.alignment.get_alignment_length() < self.prg_builder.min_match_length
+    def _infer_if_this_node_has_no_child(self, alignment):
+        if self.force_no_child:
+            return True
 
-        if single_match_interval or max_nesting_level_reached or small_variant_site:
+        single_match_interval = (len(self.all_intervals) == 1) and (
+                self.all_intervals[0] in self.match_intervals
+        )
+        if single_match_interval:
+            return True
+
+        max_nesting_level_reached = self.nesting_level == self.prg_builder.max_nesting
+        if max_nesting_level_reached:
+            return True
+
+        small_variant_site = self.alignment.get_alignment_length() < self.prg_builder.min_match_length
+        if small_variant_site:
+            return True
+
+        num_unique_nongapped_seqs = get_number_of_unique_ungapped_sequences(alignment)
+        too_few_unique_sequences = num_unique_nongapped_seqs <= 2
+        if too_few_unique_sequences:
+            return True
+
+        num_unique_gapped_seqs = get_number_of_unique_gapped_sequences(alignment)
+        assert num_unique_nongapped_seqs <= num_unique_gapped_seqs
+        alignment_has_ambiguity = num_unique_nongapped_seqs < num_unique_gapped_seqs
+        if alignment_has_ambiguity:
+            return True
+
+        return False
+
+    def _infer_if_should_not_cluster(self, interval: Interval, alignment: MSA):
+        is_a_match_interval = interval in self.match_intervals
+        if is_a_match_interval:
+            return True
+
+        num_unique_nongapped_seqs = get_number_of_unique_ungapped_sequences(alignment)
+        too_few_unique_sequences = num_unique_nongapped_seqs <= 2
+        if too_few_unique_sequences:
+            return True
+
+        num_unique_gapped_seqs = get_number_of_unique_gapped_sequences(alignment)
+        assert num_unique_nongapped_seqs <= num_unique_gapped_seqs
+        alignment_has_ambiguity = num_unique_nongapped_seqs < num_unique_gapped_seqs
+        if alignment_has_ambiguity:
+            return True
+
+        clustered_ids = kmeans_cluster_seqs(alignment, self.prg_builder.min_match_length)
+        single_cluster_found = len(clustered_ids) == 1
+        if single_cluster_found:
+            return True
+
+        return False
+
+    def _get_children(self) -> List["RecursiveTreeNode"]:
+        node_has_no_child = self._infer_if_this_node_has_no_child(self.alignment)
+        if node_has_no_child:
             return list()
 
         children = []
         for interval in self.all_intervals:
             sub_alignment = self.alignment[:, interval.start : interval.stop + 1]
-            is_a_match_interval = interval in self.match_intervals
-            if is_a_match_interval:
-                # all seqs are not necessarily exactly the same: some can have 'N'
-                # thus still process all of them, to get the one with no 'N'.
-                seqs = get_interval_seqs(sub_alignment)
-                only_one_sequence_in_match_interval = len(seqs) == 1
-                assert only_one_sequence_in_match_interval, "Got >1 filtered sequences in match interval"
+            sub_alignment_will_not_be_reclustered = self._infer_if_should_not_cluster(interval, sub_alignment)
+            if sub_alignment_will_not_be_reclustered:
                 subclass = SingleClusterNode
             else:
                 subclass = MultiClusterNode
-
             child = subclass(
                 nesting_level=self.nesting_level + 1,
                 alignment=sub_alignment,
                 parent=self,
-                prg_builder=self.prg_builder
+                prg_builder=self.prg_builder,
+                force_no_child=sub_alignment_will_not_be_reclustered
             )
             children.append(child)
 
@@ -145,7 +192,7 @@ class SingleClusterNode(RecursiveTreeNode):
     def _get_prg(self, prg_as_list: List[str], delim_char: str = " "):
         for interval in self.all_intervals:
             sub_alignment = self.alignment[:, interval.start:interval.stop + 1]
-            seqs = get_interval_seqs(sub_alignment)
+            seqs = get_expanded_sequences(sub_alignment)
 
             single_seq = len(seqs) == 1
             if single_seq:
@@ -163,7 +210,7 @@ class SingleClusterNode(RecursiveTreeNode):
                     )
                     start_index = len(prg_as_list)
                     prg_as_list.extend(seq)
-                    end_index = len(prg_as_list) + 1
+                    end_index = len(prg_as_list)
                     self.prg_builder.update_leaves_index(
                         start_index, end_index, node=self
                     )

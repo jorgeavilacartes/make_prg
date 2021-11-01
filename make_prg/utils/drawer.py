@@ -23,14 +23,17 @@ class RecursiveTreeDrawer:
     @staticmethod
     def _visit(node: RecursiveTreeNode, graph: nx.DiGraph):
         node_attributes = {}
+        node_is_SingleClusterNode = isinstance(node, SingleClusterNode)
+
         if node.is_leaf():
-            node_is_SingleClusterNode = isinstance(node, SingleClusterNode)
             assert node_is_SingleClusterNode, "Error, a leaf is not a SingleClusterNode"
             prg_as_list = []
             node._get_prg(prg_as_list)
             node_attributes["label"] = "".join(prg_as_list)
         else:
             node_attributes["label"] = str(node.id)
+
+        node_attributes["color"] = "blue" if node_is_SingleClusterNode else "red"
         graph.add_node(node, **node_attributes)
 
         if node.parent is not None:

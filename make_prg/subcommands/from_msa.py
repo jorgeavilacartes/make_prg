@@ -32,7 +32,7 @@ def register_parser(subparsers):
         action="store",
         type=str,
         required=True,
-        help=("Prefix for the output files"),
+        help="Prefix for the output files",
     )
     subparser_msa.add_argument(
         "-t",
@@ -81,14 +81,10 @@ def register_parser(subparsers):
         default=False,
         help="Outputs the recursive tree graphical representation (for development use only)",
     )
-    subparser_msa.add_argument(
-        "-O",
-        "--output-type",
-        help="p: PRG, b: Binary, g: GFA, a: All. Combinations are allowed i.e., gb: GFA and Binary. Default: %(default)s",
-        default="a",
-        type=OutputType,
-    )
+
+    # TODO: fix this
     subparser_msa.add_argument("--log", help="Path to write log to. Default is stderr")
+
     subparser_msa.set_defaults(func=run)
 
     return subparser_msa
