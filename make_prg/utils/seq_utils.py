@@ -1,4 +1,4 @@
-from typing import Generator, Tuple, Iterable, List
+from typing import Generator, Tuple, List
 import itertools
 from Bio import pairwise2
 from loguru import logger
@@ -57,7 +57,7 @@ def has_empty_sequence(alignment: MSA, interval: Tuple[int, int]) -> bool:
 
 
 def ungap(seq: str) -> str:
-    return seq.replace("-", "")
+    return seq.replace(GAP, "")
 
 
 def count(iterable) -> int:
@@ -70,9 +70,9 @@ def get_alignment_seqs(alignment: MSA) -> Generator:
 
 
 def get_number_of_unique_ungapped_sequences(sub_alignment: MSA) -> int:
-    alignment_seqs = list(get_alignment_seqs(sub_alignment))
-    ungapped_sequences = list(map(ungap, alignment_seqs))
-    deduplicated_ungapped_sequences = list(remove_duplicates(ungapped_sequences))
+    alignment_seqs = get_alignment_seqs(sub_alignment)
+    ungapped_sequences = map(ungap, alignment_seqs)
+    deduplicated_ungapped_sequences = remove_duplicates(ungapped_sequences)
     number_of_unique_nongapped_sequences = count(deduplicated_ungapped_sequences)
     return number_of_unique_nongapped_sequences
 
