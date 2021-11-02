@@ -36,6 +36,7 @@ def is_type(letter: str, interval_type: IntervalType) -> bool:
 
 class Interval:
     """Stores a closed interval [a,b]"""
+    # TODO: change to an open interval for consistency with all the other intervals used in make_prg
 
     def __init__(self, it_type: IntervalType, start: int, stop: int = None):
         self.type = it_type
