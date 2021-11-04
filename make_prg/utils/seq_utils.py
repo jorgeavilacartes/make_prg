@@ -1,7 +1,6 @@
 from typing import Generator, Tuple, List
 import itertools
 from Bio import pairwise2
-from loguru import logger
 from make_prg.from_msa import MSA
 import copy
 import numpy as np
@@ -29,23 +28,6 @@ def remove_duplicates(seqs: Sequences) -> Generator:
             continue
         seen.add(x)
         yield x
-
-
-iupac = {
-    "R": "GA",
-    "Y": "TC",
-    "K": "GT",
-    "M": "AC",
-    "S": "GC",
-    "W": "AT",
-    "A": "A",
-    "C": "C",
-    "G": "G",
-    "T": "T",
-}
-allowed_bases = set(iupac.keys())
-standard_bases = {"A", "C", "G", "T"}
-ambiguous_bases = allowed_bases.difference(standard_bases)
 
 
 def has_empty_sequence(alignment: MSA, interval: Tuple[int, int]) -> bool:
@@ -84,49 +66,88 @@ def get_number_of_unique_gapped_sequences(sub_alignment: MSA) -> int:
     return number_of_unique_gapped_sequences
 
 
-def get_expanded_sequences(alignment: MSA) -> Sequences:
-    """
-    Replace - with nothing, remove seqs containing N or other non-allowed letters
-    and duplicate sequences containing RYKMSW, replacing with AGCT alternatives
-
-    The sequences are deliberately returned in the order they are received
-    """
-    gapless_seqs = map(ungap, get_alignment_seqs(alignment))
-
-    callback_seqs, expanded_seqs = [], []
-    expanded_set = set()
-    for seq in remove_duplicates(gapless_seqs):
-        if len(expanded_set) == 0:
-            callback_seqs.append(seq)
-        if not set(seq).issubset(allowed_bases):
-            continue
-        alternatives = [iupac[base] for base in seq]
-        for tuple_product in itertools.product(*alternatives):
-            expanded_str = "".join(tuple_product)
-            if expanded_str not in expanded_set:
-                expanded_set.add(expanded_str)
-                expanded_seqs.append(expanded_str)
-
-    if len(expanded_set) == 0:
-        logger.warning(
-            "Every sequence must have contained an N in this slice - redo sequence curation"
-        )
-        logger.warning(f'Sequences were: {" ".join(callback_seqs)}')
-        logger.warning("Using these sequences anyway, and should be ignored downstream")
-        return callback_seqs
-    return expanded_seqs
+class SequenceCurationError(Exception):
+    pass
 
 
-def align(ref: str, alt: str, match_score=2, mismatch_score=-1, gap_open_score=-4, gap_extend_score=-2) \
-        -> Tuple[str, str]:
+class SequenceExpander:
+    iupac = {
+        "R": "GA",
+        "Y": "TC",
+        "K": "GT",
+        "M": "AC",
+        "S": "GC",
+        "W": "AT",
+        "A": "A",
+        "C": "C",
+        "G": "G",
+        "T": "T",
+        "N": "N"  # we don't translate N, but it is an allowed base
+    }
+    allowed_bases = set(iupac.keys())
+    standard_bases = {"A", "C", "G", "T"}
+    standard_bases_with_N = standard_bases.union({"N"})
+    ambiguous_bases = allowed_bases.difference(standard_bases_with_N)
+
+    @classmethod
+    def check_if_there_is_sequence_with_disallowed_bases(cls, sequences: List[str]):
+        for sequence in sequences:
+            if not set(sequence).issubset(cls.allowed_bases):
+                raise SequenceCurationError(
+                    "A slice of a sequence has a disallowed base.\n"
+                    f"Allowed bases: {cls.allowed_bases}.\n"
+                    f"Sequence: {sequence}\n"
+                    f"Redo sequence curation.\n"
+                )
+
+    @classmethod
+    def check_all_sequences_are_composed_of_ACGTN(cls, sequences: List[str]):
+        for sequence in sequences:
+            sequence_is_composed_of_ACGTN_only = set(sequence).issubset(cls.standard_bases_with_N)
+            assert sequence_is_composed_of_ACGTN_only, f"Sequence ({sequence}) should be composed only of ACTGN only."
+
+    @classmethod
+    def get_expanded_sequences(cls, alignment: MSA) -> Sequences:
+        """
+        Expand sequences in the given alignment, following the translation table in SequenceExpander.iupac.
+        It does the following steps:
+            1. Check that we don't have disallowed bases;
+            2. Remove gaps (-);
+            3. Duplicate sequences containing RYKMSW, replacing with AGCT alternatives;
+        Note 1: Ns are not expanded. The returned sequences must be composed of ACGTN only.
+        Note 2: The sequences are deliberately returned in the order they are received.
+        """
+        gapless_seqs = list(map(ungap, get_alignment_seqs(alignment)))
+        cls.check_if_there_is_sequence_with_disallowed_bases(gapless_seqs)
+
+        expanded_seqs = []
+        expanded_set = set()
+        deduplicated_gapless_seqs = remove_duplicates(gapless_seqs)
+        for seq in deduplicated_gapless_seqs:
+            alternatives = [cls.iupac[base] for base in seq]
+            for tuple_product in itertools.product(*alternatives):
+                expanded_str = "".join(tuple_product)
+                if expanded_str not in expanded_set:
+                    expanded_set.add(expanded_str)
+                    expanded_seqs.append(expanded_str)
+
+        cls.check_all_sequences_are_composed_of_ACGTN(expanded_seqs)
+        return expanded_seqs
+
+
+def align(seq1: str, seq2: str,
+          match_score: float = 2,
+          mismatch_score: float = -0.9,
+          gap_open_score: float = -1.1,
+          gap_extend_score: float = -1) -> Tuple[str, str]:
     alignment = pairwise2.align.globalms(
-        ref, alt, match_score, mismatch_score, gap_open_score, gap_extend_score
+        seq1, seq2, match_score, mismatch_score, gap_open_score, gap_extend_score, one_alignment_only=True
     )
     empty_alignment = len(alignment) == 0
     if empty_alignment:
         #  this usually happens if ref or alt are empty, let's check
-        ref_is_empty = len(ref) == 0
-        alt_is_empty = len(alt) == 0
+        ref_is_empty = len(seq1) == 0
+        alt_is_empty = len(seq2) == 0
 
         # only one should be empty
         both_are_empty = ref_is_empty and alt_is_empty
@@ -135,22 +156,18 @@ def align(ref: str, alt: str, match_score=2, mismatch_score=-1, gap_open_score=-
         assert not both_are_not_empty
 
         if ref_is_empty:
-            return GAP * len(alt), alt
-        elif alt_is_empty:
-            return ref, GAP * len(ref)
-        else:
-            assert True, "Unreachable code"  # just to be sure
+            return GAP * len(seq2), seq2
+        else:  # alt_is_empty
+            return seq1, GAP * len(seq1)
     else:
-        alignment = alignment[
-            0
-        ]  # get the first alignment - we might have several equally good ones
+        alignment = alignment[0]
         return alignment.seqA, alignment.seqB
 
 
-def remove_gaps_from_MSA(alignment: MSA) -> MSA:
+def remove_columns_full_of_gaps_from_MSA(alignment: MSA) -> MSA:
     """
-    Return a gapless alignment. This code is long and a bit convoluted because it is optimised (it was too slow if
-    done in the most intuitive way).
+    Note: This code is long and a bit convoluted because it is optimised (it was too slow if done in the most intuitive
+    way).
     """
     alignment_as_array = np.array([list(rec) for rec in alignment], str, order="F")
     gapless_sequences = [[] for _ in range(len(alignment))]
@@ -181,7 +198,10 @@ def get_consensus_from_MSA(alignment: MSA) -> str:
     for i in range(alignment.get_alignment_length()):
         column = set([record.seq[i] for record in alignment])
         column = column.difference({"N"})
-        if len(ambiguous_bases.intersection(column)) > 0 or len(column) != 1:
+        column_is_ambiguous = len(SequenceExpander.ambiguous_bases.intersection(column)) > 0 or len(column) != 1
+        column_is_all_gaps = column == {"-"}
+        not_a_match = column_is_ambiguous or column_is_all_gaps
+        if not_a_match:
             consensus_string_as_list.append(NONMATCH)
         else:
             consensus_string_as_list.append(column.pop())

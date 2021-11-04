@@ -136,7 +136,7 @@ class DenovoVariant:
             return split_variants
 
         # here, variant goes through several leaves
-        alignment = align(self.ref, self.alt, match_score=2, mismatch_score=-1, gap_open_score=-1, gap_extend_score=-1)
+        alignment = align(self.ref, self.alt)
         ref_alignment = deque(alignment[0])
         alt_alignment = deque(alignment[1])
         split_variants = self._split_variant_at_boundary_alignment(

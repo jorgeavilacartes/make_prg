@@ -3,8 +3,8 @@ from loguru import logger
 from make_prg.from_msa import MSA
 from make_prg.from_msa.cluster_sequences import kmeans_cluster_seqs
 from make_prg.utils.seq_utils import (
-    get_expanded_sequences,
-    remove_gaps_from_MSA,
+    SequenceExpander,
+    remove_columns_full_of_gaps_from_MSA,
     get_consensus_from_MSA,
     get_number_of_unique_ungapped_sequences,
     get_number_of_unique_gapped_sequences
@@ -17,7 +17,7 @@ class RecursiveTreeNode(ABC):
     def __init__(self, nesting_level: int, alignment: MSA, parent: Optional["RecursiveTreeNode"],
                  prg_builder: "PrgBuilder", force_no_child: bool = False):
         self.nesting_level: int = nesting_level
-        self.alignment: MSA = remove_gaps_from_MSA(alignment)
+        self.alignment: MSA = remove_columns_full_of_gaps_from_MSA(alignment)
         self.parent: "RecursiveTreeNode" = parent
         self.prg_builder: "PrgBuilder" = prg_builder
         self.force_no_child = force_no_child
@@ -192,7 +192,7 @@ class SingleClusterNode(RecursiveTreeNode):
     def _get_prg(self, prg_as_list: List[str], delim_char: str = " "):
         for interval in self.all_intervals:
             sub_alignment = self.alignment[:, interval.start:interval.stop + 1]
-            seqs = get_expanded_sequences(sub_alignment)
+            seqs = SequenceExpander.get_expanded_sequences(sub_alignment)
 
             single_seq = len(seqs) == 1
             if single_seq:

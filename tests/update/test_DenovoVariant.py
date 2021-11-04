@@ -321,7 +321,7 @@ class DenovoVariantTest(TestCase):
             dummy_node_1, dummy_node_2, dummy_node_3, dummy_node_4, dummy_node_5, dummy_node_6, dummy_node_7,
             dummy_node_8]
 
-        expected = [DenovoVariant(6, "C", ""), DenovoVariant(8, "T", ""), DenovoVariant(10, "C", ""),
+        expected = [DenovoVariant(6, "C", ""), DenovoVariant(9, "T", ""), DenovoVariant(10, "C", ""),
                     DenovoVariant(12, "T", "")]
         actual = denovo_variant.split_variant(ml_path_nodes_it_goes_through)
 

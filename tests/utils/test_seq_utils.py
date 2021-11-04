@@ -1,9 +1,5 @@
 from unittest import TestCase
 
-from Bio import AlignIO
-from Bio.Seq import Seq
-from Bio.SeqRecord import SeqRecord
-
 from tests.from_msa import make_alignment
 from make_prg.utils.seq_utils import (
     is_non_match,
@@ -16,9 +12,14 @@ from make_prg.utils.seq_utils import (
     get_number_of_unique_gapped_sequences,
     get_alignment_seqs,
     count,
-    get_expanded_sequences,
+    SequenceExpander,
+    align,
     has_empty_sequence,
+    SequenceCurationError,
+    remove_columns_full_of_gaps_from_MSA,
+    get_consensus_from_MSA
 )
+from make_prg.from_msa import MSA
 
 
 class TestSeqUtilsMisc(TestCase):
@@ -209,24 +210,230 @@ class TestEmptySeq(TestCase):
         self.assertFalse(has_empty_sequence(msa, (9, 11)))
 
 
-class TestGetExpandedSequences(TestCase):
-    def test_ambiguous_bases_one_seq(self):
-        alignment = AlignIO.MultipleSeqAlignment([SeqRecord(Seq("RWAAT"))])
-        result = get_expanded_sequences(alignment)
+class TestSequenceExpander(TestCase):
+    def test___get_expanded_sequences___ambiguous_bases_one_seq(self):
+        msa = make_alignment(["RWAAT"])
+
         expected = {"GAAAT", "AAAAT", "GTAAT", "ATAAT"}
-        self.assertEqual(set(result), expected)
+        actual = SequenceExpander.get_expanded_sequences(msa)
 
-    def test_ambiguous_bases_one_seq_with_repeated_base(self):
-        alignment = AlignIO.MultipleSeqAlignment([SeqRecord(Seq("RRAAT"))])
-        result = get_expanded_sequences(alignment)
+        self.assertEqual(expected, set(actual))
+
+    def test___get_expanded_sequences___ambiguous_bases_one_seq_with_repeated_base(self):
+        msa = make_alignment(["RRAAT"])
+
         expected = {"GAAAT", "AAAAT", "GGAAT", "AGAAT"}
-        self.assertEqual(set(result), expected)
+        actual = SequenceExpander.get_expanded_sequences(msa)
 
-    def test_first_sequence_in_is_first_sequence_out(self):
-        alignment = make_alignment(["TTTT", "AAAA", "CC-C"])
-        result = get_expanded_sequences(alignment)
+        self.assertEqual(expected, set(actual))
+
+    def test___get_expanded_sequences___ambiguous_bases_several_seqs_with_gaps___all_wildcards(self):
+        msa = make_alignment([
+            "--RYAA",
+            "KMTT--",
+            "-CSWG-",
+            "GTAA--",  # one of the expanded ones
+            "--ATAA",  # one of the expanded ones
+            "-GCTT-",  # one of the expanded ones
+            "CG--TG",  # one of the expanded ones
+            "C-CT-G",  # one of the expanded ones
+            "AA--AA"   # new non-wildcard seq
+        ])
+
+        expected = {
+            "GTAA", "GCAA", "ATAA", "ACAA",
+            "GATT", "GCTT", "TATT", "TCTT",
+            "CGAG", "CGTG", "CCAG", "CCTG",
+            "AAAA"
+            }
+        actual = SequenceExpander.get_expanded_sequences(msa)
+
+        self.assertEqual(expected, set(actual))
+
+    def test___get_expanded_sequences___ambiguous_bases_several_seqs_with_gaps_and_Ns___all_wildcards(self):
+        msa = make_alignment([
+            "-NRYAA",
+            "KMTT--",
+            "-CSWGN",
+            "AA--NA"   # new non-wildcard seq
+        ])
+
+        expected = {
+            "NGTAA", "NGCAA", "NATAA", "NACAA",
+            "GATT", "GCTT", "TATT", "TCTT",
+            "CGAGN", "CGTGN", "CCAGN", "CCTGN",
+            "AANA"
+            }
+        actual = SequenceExpander.get_expanded_sequences(msa)
+
+        self.assertEqual(expected, set(actual))
+
+    def test___get_expanded_sequences___first_sequence_in_is_first_sequence_out(self):
+        msa = make_alignment(["TTTT", "AAAA", "CC-C"])
+
         expected = ["TTTT", "AAAA", "CCC"]
-        self.assertEqual(expected, result)
+        actual = SequenceExpander.get_expanded_sequences(msa)
+
+        self.assertEqual(expected, actual)
+
+    def test___get_expanded_sequences___sequences_with_disallowed_chars(self):
+        msa = make_alignment(["TTTTN", "AAAAN", "CC-C-", "GGGGN", "AAAAB"])
+        with self.assertRaises(SequenceCurationError):
+            SequenceExpander.get_expanded_sequences(msa)
+
+
+class TestAlign(TestCase):
+    def test___align___small_sequence_with_indel___prioritise_matches(self):
+        seq1 = "TA"
+        seq2 = "TGA"
+
+        expected = ("T-A",
+                    "TGA")
+        actual = align(seq1, seq2)
+
+        self.assertEqual(expected, actual)
+
+    def test___align___medium_sequence_with_indel___prioritise_matches(self):
+        seq1 = "TTTAAA"
+        seq2 = "TTTGGAAA"
+
+        expected = ("TTT--AAA",
+                    "TTTGGAAA")
+        actual = align(seq1, seq2)
+
+        self.assertEqual(expected, actual)
+
+    def test___align___small_sequence_with_indel_and_mismatch(self):
+        seq1 = "CA"
+        seq2 = "TGA"
+
+        expected = ("C-A",
+                    "TGA")
+        actual = align(seq1, seq2)
+
+        self.assertEqual(expected, actual)
+
+    def test___align___several_matches_islands_with_indels___prioritise_matches(self):
+        seq1 = "AAACCCGGGTTT"
+        seq2 = "GTGAAAGGCCCTATAGGGAAATTTAA"
+
+        expected = ("---AAA--CCC----GGG---TTT--",
+                    "GTGAAAGGCCCTATAGGGAAATTTAA")
+        actual = align(seq1, seq2)
+
+        self.assertEqual(expected, actual)
+
+    def test___align___several_matches_islands_with_indels_and_mismatches___prioritise_matches(self):
+        seq1 = "AAAAACCCCCGGGGGTTTTT"
+        seq2 = "GTGAATAAGGCCGCCTATAGGCGGAAATTATTAA"
+
+        expected = ("---AAAAA--CCCCC----GGGGG---TTTTT--",
+                    "GTGAATAAGGCCGCCTATAGGCGGAAATTATTAA")
+        actual = align(seq1, seq2)
+
+        self.assertEqual(expected, actual)
+
+    def test___align___seq1_is_empty(self):
+        seq1 = ""
+        seq2 = "ACGT"
+
+        expected = ("----",
+                    "ACGT")
+        actual = align(seq1, seq2)
+
+        self.assertEqual(expected, actual)
+
+    def test___align___seq2_is_empty(self):
+        seq1 = "ACGT"
+        seq2 = ""
+
+        expected = ("ACGT",
+                    "----")
+        actual = align(seq1, seq2)
+
+        self.assertEqual(expected, actual)
+
+    def test___align___both_seqs_are_empty___raises_AssertionError(self):
+        with self.assertRaises(AssertionError):
+            align("", "")
+
+    def test___align___several_equally_good_alignments___only_one_is_chosen(self):
+        seq1 = "A"
+        seq2 = "T"
+
+        expected = ("A-",
+                    "-T")
+        actual = align(seq1, seq2, 0, 0, 0, 0)
+
+        self.assertEqual(expected, actual)
+
+
+class Test_remove_columns_full_of_gaps_from_MSA(TestCase):
+    @staticmethod
+    def check_if_two_alignments_are_equal(msa_1: MSA, msa_2: MSA) -> bool:
+        return format(msa_1, "fasta") == format(msa_2, "fasta")
+
+    def test___remove_columns_full_of_gaps_from_MSA___no_gaps_at_all(self):
+        msa = make_alignment([
+            "AAAA",
+            "AACA",
+            "AAGA",
+            "AATA",
+        ])
+
+        expected = msa
+        actual = remove_columns_full_of_gaps_from_MSA(msa)
+
+        self.assertTrue(self.check_if_two_alignments_are_equal(expected, actual))
+
+    def test___remove_columns_full_of_gaps_from_MSA___some_gaps___no_columns_removed(self):
+        msa = make_alignment([
+            "AAA-",
+            "-ACA",
+            "-AG-",
+            "A-T-",
+        ])
+
+        expected = msa
+        actual = remove_columns_full_of_gaps_from_MSA(msa)
+
+        self.assertTrue(self.check_if_two_alignments_are_equal(expected, actual))
+
+    def test___remove_columns_full_of_gaps_from_MSA___some_gaps___one_column_removed(self):
+        msa = make_alignment([
+            "AA--",
+            "-A-A",
+            "-A--",
+            "A---",
+        ])
+
+        expected = make_alignment([
+            "AA-",
+            "-AA",
+            "-A-",
+            "A--",
+        ])
+        actual = remove_columns_full_of_gaps_from_MSA(msa)
+
+        self.assertTrue(self.check_if_two_alignments_are_equal(expected, actual))
+
+    def test___remove_columns_full_of_gaps_from_MSA___some_gaps___two_columns_removed(self):
+        msa = make_alignment([
+            "-A--",
+            "-A-A",
+            "-A--",
+            "----",
+        ])
+
+        expected = make_alignment([
+            "A-",
+            "AA",
+            "A-",
+            "--",
+        ])
+        actual = remove_columns_full_of_gaps_from_MSA(msa)
+
+        self.assertTrue(self.check_if_two_alignments_are_equal(expected, actual))
 
 
 class TestSeqIteration(TestCase):
@@ -234,10 +441,83 @@ class TestSeqIteration(TestCase):
 
     def test_get_seqs_from_alignment(self):
         msa = make_alignment(self.input_seqs)
-        result = list(get_alignment_seqs(msa))
-        self.assertEqual(result, self.input_seqs)
+
+        expected = self.input_seqs
+        actual = list(get_alignment_seqs(msa))
+
+        self.assertEqual(expected, actual)
 
     def test_count_alignment_seqs(self):
         msa = make_alignment(self.input_seqs)
-        result = count(get_alignment_seqs(msa))
-        self.assertEqual(result, 3)
+
+        expected = 3
+        actual = count(get_alignment_seqs(msa))
+
+        self.assertEqual(expected, actual)
+
+
+class Test_get_consensus_from_MSA(TestCase):
+    def test___get_consensus_from_MSA___all_match(self):
+        alignment = make_alignment(["AATTA", "AATTA"])
+
+        expected = "AATTA"
+        actual = get_consensus_from_MSA(alignment)
+
+        self.assertEqual(expected, actual)
+
+    def test___get_consensus_from_MSA___mixed_match_nonmatch(self):
+        alignment = make_alignment(["AAGTA", "CATTA"])
+
+        expected = "*A*TA"
+        actual = get_consensus_from_MSA(alignment)
+
+        self.assertEqual(expected, actual)
+
+    def test___get_consensus_from_MSA___indel_nonmatch(self):
+        alignment = make_alignment(["AAAA", "A--A"])
+
+        expected = "A**A"
+        actual = get_consensus_from_MSA(alignment)
+
+        self.assertEqual(expected, actual)
+
+    def test___get_consensus_from_MSA___IUPACAmbiguous_nonmatch(self):
+        alignment = make_alignment(["RYA", "RTA"])
+
+        expected = "**A"
+        actual = get_consensus_from_MSA(alignment)
+
+        self.assertEqual(expected, actual)
+
+    def test___get_consensus_from_MSA___N_special_treatment(self):
+        """
+        i)A and N at pos 2 are different, but still consensus
+        ii)N and N at pos 0 are same, but not consensus"""
+        alignment = make_alignment(["TNNNN", "TNAR-"])
+
+        expected = "T*A**"
+        actual = get_consensus_from_MSA(alignment)
+
+        self.assertEqual(expected, actual)
+
+    def test___get_consensus_from_MSA___N_special_treatment___several_sequences(self):
+        """
+        i)A and N at pos 2 are different, but still consensus
+        ii)N and N at pos 0 are same, but not consensus"""
+        alignment = make_alignment([
+            "TNNNNN",
+            "TANAAN",
+            "TAA-RN"])
+
+        expected = "TAA***"
+        actual = get_consensus_from_MSA(alignment)
+
+        self.assertEqual(expected, actual)
+
+    def test___get_consensus_from_MSA___all_gap_nonmatch(self):
+        alignment = make_alignment(["A--A", "A--A"])
+
+        expected = "A**A"
+        actual = get_consensus_from_MSA(alignment)
+
+        self.assertEqual(expected, actual)
