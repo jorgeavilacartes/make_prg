@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from tests.from_msa import make_alignment
+from tests.test_helpers import make_alignment, equal_msas
 from make_prg.utils.seq_utils import (
     is_non_match,
     NONMATCH,
@@ -378,10 +378,6 @@ class TestAlign(TestCase):
 
 
 class Test_remove_columns_full_of_gaps_from_MSA(TestCase):
-    @staticmethod
-    def check_if_two_alignments_are_equal(msa_1: MSA, msa_2: MSA) -> bool:
-        return format(msa_1, "fasta") == format(msa_2, "fasta")
-
     def test___remove_columns_full_of_gaps_from_MSA___no_gaps_at_all(self):
         msa = make_alignment([
             "AAAA",
@@ -393,7 +389,7 @@ class Test_remove_columns_full_of_gaps_from_MSA(TestCase):
         expected = msa
         actual = remove_columns_full_of_gaps_from_MSA(msa)
 
-        self.assertTrue(self.check_if_two_alignments_are_equal(expected, actual))
+        self.assertTrue(equal_msas(expected, actual))
 
     def test___remove_columns_full_of_gaps_from_MSA___some_gaps___no_columns_removed(self):
         msa = make_alignment([
@@ -406,7 +402,7 @@ class Test_remove_columns_full_of_gaps_from_MSA(TestCase):
         expected = msa
         actual = remove_columns_full_of_gaps_from_MSA(msa)
 
-        self.assertTrue(self.check_if_two_alignments_are_equal(expected, actual))
+        self.assertTrue(equal_msas(expected, actual))
 
     def test___remove_columns_full_of_gaps_from_MSA___some_gaps___one_column_removed(self):
         msa = make_alignment([
@@ -424,7 +420,7 @@ class Test_remove_columns_full_of_gaps_from_MSA(TestCase):
         ])
         actual = remove_columns_full_of_gaps_from_MSA(msa)
 
-        self.assertTrue(self.check_if_two_alignments_are_equal(expected, actual))
+        self.assertTrue(equal_msas(expected, actual))
 
     def test___remove_columns_full_of_gaps_from_MSA___some_gaps___two_columns_removed(self):
         msa = make_alignment([
@@ -442,7 +438,7 @@ class Test_remove_columns_full_of_gaps_from_MSA(TestCase):
         ])
         actual = remove_columns_full_of_gaps_from_MSA(msa)
 
-        self.assertTrue(self.check_if_two_alignments_are_equal(expected, actual))
+        self.assertTrue(equal_msas(expected, actual))
 
 
 class TestSeqIteration(TestCase):

@@ -1,7 +1,7 @@
 from unittest import TestCase
 from typing import List
 
-from tests.from_msa import make_alignment, MSA
+from tests.test_helpers import make_alignment, MSA
 from make_prg.from_msa.interval_partition import (
     IntervalType,
     Interval,

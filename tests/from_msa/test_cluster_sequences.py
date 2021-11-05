@@ -21,7 +21,7 @@ from make_prg.from_msa.cluster_sequences import (
     merge_clusters,
     kmeans_cluster_seqs
 )
-from tests.from_msa import make_alignment, MSA
+from tests.test_helpers import make_alignment, MSA
 
 
 class TestCountKmers(TestCase):

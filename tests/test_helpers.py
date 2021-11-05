@@ -1,8 +1,6 @@
 from typing import List
-
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-
 from make_prg.from_msa import MSA
 
 
@@ -16,3 +14,7 @@ def make_alignment(seqs: List[str], ids: List[str] = None) -> MSA:
     else:
         seqrecords = [SeqRecord(Seq(seq), id=ID) for seq, ID in zip(seqs, ids)]
     return MSA(seqrecords)
+
+
+def equal_msas(msa_1: MSA, msa_2: MSA) -> bool:
+    return format(msa_1, "fasta") == format(msa_2, "fasta")
