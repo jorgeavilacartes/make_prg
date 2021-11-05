@@ -82,12 +82,11 @@ class SequenceExpander:
         "C": "C",
         "G": "G",
         "T": "T",
-        "N": "N"  # we don't translate N, but it is an allowed base
     }
-    allowed_bases = set(iupac.keys())
+    expandable_bases = set(iupac.keys())
+    allowed_bases = expandable_bases.union({"N"})
     standard_bases = {"A", "C", "G", "T"}
-    standard_bases_with_N = standard_bases.union({"N"})
-    ambiguous_bases = allowed_bases.difference(standard_bases_with_N)
+    ambiguous_bases = expandable_bases.difference(standard_bases)
 
     @classmethod
     def check_if_there_is_sequence_with_disallowed_bases(cls, sequences: List[str]):
@@ -101,10 +100,10 @@ class SequenceExpander:
                 )
 
     @classmethod
-    def check_all_sequences_are_composed_of_ACGTN(cls, sequences: List[str]):
+    def check_all_sequences_are_composed_of_ACGT(cls, sequences: List[str]):
         for sequence in sequences:
-            sequence_is_composed_of_ACGTN_only = set(sequence).issubset(cls.standard_bases_with_N)
-            assert sequence_is_composed_of_ACGTN_only, f"Sequence ({sequence}) should be composed only of ACTGN only."
+            sequence_is_composed_of_ACGT_only = set(sequence).issubset(cls.standard_bases)
+            assert sequence_is_composed_of_ACGT_only, f"Sequence ({sequence}) should be composed only of ACTG only."
 
     @classmethod
     def get_expanded_sequences(cls, alignment: MSA) -> Sequences:
@@ -113,9 +112,10 @@ class SequenceExpander:
         It does the following steps:
             1. Check that we don't have disallowed bases;
             2. Remove gaps (-);
-            3. Duplicate sequences containing RYKMSW, replacing with AGCT alternatives;
-        Note 1: Ns are not expanded. The returned sequences must be composed of ACGTN only.
-        Note 2: The sequences are deliberately returned in the order they are received.
+            3. Remove sequences with N;
+            4. Duplicate sequences containing RYKMSW, replacing with AGCT alternatives;
+        Note 1: The sequences are deliberately returned in the order they are received.
+        Note 2: Returned sequences are composed of ACGT only
         """
         gapless_seqs = list(map(ungap, get_alignment_seqs(alignment)))
         cls.check_if_there_is_sequence_with_disallowed_bases(gapless_seqs)
@@ -124,6 +124,9 @@ class SequenceExpander:
         expanded_set = set()
         deduplicated_gapless_seqs = remove_duplicates(gapless_seqs)
         for seq in deduplicated_gapless_seqs:
+            if "N" in seq:
+                continue
+
             alternatives = [cls.iupac[base] for base in seq]
             for tuple_product in itertools.product(*alternatives):
                 expanded_str = "".join(tuple_product)
@@ -131,7 +134,15 @@ class SequenceExpander:
                     expanded_set.add(expanded_str)
                     expanded_seqs.append(expanded_str)
 
-        cls.check_all_sequences_are_composed_of_ACGTN(expanded_seqs)
+        all_sequences_contained_N = len(expanded_seqs) == 0
+        if all_sequences_contained_N:
+            raise SequenceCurationError(
+                "All sequences in this slice contained N. Redo sequence curation.\n"
+                f"Alignment:\n"
+                f"{format(alignment, 'fasta')}"
+            )
+
+        cls.check_all_sequences_are_composed_of_ACGT(expanded_seqs)
         return expanded_seqs
 
 

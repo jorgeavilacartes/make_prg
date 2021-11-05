@@ -255,18 +255,27 @@ class TestSequenceExpander(TestCase):
             "-NRYAA",
             "KMTT--",
             "-CSWGN",
-            "AA--NA"   # new non-wildcard seq
+            "AA--AA"   # new non-wildcard seq
         ])
 
         expected = {
-            "NGTAA", "NGCAA", "NATAA", "NACAA",
-            "GATT", "GCTT", "TATT", "TCTT",
-            "CGAGN", "CGTGN", "CCAGN", "CCTGN",
-            "AANA"
+            "GATT", "GCTT", "TATT", "TCTT", "AAAA"
             }
         actual = SequenceExpander.get_expanded_sequences(msa)
 
         self.assertEqual(expected, set(actual))
+
+    def test___get_expanded_sequences___ambiguous_bases_all_seqs_with_Ns___raises_SequenceCurationError(self):
+        msa = make_alignment([
+            "-NRYAA",
+            "KMNT--",
+            "-CSWGN",
+            "AA--NA"   # new non-wildcard seq
+        ])
+
+        with self.assertRaises(SequenceCurationError) as error:
+            SequenceExpander.get_expanded_sequences(msa)
+
 
     def test___get_expanded_sequences___first_sequence_in_is_first_sequence_out(self):
         msa = make_alignment(["TTTT", "AAAA", "CC-C"])
@@ -276,7 +285,7 @@ class TestSequenceExpander(TestCase):
 
         self.assertEqual(expected, actual)
 
-    def test___get_expanded_sequences___sequences_with_disallowed_chars(self):
+    def test___get_expanded_sequences___sequence_with_disallowed_char(self):
         msa = make_alignment(["TTTTN", "AAAAN", "CC-C-", "GGGGN", "AAAAB"])
         with self.assertRaises(SequenceCurationError):
             SequenceExpander.get_expanded_sequences(msa)
