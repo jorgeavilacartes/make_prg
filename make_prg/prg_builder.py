@@ -3,7 +3,6 @@ from make_prg.utils.io_utils import load_alignment_file, zip_set_of_files
 import pickle
 from pathlib import Path
 from zipfile import ZipFile
-from make_prg.utils.msa_aligner import MSAAligner
 from make_prg.recursion_tree import SingleClusterNode, RecursiveTreeNode
 from make_prg.utils.drawer import RecursiveTreeDrawer
 from make_prg.utils.prg_encoder import PrgEncoder, PRG_Ints
@@ -25,12 +24,12 @@ class PrgBuilder(object):
         alignment_format: str,
         max_nesting: int,
         min_match_length: int,
-        aligner: Optional[MSAAligner] = None,
+        aligner: Optional["MSAAligner"] = None,
     ):
         self.locus_name: str = locus_name
         self.max_nesting: int = max_nesting
         self.min_match_length: int = min_match_length
-        self.aligner: Optional[MSAAligner] = aligner
+        self.aligner: Optional["MSAAligner"] = aligner
         self.next_node_id: int = 0
         self.site_num: int = 5
         self.leaves_index: Dict[Tuple[int, int], SingleClusterNode] = {}

@@ -20,9 +20,13 @@ class NotAValidExecutableError(Exception):
     pass
 
 
+class ExecutionError(Exception):
+    pass
+
+
 class MSAAligner(ABC):
     def _set_executable(self, executable: str):
-        is_valid_executable = shutil.which(executable) is not None
+        is_valid_executable = shutil.which(executable, mode=os.X_OK) is not None
         if not is_valid_executable:
             raise NotAValidExecutableError(f"Given MSA executable {executable} does not work or is invalid")
         self._executable: str = executable
@@ -55,7 +59,7 @@ class MSAAligner(ABC):
         exit_code = process.wait()
 
         if exit_code != 0:
-            raise RuntimeError(
+            raise ExecutionError(
                 f"Failed to execute {self.__class__.get_aligner_name()} for arguments {args} due to the following "
                 f"error:\n{process.stderr.read()}"
             )
@@ -65,7 +69,9 @@ class MSAAligner(ABC):
 
     @staticmethod
     def _create_new_sequences_file(directory: Path, new_sequences: Set[str]) -> Path:
-        new_sequences_filepath = directory / f"new_sequences.fa"
+        # this is just done so that we have a deterministic order of new_sequences and tests run correctly
+        new_sequences = sorted(list(new_sequences))
+        new_sequences_filepath = directory / "new_sequences.fa"
         with open(new_sequences_filepath, "w") as new_sequences_handler:
             for index_new_seq, new_seq in enumerate(new_sequences):
                 print(
