@@ -113,3 +113,5 @@ sample_example/make_prg_*
 /sample_example/Cluster_1011_updated/
 
 tests/data/utils/create_new_sequences_file/new_sequences.fa
+
+tests/data/utils/gfa/big_bang.gfa
