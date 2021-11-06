@@ -115,3 +115,5 @@ sample_example/make_prg_*
 tests/data/utils/create_new_sequences_file/new_sequences.fa
 
 tests/data/utils/gfa/big_bang.gfa
+
+tests/data/utils/recursive_tree_drawer/sample.recursion_tree.png

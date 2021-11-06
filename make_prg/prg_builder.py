@@ -4,7 +4,7 @@ import pickle
 from pathlib import Path
 from zipfile import ZipFile
 from make_prg.recursion_tree import SingleClusterNode, RecursiveTreeNode
-from make_prg.utils.drawer import RecursiveTreeDrawer
+from make_prg.utils.recursive_tree_drawer import RecursiveTreeDrawer
 from make_prg.utils.prg_encoder import PrgEncoder, PRG_Ints
 import os
 
