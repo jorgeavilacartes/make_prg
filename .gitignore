@@ -117,3 +117,7 @@ tests/data/utils/create_new_sequences_file/new_sequences.fa
 tests/data/utils/gfa/big_bang.gfa
 
 tests/data/utils/recursive_tree_drawer/sample.recursion_tree.png
+
+tests/data/utils/io_utils/concatenate_text_files/concatenated.txt
+
+tests/data/utils/io_utils/zip_set_of_files/files.zip

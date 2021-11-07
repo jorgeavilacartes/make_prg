@@ -8,12 +8,11 @@ from loguru import logger
 from make_prg.from_msa import MSA
 from typing import Dict, Optional, List, Tuple
 from collections import defaultdict
-from make_prg import prg_builder
 from pathlib import Path
 from zipfile import ZipFile
 
 
-def load_alignment_file(msa_file: str, alignment_format: str) -> MSA:
+def load_alignment_file(msa_file: [str, Path], alignment_format: str) -> MSA:
     msa_file = str(msa_file)
     if msa_file.endswith(".gz"):
         handle = gzip.open(msa_file, "rt")
@@ -35,6 +34,7 @@ def concatenate_text_files(input_filepaths, output_filepath):
             fout.write(line)
 
 
+# Note: not unit tested
 # From https://gist.github.com/jacobtomlinson/9031697
 def remove_empty_folders(path: str, remove_root: bool = True):
     if not os.path.isdir(path):
@@ -54,6 +54,7 @@ def remove_empty_folders(path: str, remove_root: bool = True):
         os.rmdir(path)
 
 
+# Note: not unit tested
 def output_files_already_exist(output_prefix: str):
     return (
         Path(output_prefix + ".prg.fa").exists()
@@ -80,6 +81,7 @@ def zip_set_of_files(zip_filepath: Path, filename_to_filepath: Dict[str, Path]):
             zip_file.write(filepath, filename)
 
 
+# Note: this whole class is not unit tested
 class SetOutputFiles:
     """
     Class that represents all files that were generated in processing a PRG (PRG fasta, GFA, pickles, etc)
@@ -138,6 +140,7 @@ class SetOutputFiles:
         return locus_to_set_of_output_files
 
 
+# Note: not unit tested
 def get_stats_on_variants(stats_files: List[Path]) -> Tuple[int, int]:
     nb_of_variants_successfully_applied = 0
     nb_of_variants_that_failed_to_be_applied = 0
@@ -155,6 +158,11 @@ def get_stats_on_variants(stats_files: List[Path]) -> Tuple[int, int]:
     return nb_of_variants_successfully_applied, nb_of_variants_that_failed_to_be_applied
 
 
+# this avoids circular import issues, probably has a better way through this though
+from make_prg import prg_builder
+
+
+# Note: not unit tested
 def create_final_files(threads: int, output_prefix: str, is_a_single_MSA: bool, output_stats: bool = False):
     logger.info("Concatenating files from several threads into single final files...")
 
