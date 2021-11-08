@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import patch, Mock, call, mock_open
+from unittest.mock import patch, Mock, mock_open
 import os
 from make_prg.utils.msa_aligner import MAFFT, NotAValidExecutableError, ExecutionError, TempDirAlreadyExistsError
 from pathlib import Path
