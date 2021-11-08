@@ -121,3 +121,7 @@ tests/data/utils/recursive_tree_drawer/sample.recursion_tree.png
 tests/data/utils/io_utils/concatenate_text_files/concatenated.txt
 
 tests/data/utils/io_utils/zip_set_of_files/files.zip
+
+tests/data/prg_builder/write_prg/sample.bin
+
+tests/data/prg_builder/write_prg/sample.prg.fa

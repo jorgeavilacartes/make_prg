@@ -81,8 +81,8 @@ class PrgBuilder(object):
             pickle.dump(self, filehandler)
 
     @staticmethod
-    def deserialize(bytes_from_zip) -> "PrgBuilder":
-        return pickle.loads(bytes_from_zip)
+    def deserialize_from_bytes(array_of_bytes: bytes) -> "PrgBuilder":
+        return pickle.loads(array_of_bytes)
 
     @staticmethod
     def write_prg(output_prefix: str, prg_string: str):
@@ -101,7 +101,7 @@ class PrgBuilder(object):
         with prg_ints_fpath.open("wb") as ostream:
             prg_encoder.write(prg_ints, ostream)
 
-    def output_debug_graphs(self, debug_graphs_dir):
+    def output_debug_graphs(self, debug_graphs_dir: Path):
         os.makedirs(debug_graphs_dir, exist_ok=True)
         recursive_tree_drawer = RecursiveTreeDrawer(self.root)
         recursive_tree_drawer.output_graph(debug_graphs_dir / f"{self.locus_name}.recursion_tree.png")
@@ -134,4 +134,4 @@ class PrgBuilderZipDatabase:
         return self._zip_file.namelist()
 
     def get_PrgBuilder(self, locus: str) -> PrgBuilder:
-        return PrgBuilder.deserialize(self._zip_file.read(locus))
+        return PrgBuilder.deserialize_from_bytes(self._zip_file.read(locus))
