@@ -112,7 +112,7 @@ class TestMAFFT(TestCase):
     @patch("shutil.which", return_value=1)
     @patch.object(Path, Path.mkdir.__name__)
     @patch("shutil.rmtree")
-    def test___get_aligner_name(self, shutil_rmtree_mock, *uninteresting_mocks):
+    def test___cleanup_run(self, shutil_rmtree_mock, *uninteresting_mocks):
         run_tmpdir = Path("run_tmpdir")
 
         mafft = MAFFT(self.executable, self.tmpdir)
