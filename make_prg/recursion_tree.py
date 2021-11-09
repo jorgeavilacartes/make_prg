@@ -26,7 +26,11 @@ class RecursiveTreeNode(ABC):
 
         # generate recursion tree
         self._init_pre_recursion_attributes()
-        self.children: List["RecursiveTreeNode"] = self._get_children()
+        self._children: List["RecursiveTreeNode"] = self._get_children()
+
+    @property
+    def children(self):
+        return self._children
 
     @abstractmethod
     def _init_pre_recursion_attributes(self):
@@ -45,6 +49,11 @@ class RecursiveTreeNode(ABC):
 
 
 class MultiClusterNode(RecursiveTreeNode):
+    def __init__(self, nesting_level: int, alignment: MSA, parent: Optional["RecursiveTreeNode"],
+                 prg_builder: "PrgBuilder", force_no_child: bool = False):
+        super().__init__(nesting_level, alignment, parent, prg_builder, force_no_child)
+        assert not self.is_leaf(), "Multicluster nodes should never be leaves"
+
     def _init_pre_recursion_attributes(self):
         pass  # nothing to init here
 
@@ -258,5 +267,5 @@ class SingleClusterNode(RecursiveTreeNode):
 
         # regenerate recursion tree
         self._init_pre_recursion_attributes()
-        self.children = self._get_children()
+        self._children = self._get_children()
     ##################################################################################
