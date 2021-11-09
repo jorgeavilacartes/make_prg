@@ -52,7 +52,7 @@ class TestMultiClusterNode(TestCase):
             prg_as_list.append(f"child_{self.child_id}")
 
     @patch.object(PrgBuilder, PrgBuilder.get_next_site_num.__name__, return_value=32)
-    def test___preorder_traversal_to_build_prg___multiple_children(self, *mocks):
+    def test___preorder_traversal_to_build_prg___single_child(self, *mocks):
         self.setup()
         node = MultiClusterNode(1, self.alignment, None, self.prg_builder, False)
 
@@ -133,9 +133,66 @@ class TestMultiClusterNode(TestCase):
         actual = self.multi_cluster_node._get_sub_alignment_by_list_id(["s3", "s1"])
         self.assertTrue(equal_msas(expected, actual))
 
-    def test___get_children(self, *mocks):
-        # TODO: test
-        pass
+    @patch("make_prg.recursion_tree.SingleClusterNode")
+    @patch.object(MultiClusterNode, MultiClusterNode._get_subalignments_by_clustering.__name__)
+    def test___get_children___single_cluster(self, get_subalignments_by_clustering_mock, SingleClusterNode_mock,
+                                             *mocks):
+        single_alignment = make_alignment(["AAAT", "C--C", "AATT"])
+        subalignments = [single_alignment]
+        get_subalignments_by_clustering_mock.return_value = subalignments
+        self.setup()
+
+        expected = [SingleClusterNode_mock.return_value]
+        actual = self.multi_cluster_node.children
+
+        self.assertEqual(expected, actual)
+        SingleClusterNode_mock.assert_called_once_with(
+            nesting_level=1,
+            alignment=single_alignment,
+            parent=self.multi_cluster_node,
+            prg_builder=self.prg_builder,
+            force_no_child=True
+        )
+
+    get_children___multiple_clusters___SingleClusterNode___side_effect = [Mock(), Mock(), Mock()]
+    @patch("make_prg.recursion_tree.SingleClusterNode", side_effect=get_children___multiple_clusters___SingleClusterNode___side_effect)
+    @patch.object(MultiClusterNode, MultiClusterNode._get_subalignments_by_clustering.__name__)
+    def test___get_children___multiple_clusters(self, get_subalignments_by_clustering_mock, SingleClusterNode_mock,
+                                             *mocks):
+        alignment_1 = make_alignment(["AAAT", "C--C", "AATT"])
+        alignment_2 = make_alignment(["GGGG"])
+        alignment_3 = make_alignment(["CCCC", "TTTT"])
+
+        subalignments = [alignment_1, alignment_2, alignment_3]
+        get_subalignments_by_clustering_mock.return_value = subalignments
+        self.setup()
+
+        expected = self.get_children___multiple_clusters___SingleClusterNode___side_effect
+        actual = self.multi_cluster_node.children
+
+        self.assertEqual(expected, actual)
+        self.assertEqual(3, SingleClusterNode_mock.call_count)
+        SingleClusterNode_mock.assert_any_call(
+            nesting_level=1,
+            alignment=alignment_1,
+            parent=self.multi_cluster_node,
+            prg_builder=self.prg_builder,
+            force_no_child=False
+        )
+        SingleClusterNode_mock.assert_any_call(
+            nesting_level=1,
+            alignment=alignment_2,
+            parent=self.multi_cluster_node,
+            prg_builder=self.prg_builder,
+            force_no_child=False
+        )
+        SingleClusterNode_mock.assert_any_call(
+            nesting_level=1,
+            alignment=alignment_3,
+            parent=self.multi_cluster_node,
+            prg_builder=self.prg_builder,
+            force_no_child=False
+        )
 
 
     # TODO: MOVE TO SINGLECLUSTERNODE
