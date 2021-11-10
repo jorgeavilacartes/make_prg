@@ -112,15 +112,14 @@ class SingleClusterNode(RecursiveTreeNode):
     def _init_pre_recursion_attributes(self):
         self.consensus: str = get_consensus_from_MSA(self.alignment)
         self.length: int = len(self.consensus)
+        interval_partitioner = IntervalPartitioner(self.consensus, self.prg_builder.min_match_length, self.alignment)
         (
             self.match_intervals,
             self.non_match_intervals,
             self.all_intervals,
-        ) = IntervalPartitioner(
-            self.consensus, self.prg_builder.min_match_length, self.alignment
-        ).get_intervals()
+        ) = interval_partitioner.get_intervals()
 
-    def _infer_if_this_node_has_no_child(self, alignment):
+    def _infer_if_this_node_should_have_no_child(self):
         if self.force_no_child:
             return True
 
@@ -138,15 +137,16 @@ class SingleClusterNode(RecursiveTreeNode):
         if small_variant_site:
             return True
 
-        num_unique_nongapped_seqs = get_number_of_unique_ungapped_sequences(alignment)
+        num_unique_nongapped_seqs = get_number_of_unique_ungapped_sequences(self.alignment)
         too_few_unique_sequences = num_unique_nongapped_seqs <= 2
         if too_few_unique_sequences:
             return True
 
-        num_unique_gapped_seqs = get_number_of_unique_gapped_sequences(alignment)
+        num_unique_gapped_seqs = get_number_of_unique_gapped_sequences(self.alignment)
         assert num_unique_nongapped_seqs <= num_unique_gapped_seqs
         alignment_has_ambiguity = num_unique_nongapped_seqs < num_unique_gapped_seqs
         if alignment_has_ambiguity:
+            # TODO: fix alignment by deduplicating nongapped seqs and realigning them
             return True
 
         return False
@@ -175,7 +175,7 @@ class SingleClusterNode(RecursiveTreeNode):
         return False
 
     def _get_children(self) -> List["RecursiveTreeNode"]:
-        node_has_no_child = self._infer_if_this_node_has_no_child(self.alignment)
+        node_has_no_child = self._infer_if_this_node_should_have_no_child()
         if node_has_no_child:
             return list()
 
