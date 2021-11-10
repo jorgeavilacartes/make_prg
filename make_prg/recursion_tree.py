@@ -119,7 +119,23 @@ class SingleClusterNode(RecursiveTreeNode):
             self.all_intervals,
         ) = interval_partitioner.get_intervals()
 
-    def _infer_if_this_node_should_have_no_child(self):
+    @staticmethod
+    def _alignment_has_issues(alignment: MSA) -> bool:
+        num_unique_nongapped_seqs = get_number_of_unique_ungapped_sequences(alignment)
+        too_few_unique_sequences = num_unique_nongapped_seqs <= 2
+        if too_few_unique_sequences:
+            return True
+
+        num_unique_gapped_seqs = get_number_of_unique_gapped_sequences(alignment)
+        assert num_unique_nongapped_seqs <= num_unique_gapped_seqs
+        alignment_has_ambiguity = num_unique_nongapped_seqs < num_unique_gapped_seqs
+        if alignment_has_ambiguity:
+            # TODO: fix alignment by deduplicating nongapped seqs and realigning them
+            return True
+
+        return False
+
+    def _infer_if_this_node_should_have_no_child(self) -> bool:
         if self.force_no_child:
             return True
 
@@ -137,16 +153,8 @@ class SingleClusterNode(RecursiveTreeNode):
         if small_variant_site:
             return True
 
-        num_unique_nongapped_seqs = get_number_of_unique_ungapped_sequences(self.alignment)
-        too_few_unique_sequences = num_unique_nongapped_seqs <= 2
-        if too_few_unique_sequences:
-            return True
-
-        num_unique_gapped_seqs = get_number_of_unique_gapped_sequences(self.alignment)
-        assert num_unique_nongapped_seqs <= num_unique_gapped_seqs
-        alignment_has_ambiguity = num_unique_nongapped_seqs < num_unique_gapped_seqs
-        if alignment_has_ambiguity:
-            # TODO: fix alignment by deduplicating nongapped seqs and realigning them
+        alignment_has_issues = self._alignment_has_issues(self.alignment)
+        if alignment_has_issues:
             return True
 
         return False
@@ -156,15 +164,8 @@ class SingleClusterNode(RecursiveTreeNode):
         if is_a_match_interval:
             return True
 
-        num_unique_nongapped_seqs = get_number_of_unique_ungapped_sequences(alignment)
-        too_few_unique_sequences = num_unique_nongapped_seqs <= 2
-        if too_few_unique_sequences:
-            return True
-
-        num_unique_gapped_seqs = get_number_of_unique_gapped_sequences(alignment)
-        assert num_unique_nongapped_seqs <= num_unique_gapped_seqs
-        alignment_has_ambiguity = num_unique_nongapped_seqs < num_unique_gapped_seqs
-        if alignment_has_ambiguity:
+        alignment_has_issues = self._alignment_has_issues(self.alignment)
+        if alignment_has_issues:
             return True
 
         clustered_ids = kmeans_cluster_seqs(alignment, self.prg_builder.min_match_length)
