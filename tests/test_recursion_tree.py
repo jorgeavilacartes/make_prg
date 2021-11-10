@@ -6,6 +6,7 @@ from make_prg.prg_builder import PrgBuilder
 from make_prg.from_msa import MSA
 from pathlib import Path
 from make_prg.from_msa.interval_partition import IntervalType, Interval
+from make_prg.utils.seq_utils import SequenceExpander
 
 
 @patch.object(PrgBuilder, PrgBuilder.get_next_node_id.__name__, return_value=0)
@@ -490,3 +491,240 @@ class TestSingleClusterNode(TestCase):
             expected = [single_cluster_node_mock_1, multi_cluster_node_mock_1, single_cluster_node_mock_2, multi_cluster_node_mock_2]
             actual = node._get_children()
             self.assertEqual(expected, actual)
+
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, return_value = ["ACGT"])
+    @patch.object(PrgBuilder, PrgBuilder.update_leaves_index.__name__)
+    def test___get_prg___single_interval_and_single_seq(self, update_leaves_index_mock, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.all_intervals = [Interval(IntervalType.Match, 0, 0)]
+
+        expected_prg_as_list = list("ACGT")
+        actual_prg_as_list = []
+        self.single_cluster_node._get_prg(actual_prg_as_list, delim_char="*")
+
+        self.assertEqual(expected_prg_as_list, actual_prg_as_list)
+        update_leaves_index_mock.assert_called_once_with(0, 4, node=self.single_cluster_node)
+
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, return_value=[
+        "AA", "C", "GGGG"])
+    @patch.object(PrgBuilder, PrgBuilder.get_next_site_num.__name__, return_value=42)
+    @patch.object(PrgBuilder, PrgBuilder.update_leaves_index.__name__)
+    def test___get_prg___single_interval_and_several_seqs(self, update_leaves_index_mock, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.all_intervals = [Interval(IntervalType.Match, 0, 0)]
+
+        expected_prg_as_list = list("*42*AA*43*C*43*GGGG*42*")
+        actual_prg_as_list = []
+        self.single_cluster_node._get_prg(actual_prg_as_list, delim_char="*")
+
+        self.assertEqual(expected_prg_as_list, actual_prg_as_list)
+        self.assertEqual(3, update_leaves_index_mock.call_count)
+        update_leaves_index_mock.assert_any_call(4, 6, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(10, 11, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(15, 19, node=self.single_cluster_node)
+
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, side_effect=[
+        ["ACGT"],
+        ["AA", "C", "GGGG"],
+        ["TTTT"],
+        ["G", "T"]
+    ])
+    @patch.object(SingleClusterNode, SingleClusterNode._init_pre_recursion_attributes.__name__)
+    @patch.object(SingleClusterNode, SingleClusterNode._get_children.__name__)
+    @patch.object(PrgBuilder, PrgBuilder.update_leaves_index.__name__)
+    def test___get_prg___several_intervals___single_and_multiple_seqs_intertwinned(self, update_leaves_index_mock, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.all_intervals = [
+            Interval(IntervalType.Match, 0, 0),
+            Interval(IntervalType.Match, 1, 1),
+            Interval(IntervalType.Match, 2, 2),
+            Interval(IntervalType.Match, 3, 3),
+        ]
+        self.single_cluster_node.prg_builder.site_num = 42
+
+        expected_prg_as_list = list("ACGT*42*AA*43*C*43*GGGG*42*TTTT*44*G*45*T*44*")
+        actual_prg_as_list = []
+        self.single_cluster_node._get_prg(actual_prg_as_list, delim_char="*")
+
+        self.assertEqual(expected_prg_as_list, actual_prg_as_list)
+        self.assertEqual(7, update_leaves_index_mock.call_count)
+        update_leaves_index_mock.assert_any_call(0, 4, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(8, 10, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(14, 15, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(19, 23, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(27, 31, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(35, 36, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(40, 41, node=self.single_cluster_node)
+
+
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, side_effect=[
+        ["AA"],
+        ["CCCC"],
+        ["G"]
+    ])
+    @patch.object(SingleClusterNode, SingleClusterNode._init_pre_recursion_attributes.__name__)
+    @patch.object(SingleClusterNode, SingleClusterNode._get_children.__name__)
+    @patch.object(PrgBuilder, PrgBuilder.update_leaves_index.__name__)
+    def test___get_prg___several_intervals___all_single_seqs(self, update_leaves_index_mock, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.all_intervals = [
+            Interval(IntervalType.Match, 0, 0),
+            Interval(IntervalType.Match, 1, 1),
+            Interval(IntervalType.Match, 2, 2),
+        ]
+        self.single_cluster_node.prg_builder.site_num = 42
+
+        expected_prg_as_list = list("AACCCCG")
+        actual_prg_as_list = []
+        self.single_cluster_node._get_prg(actual_prg_as_list, delim_char="*")
+
+        self.assertEqual(expected_prg_as_list, actual_prg_as_list)
+        self.assertEqual(3, update_leaves_index_mock.call_count)
+
+        # TODO: updates are very likely made much better if we can join all these intervals together
+        update_leaves_index_mock.assert_any_call(0, 2, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(2, 6, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(6, 7, node=self.single_cluster_node)
+
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, side_effect=[
+        ["AA", "C", "GGGG"],
+        ["G", "T"],
+        ["A", "C"],
+    ])
+    @patch.object(SingleClusterNode, SingleClusterNode._init_pre_recursion_attributes.__name__)
+    @patch.object(SingleClusterNode, SingleClusterNode._get_children.__name__)
+    @patch.object(PrgBuilder, PrgBuilder.update_leaves_index.__name__)
+    def test___get_prg___several_intervals___all_several_seqs(self, update_leaves_index_mock, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.all_intervals = [
+            Interval(IntervalType.Match, 0, 0),
+            Interval(IntervalType.Match, 1, 1),
+            Interval(IntervalType.Match, 2, 2),
+        ]
+        self.single_cluster_node.prg_builder.site_num = 42
+
+        expected_prg_as_list = list("*42*AA*43*C*43*GGGG*42**44*G*45*T*44**46*A*47*C*46*")
+        actual_prg_as_list = []
+        self.single_cluster_node._get_prg(actual_prg_as_list, delim_char="*")
+
+        self.assertEqual(expected_prg_as_list, actual_prg_as_list)
+        self.assertEqual(7, update_leaves_index_mock.call_count)
+
+        update_leaves_index_mock.assert_any_call(4, 6, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(10, 11, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(15, 19, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(27, 28, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(32, 33, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(41, 42, node=self.single_cluster_node)
+        update_leaves_index_mock.assert_any_call(46, 47, node=self.single_cluster_node)
+
+    @patch.object(SingleClusterNode, SingleClusterNode._get_prg.__name__)
+    def test___preorder_traversal_to_build_prg___no_children___compute_PRG(self, get_prg_mock, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node._children = []
+        prg_as_list = []
+
+        self.single_cluster_node.preorder_traversal_to_build_prg(prg_as_list, delim_char="*")
+
+        get_prg_mock.assert_called_once_with(prg_as_list, "*")
+
+    @patch.object(SingleClusterNode, SingleClusterNode._get_prg.__name__)
+    def test___preorder_traversal_to_build_prg___one_child___recursion_happens(self, get_prg_mock, *uninteresting_mocks):
+        self.setup()
+        preorder_traversal_to_build_prg_mock = Mock()
+        child = Mock(preorder_traversal_to_build_prg=preorder_traversal_to_build_prg_mock)
+        self.single_cluster_node._children = [child]
+        prg_as_list = []
+
+        self.single_cluster_node.preorder_traversal_to_build_prg(prg_as_list, delim_char="*")
+
+        get_prg_mock.assert_not_called()
+        preorder_traversal_to_build_prg_mock.assert_called_once_with(prg_as_list, "*")
+
+    @patch.object(SingleClusterNode, SingleClusterNode._get_prg.__name__)
+    def test___preorder_traversal_to_build_prg___several_children___recursion_happens(self, get_prg_mock,
+                                                                               *uninteresting_mocks):
+        self.setup()
+        preorder_traversal_to_build_prg_mock_1 = Mock()
+        child_1 = Mock(preorder_traversal_to_build_prg=preorder_traversal_to_build_prg_mock_1)
+        preorder_traversal_to_build_prg_mock_2 = Mock()
+        child_2 = Mock(preorder_traversal_to_build_prg=preorder_traversal_to_build_prg_mock_2)
+        preorder_traversal_to_build_prg_mock_3 = Mock()
+        child_3 = Mock(preorder_traversal_to_build_prg=preorder_traversal_to_build_prg_mock_3)
+        self.single_cluster_node._children = [child_1, child_2, child_3]
+        prg_as_list = []
+
+        self.single_cluster_node.preorder_traversal_to_build_prg(prg_as_list, delim_char="*")
+
+        get_prg_mock.assert_not_called()
+        preorder_traversal_to_build_prg_mock_1.assert_called_once_with(prg_as_list, "*")
+        preorder_traversal_to_build_prg_mock_2.assert_called_once_with(prg_as_list, "*")
+        preorder_traversal_to_build_prg_mock_3.assert_called_once_with(prg_as_list, "*")
+
+    def test___add_seq_to_batch_update(self, *uninteresting_mocks):
+        self.setup()
+        sequence = "ACGT"
+
+        self.assertEqual(set(), self.single_cluster_node.new_sequences)
+        self.single_cluster_node.add_seq_to_batch_update(sequence)
+
+        expected = {sequence}
+        actual = self.single_cluster_node.new_sequences
+        self.assertEqual(expected, actual)
+
+    @patch.object(SingleClusterNode, SingleClusterNode._update_leaf.__name__)
+    def test___batch_update___no_new_sequences___no_update_to_be_done(self, update_leaf_mock, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.batch_update()
+        update_leaf_mock.assert_not_called()
+
+    @patch.object(SingleClusterNode, SingleClusterNode._update_leaf.__name__)
+    def test___batch_update___one_new_sequence___update_is_called(self, update_leaf_mock, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.add_seq_to_batch_update("ACGT")
+        self.single_cluster_node.batch_update()
+        update_leaf_mock.assert_called_once_with()
+
+    def test___update_leaf___no_aligner_was_given___raises_AssertionError(self, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.add_seq_to_batch_update("ACGT")
+        with self.assertRaises(AssertionError):
+            self.single_cluster_node._update_leaf()
+
+
+    def test___update_leaf___no_aligner_was_given___raises_AssertionError(self, init_pre_recursion_attributes_mock,
+                                                                          *uninteresting_mocks):
+        self.setup()
+
+        update_alignment = Mock()
+        get_updated_alignment_mock = Mock(return_value=update_alignment)
+        aligner_mock = Mock()
+        aligner_mock.get_updated_alignment = get_updated_alignment_mock
+        self.prg_builder.aligner = aligner_mock
+
+        self.single_cluster_node.add_seq_to_batch_update("AAAA")
+        self.single_cluster_node.add_seq_to_batch_update("CC")
+
+        # we repatch some stuff to check the calls on the _update_leaf() only
+        with patch.object(SingleClusterNode, SingleClusterNode._get_children.__name__, return_value=["updated_child_1", "updated_child_2"]) as get_children_mock, \
+             patch.object(SingleClusterNode, SingleClusterNode._init_pre_recursion_attributes.__name__) as init_pre_recursion_attributes_mock:
+            self.single_cluster_node._update_leaf()
+
+            # assert_called_once_with() does not work because can't check if MSAs are equal
+            get_updated_alignment_mock.assert_called_once()
+            kwargs = get_updated_alignment_mock.call_args_list[0].kwargs
+            self.assertTrue(equal_msas(self.alignment, kwargs["current_alignment"]))
+            self.assertEqual({"AAAA", "CC"}, kwargs["new_sequences"])
+
+            init_pre_recursion_attributes_mock.assert_called_once_with()
+            get_children_mock.assert_called_once_with()
+
+            # lets check all attributes anyway, except the ones initialised by init_pre_recursion_attributes()
+            self.assertEqual(1, self.single_cluster_node.nesting_level)
+            self.assertTrue(update_alignment, self.single_cluster_node.alignment)
+            self.assertIsNone(self.single_cluster_node.parent)
+            self.assertEqual(self.prg_builder, self.single_cluster_node.prg_builder)
+            self.assertFalse(self.single_cluster_node.force_no_child)
+            self.assertEqual(0, self.single_cluster_node.id)
+            self.assertEqual(set(), self.single_cluster_node.new_sequences)
+            self.assertEqual(["updated_child_1", "updated_child_2"], self.single_cluster_node.children)
