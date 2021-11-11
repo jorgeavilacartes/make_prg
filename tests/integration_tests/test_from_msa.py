@@ -1,3 +1,4 @@
+import os
 from unittest import TestCase
 from pathlib import Path
 from make_prg.subcommands import from_msa
@@ -136,3 +137,71 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
         from_msa.run(options)
         self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/nested_snps_deletion",
                                             data_dir / "output/nested_snps_deletion"))
+
+    def test___input_file_does_not_exist___raises_FileNotFoundError(self):
+        options = self.prepare_options("unexistent_file")
+        with self.assertRaises(FileNotFoundError):
+            from_msa.run(options)
+
+    # This tests the multi loci input and output
+    def test___several_alignments(self):
+        input_data = str(data_dir / "several")
+        output_folder = data_dir / "output" / "several"
+        remove_dir_if_exists(output_folder)
+        output_prefix = str(output_folder / "several")
+
+        options = Namespace(
+            input=input_data,
+            output_prefix=output_prefix,
+            alignment_format='fasta',
+            log=None,
+            max_nesting=5,
+            min_match_length=7,
+            output_graphs=False,
+            threads=1,
+            verbose=False)
+
+        from_msa.run(options)
+
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/several",
+                                            data_dir / "output/several"))
+
+    def test___input_dir_has_no_files___raises_FileNotFoundError(self):
+        unexistent_folder = data_dir / "unexistent_folder"
+        os.makedirs(unexistent_folder, exist_ok=True)
+        input_data = str(unexistent_folder)
+        output_folder = data_dir / "output" / "unexistent_folder"
+        remove_dir_if_exists(output_folder)
+        output_prefix = str(output_folder / "unexistent_folder")
+
+        options = Namespace(
+            input=input_data,
+            output_prefix=output_prefix,
+            alignment_format='fasta',
+            log=None,
+            max_nesting=5,
+            min_match_length=7,
+            output_graphs=False,
+            threads=1,
+            verbose=False)
+
+        with self.assertRaises(FileNotFoundError):
+            from_msa.run(options)
+
+    def test___output_files_already_exist(self):
+        input_data = str(data_dir / "match.fa")
+        output_prefix = str(data_dir / "truth_output/match/match")
+
+        options = Namespace(
+            input=input_data,
+            output_prefix=output_prefix,
+            alignment_format='fasta',
+            log=None,
+            max_nesting=5,
+            min_match_length=7,
+            output_graphs=False,
+            threads=1,
+            verbose=False)
+
+        with self.assertRaises(RuntimeError):
+            from_msa.run(options)
