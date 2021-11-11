@@ -2,6 +2,9 @@ from typing import List
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from make_prg.from_msa import MSA
+import os
+import shutil
+import filecmp
 
 
 def make_alignment(seqs: List[str], ids: List[str] = None) -> MSA:
@@ -36,3 +39,37 @@ sample_prg = " 5 AATAGGCCG 7  9 GATGCAGTTCAA 10 GATGCGGCGTA 9 AACGCCTTATCCGGCATA
 
 def first_dict_contained_in_second(dict_1, dict_2) -> bool:
     return dict_1.items() <= dict_2.items()
+
+def remove_dir_if_exists(directory):
+    if os.path.exists(directory) and os.path.isdir(directory):
+        shutil.rmtree(directory)
+
+
+# From https://stackoverflow.com/a/6681395/5264075
+def are_dir_trees_equal(dir1, dir2):
+    """
+    Compare two directories recursively. Files in each directory are
+    assumed to be equal if their names and contents are equal.
+
+    @param dir1: First directory path
+    @param dir2: Second directory path
+
+    @return: True if the directory trees are the same and
+        there were no errors while accessing the directories or files,
+        False otherwise.
+   """
+
+    dirs_cmp = filecmp.dircmp(dir1, dir2)
+    if len(dirs_cmp.left_only)>0 or len(dirs_cmp.right_only)>0 or \
+        len(dirs_cmp.funny_files)>0:
+        return False
+    (_, mismatch, errors) =  filecmp.cmpfiles(
+        dir1, dir2, dirs_cmp.common_files, shallow=False)
+    if len(mismatch)>0 or len(errors)>0:
+        return False
+    for common_dir in dirs_cmp.common_dirs:
+        new_dir1 = os.path.join(dir1, common_dir)
+        new_dir2 = os.path.join(dir2, common_dir)
+        if not are_dir_trees_equal(new_dir1, new_dir2):
+            return False
+    return True

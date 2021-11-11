@@ -125,3 +125,4 @@ tests/data/utils/io_utils/zip_set_of_files/files.zip
 tests/data/prg_builder/write_prg/sample.bin
 
 tests/data/prg_builder/write_prg/sample.prg.fa
+/tests/integration_tests/data/output/
