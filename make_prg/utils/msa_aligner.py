@@ -75,7 +75,7 @@ class MSAAligner(ABC):
         with open(new_sequences_filepath, "w") as new_sequences_handler:
             for index_new_seq, new_seq in enumerate(new_sequences):
                 print(
-                    f">Denovo_path_{index_new_seq}_random_id_{uuid.uuid4()}",
+                    f">Denovo_path_{index_new_seq}",
                     file=new_sequences_handler,
                 )
                 print(new_seq, file=new_sequences_handler)

@@ -66,7 +66,6 @@ class TestMAFFT(TestCase):
 
     @patch("shutil.which", return_value=1)
     @patch.object(Path, Path.mkdir.__name__)
-    @patch("uuid.uuid4", side_effect=list(range(3)))
     def test___create_new_sequences_file(self, *uninteresting_mocks):
         directory = Path("tests/data/utils/create_new_sequences_file")
         new_sequences = {"ACGT", "AAAA", "TTTT"}
