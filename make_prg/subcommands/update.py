@@ -184,8 +184,7 @@ def run(options):
         logger.success(f"All PRGs updated!")
 
         is_a_single_MSA = prg_builder_zip_db.get_number_of_loci() == 1
-        io_utils.create_final_files(options.threads, options.output_prefix,
-                                    is_a_single_MSA=is_a_single_MSA, output_stats=True)
+        io_utils.create_final_files(options.output_prefix, is_a_single_MSA=is_a_single_MSA, output_stats=True)
         logger.success("All done!")
     finally:
         if prg_builder_zip_db is not None:

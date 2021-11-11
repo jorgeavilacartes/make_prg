@@ -158,6 +158,5 @@ def run(cl_options):
         pool.map(process_MSA, input_files, chunksize=1)
     logger.success(f"All PRGs generated!")
 
-    io_utils.create_final_files(options.threads, options.output_prefix,
-                                is_a_single_MSA=is_a_single_file)
+    io_utils.create_final_files(options.output_prefix, is_a_single_MSA=is_a_single_file)
     logger.success("All done!")

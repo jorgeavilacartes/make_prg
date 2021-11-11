@@ -1,3 +1,4 @@
+import glob
 import gzip
 import fileinput
 import multiprocessing
@@ -129,24 +130,23 @@ class SetOutputFiles:
         self._delete_file(self.stats)
 
     @staticmethod
-    def get_locus_to_set_of_output_files(threads: int, temp_root: Path) -> Dict[str, "SetOutputFiles"]:
+    def get_locus_to_set_of_output_files(temp_root: Path) -> Dict[str, "SetOutputFiles"]:
         locus_to_set_of_output_files = defaultdict(SetOutputFiles)
-        for process_num in range(1, threads + 1):
-            workdir = temp_root / f"ForkPoolWorker-{process_num}"
-            if workdir.exists():
-                for file in workdir.iterdir():
-                    if file.is_file():
-                        locus_name = SetOutputFiles.clear_temp_extensions(file.name)
-                        if file.name.endswith(".prg.fa"):
-                            locus_to_set_of_output_files[locus_name].PRG = file
-                        elif file.name.endswith(".bin"):
-                            locus_to_set_of_output_files[locus_name].binary_PRG = file
-                        elif file.name.endswith(".gfa"):
-                            locus_to_set_of_output_files[locus_name].gfa = file
-                        elif file.name.endswith(".pickle"):
-                            locus_to_set_of_output_files[locus_name].pickle = file
-                        elif file.name.endswith(".stats"):
-                            locus_to_set_of_output_files[locus_name].stats = file
+        for workdir in glob.glob(str(temp_root / "ForkPoolWorker-*")):
+            workdir = Path(workdir)
+            for file in workdir.iterdir():
+                if file.is_file():
+                    locus_name = SetOutputFiles.clear_temp_extensions(file.name)
+                    if file.name.endswith(".prg.fa"):
+                        locus_to_set_of_output_files[locus_name].PRG = file
+                    elif file.name.endswith(".bin"):
+                        locus_to_set_of_output_files[locus_name].binary_PRG = file
+                    elif file.name.endswith(".gfa"):
+                        locus_to_set_of_output_files[locus_name].gfa = file
+                    elif file.name.endswith(".pickle"):
+                        locus_to_set_of_output_files[locus_name].pickle = file
+                    elif file.name.endswith(".stats"):
+                        locus_to_set_of_output_files[locus_name].stats = file
         return locus_to_set_of_output_files
 
 
@@ -173,12 +173,11 @@ from make_prg import prg_builder
 
 
 # Note: not unit tested
-def create_final_files(threads: int, output_prefix: str, is_a_single_MSA: bool, output_stats: bool = False):
+def create_final_files(output_prefix: str, is_a_single_MSA: bool, output_stats: bool = False):
     logger.info("Concatenating files from several threads into single final files...")
 
     logger.info("Creating FASTA file of PRGs...")
-    locus_to_set_of_output_files = SetOutputFiles.get_locus_to_set_of_output_files(
-        threads, Path(output_prefix) / "mp_temp")
+    locus_to_set_of_output_files = SetOutputFiles.get_locus_to_set_of_output_files(Path(output_prefix) / "mp_temp")
 
     prg_files = [output_files.PRG for output_files in locus_to_set_of_output_files.values()]
     concatenate_text_files(prg_files, output_prefix + ".prg.fa")
