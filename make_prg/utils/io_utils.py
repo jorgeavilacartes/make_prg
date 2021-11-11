@@ -9,7 +9,7 @@ from make_prg.from_msa import MSA
 from typing import Dict, Optional, List, Tuple
 from collections import defaultdict
 from pathlib import Path
-from zipfile import ZipFile
+from zipfile import ZipFile, ZipInfo
 
 
 def load_alignment_file(msa_file: [str, Path], alignment_format: str) -> MSA:
@@ -78,7 +78,17 @@ def zip_set_of_files(zip_filepath: Path, filename_to_filepath: Dict[str, Path]):
     assert is_a_zip_file, "zip_set_of_files() was not given a .zip filepath"
     with ZipFile(zip_filepath, "w") as zip_file:
         for filename, filepath in filename_to_filepath.items():
-            zip_file.write(filepath, filename)
+            with open(filepath, "rb") as filehandler:
+                info = ZipInfo(filename=filename,
+                               # Ensures Zip files are comparable using diffs, and have same hashes
+                               # Useful for testing and for comparing PRGs
+                               # From https://stackoverflow.com/questions/11115140/forcing-a-specific-timestamp-for-files-in-pythons-zipfile
+                               date_time=(1980, 1, 1, 0, 0, 0))
+
+                # TODO: this reads the whole file into memory first and then adds it to the zip archive
+                # TODO: improve this by reading and writing by chunks?
+                bytes_from_file = filehandler.read()
+                zip_file.writestr(info, bytes_from_file)
 
 
 # Note: this whole class is not unit tested
