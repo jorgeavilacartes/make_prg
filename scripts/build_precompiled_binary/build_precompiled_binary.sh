@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # run from project root: scripts/build_precompiled_binary/build_precompiled_binary.sh
 
+version="1.0.0"
+
 set -eu
 CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SCRIPTS_DIR="$(dirname "${CURRENT_DIR}")"
@@ -14,7 +16,6 @@ if [ -d "${PORTABLE_EXECUTABLE_BUILD_DIR}" ]; then
   exit 1
 fi
 
-version="0.3.0"
 docker run --rm \
   -v "$(pwd)":/make_prg \
   leandroishilima/make_prg_precompiled_binary_builder:${version} \
@@ -28,4 +29,5 @@ docker run --rm \
   --specpath precompiled_binary/spec \
   --name make_prg_${version} \
   --hidden-import=\"sklearn.utils._weight_vector\" \
+  --hidden-import=\"sklearn.neighbors._partition_nodes\" \
   make_prg/__main__.py"
