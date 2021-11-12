@@ -78,8 +78,6 @@ def register_parser(subparsers):
     return subparser_update_prg
 
 
-# TODO: all these arguments are pickled/unpickled for multiprocessing
-# TODO: check if they are memory heavy
 def update(
     locus_name: str,
     update_DS_filepath: Path,
