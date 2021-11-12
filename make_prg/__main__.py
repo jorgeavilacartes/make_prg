@@ -34,12 +34,13 @@ def main():
 
     args = parser.parse_args()
 
-    log_lvl = "DEBUG" if args.verbose else "INFO"
-    log_file = args.log if args.log else sys.stderr
-    handlers = [
-        dict(sink=log_file, enqueue=True, level=log_lvl),
-    ]
-    logger.configure(handlers=handlers)
+    if hasattr(args, "verbose") and hasattr(args, "log"):
+        log_lvl = "DEBUG" if args.verbose else "INFO"
+        log_file = args.log if args.log else sys.stderr
+        handlers = [
+            dict(sink=log_file, enqueue=True, level=log_lvl),
+        ]
+        logger.configure(handlers=handlers)
 
     if hasattr(args, "func"):
         args.func(args)
