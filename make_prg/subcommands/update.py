@@ -104,8 +104,8 @@ def update(
                 prg_builder_tree_node = prg_builder_for_locus.get_node_given_interval(
                     update_data.ml_path_node_key
                 )
-                prg_builder_tree_node.add_seq_to_batch_update(
-                    update_data.new_node_sequence
+                prg_builder_tree_node.add_data_to_batch_update(
+                    update_data
                 )
                 leaves_to_update.add(prg_builder_tree_node)
                 nb_of_variants_sucessfully_updated += 1

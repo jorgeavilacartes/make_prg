@@ -159,15 +159,26 @@ class DenovoVariantsDBTest(TestCase):
         self.assertEqual(Path(denovo_paths_filepath), denovo_variants_DB.filepath)
         expected_locus_name_to_update_data = {
             'GC00010897': [
-                UpdateData(ml_path_node_key=(0, 110), new_node_sequence="ATGCAGATACGTGAACAGGGCCGCAAAATTCAGTGCATCCGCATCGTGTACGACAAGGCCATTGGCCGGGGTCGGCAGACGGTCATTGCCACACTGGCCCGCTATACGAC"),
-                UpdateData(ml_path_node_key=(374, 491), new_node_sequence="GTCGGCAAGGCCTTGCGCAAGGCTGGTCACGCGAAGCCCAAGGCGGTCAGAAAGGGCAAGCCGGTCGATCCGGCTGATCCCAAGGATCAAGGGGTGGGGGCACCAAAGGGGAAATGA")
+                UpdateData(ml_path_node_key=(0, 110),
+                           ml_path=denovo_variants_DB.locus_name_to_update_data['GC00010897'][0].ml_path,
+                           new_node_sequence="ATGCAGATACGTGAACAGGGCCGCAAAATTCAGTGCATCCGCATCGTGTACGACAAGGCCATTGGCCGGGGTCGGCAGACGGTCATTGCCACACTGGCCCGCTATACGAC"),
+                UpdateData(ml_path_node_key=(374, 491),
+                           ml_path=denovo_variants_DB.locus_name_to_update_data['GC00010897'][1].ml_path,
+                           new_node_sequence="GTCGGCAAGGCCTTGCGCAAGGCTGGTCACGCGAAGCCCAAGGCGGTCAGAAAGGGCAAGCCGGTCGATCCGGCTGATCCCAAGGATCAAGGGGTGGGGGCACCAAAGGGGAAATGA")
             ],
             'GC00006032': [
-                UpdateData(ml_path_node_key=(0, 145), new_node_sequence="TTGAGTAAAACAATCCCCCGCGCTTATATAAGCGCGTTGATATTTTTAGTTATTAACAAGCAACATCATGCTAATACAGACATACAAGGAGATCATCTCTCTTTGCCTGTTTTTTATTATTTCAGGAGTGTAAACACATTTTCCG")
+                UpdateData(ml_path_node_key=(0, 145),
+                           ml_path=denovo_variants_DB.locus_name_to_update_data['GC00006032'][0].ml_path,
+                           new_node_sequence="TTGAGTAAAACAATCCCCCGCGCTTATATAAGCGCGTTGATATTTTTAGTTATTAACAAGCAACATCATGCTAATACAGACATACAAGGAGATCATCTCTCTTTGCCTGTTTTTTATTATTTCAGGAGTGTAAACACATTTTCCG")
             ],
             'Cluster_1011': [
-                UpdateData(ml_path_node_key=(930, 946), new_node_sequence="TTTTTGACCATTTCCA"),
-                UpdateData(ml_path_node_key=(955, 956), new_node_sequence="C")
+                UpdateData(ml_path_node_key=(930, 946),
+                           ml_path=denovo_variants_DB.locus_name_to_update_data['Cluster_1011'][0].ml_path,
+                           new_node_sequence="TTTTTGACCATTTCCA"),
+
+                UpdateData(ml_path_node_key=(955, 956),
+                           ml_path=denovo_variants_DB.locus_name_to_update_data['Cluster_1011'][1].ml_path,
+                           new_node_sequence="C")
             ]}
         self.assertEqual(expected_locus_name_to_update_data, denovo_variants_DB.locus_name_to_update_data)
 

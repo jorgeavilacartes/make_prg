@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from intervaltree.intervaltree import IntervalTree
 
 
@@ -57,12 +57,14 @@ class MLPath:
         if len(ml_path_nodes) == 0:
             raise MLPathError("ML paths cannot be empty")
         self._ml_path_nodes: List[MLPathNode] = ml_path_nodes
-        self._ml_path_index: IntervalTree = IntervalTree()
+        self._ml_path_index_in_linear_path_space: IntervalTree = IntervalTree()
+        self._ml_path_index_in_PRG_space: Dict[Tuple[int, int], MLPathNode] = {}  # dict because this is exact index
         self._index()
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (self._ml_path_nodes, self._ml_path_index) == (other._ml_path_nodes, other._ml_path_index)
+            return (self._ml_path_nodes, self._ml_path_index_in_linear_path_space, self._ml_path_index_in_PRG_space) == \
+                   (other._ml_path_nodes, other._ml_path_index_in_linear_path_space, other._ml_path_index_in_PRG_space)
         else:
             return False
 
@@ -70,7 +72,7 @@ class MLPath:
         start_index_in_linear_path = 0
         for ml_path_node_index, ml_path_node in enumerate(self._ml_path_nodes):
             end_index_in_linear_path = start_index_in_linear_path + len(ml_path_node.sequence)
-            self._ml_path_index.addi(
+            self._ml_path_index_in_linear_path_space.addi(
                 start_index_in_linear_path,
                 end_index_in_linear_path,
                 data=ml_path_node,
@@ -78,6 +80,8 @@ class MLPath:
             ml_path_node.start_index_in_linear_path = start_index_in_linear_path
             ml_path_node.end_index_in_linear_path = end_index_in_linear_path
             start_index_in_linear_path = end_index_in_linear_path
+
+            self._ml_path_index_in_PRG_space[ml_path_node.key] = ml_path_node
 
     def get_last_insertion_pos(self) -> int:
         """
@@ -88,8 +92,8 @@ class MLPath:
     def get_last_node(self) -> MLPathNode:
         return self._ml_path_nodes[-1]
 
-    def get_node_at_position(self, position: int) -> MLPathNode:
-        nodes = self._ml_path_index[position]
+    def get_node_given_position_in_linear_path_space(self, position: int) -> MLPathNode:
+        nodes = self._ml_path_index_in_linear_path_space[position]
 
         two_or_more_nodes_overlap_this_position = len(nodes) >= 2
         assert not two_or_more_nodes_overlap_this_position, f"2+ nodes overlap at position {position}, " \
@@ -103,3 +107,12 @@ class MLPath:
         # only one node overlap this position
         node = list(nodes)[0].data
         return node
+
+    def get_node_given_interval_in_PRG_space(self, interval: Tuple[int, int]) -> MLPathNode:
+        leaf_interval_not_indexed = interval not in self._ml_path_index_in_PRG_space
+        if leaf_interval_not_indexed:
+            raise MLPathError(f"PRG space interval ({interval}) not indexed in this node ({self})")
+        return self._ml_path_index_in_PRG_space[interval]
+
+    def __repr__(self):
+        return f"MLPath({self._ml_path_nodes})"

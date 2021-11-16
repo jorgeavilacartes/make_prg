@@ -34,28 +34,29 @@ class Test_Update_Integration_Full_Builds(TestCase):
         self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/match_update_simple",
                                             data_dir / "output_update/match_update_simple"))
 
-    def test___update___match_update_complex(self):
+    def test___update___match_update_complex___several_samples_and_variants(self):
         options = self.prepare_options(test_name="match_update_complex",
                                        update_DS=data_dir/"truth_output/match/match.update_DS.zip")
         update.run(options)
         self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/match_update_complex",
                                             data_dir / "output_update/match_update_complex"))
 
-    def test___update___match_nonmatch_match(self):
+    def test___update___match_nonmatch_match___locus_with_different_ML_path_for_each_sample(self):
         options = self.prepare_options(test_name="match.nonmatch.match_update",
                                        update_DS=data_dir/"truth_output/match.nonmatch.match/match.nonmatch.match.update_DS.zip")
         update.run(options)
         self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/match.nonmatch.match_update",
                                             data_dir / "output_update/match.nonmatch.match_update"))
 
-    # TODO: add these tests
-    # def test___update___nested_snp_backgrounds(self):
-    #     options = self.prepare_options(test_name="nested_snps_seq_backgrounds_update",
-    #                                    update_DS=data_dir/"truth_output/nested_snps_seq_backgrounds/nested_snps_seq_backgrounds.update_DS.zip")
-    #     update.run(options)
-    #     self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/nested_snps_seq_backgrounds_update",
-    #                                         data_dir / "output_update/nested_snps_seq_backgrounds_update"))
-    #
+    # TODO: understand why sometimes fails and most of times is ok
+    def test___update___nested_snp_backgrounds(self):
+        options = self.prepare_options(test_name="nested_snps_seq_backgrounds_update",
+                                       update_DS=data_dir/"truth_output/nested_snps_seq_backgrounds/nested_snps_seq_backgrounds.update_DS.zip")
+        update.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/nested_snps_seq_backgrounds_update",
+                                            data_dir / "output_update/nested_snps_seq_backgrounds_update"))
+
+    # TODO: finish
     # def test___update___nested_snps_under_del(self):
     #     options = self.prepare_options("nested_snps_deletion")
     #     options.min_match_length = 1

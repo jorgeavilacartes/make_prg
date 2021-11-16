@@ -122,7 +122,7 @@ class DenovoLocusInfoTest(TestCase):
         denovo_variant = DenovoVariant(0, "ACGT", "TT")
         denovo_locus_info = DenovoLocusInfo("sample", "locus", self.ml_path, [denovo_variant])
 
-        expected = [UpdateData(self.ml_path_node_1.key, "TT")]
+        expected = [UpdateData(self.ml_path_node_1.key, self.ml_path, "TT")]
         actual = denovo_locus_info.get_update_data()
 
         self.assertEqual(expected, actual)
@@ -132,7 +132,7 @@ class DenovoLocusInfoTest(TestCase):
         denovo_variant = DenovoVariant(5, "AA", "ATTTTT")
         denovo_locus_info = DenovoLocusInfo("sample", "locus", self.ml_path, [denovo_variant])
 
-        expected = [UpdateData(self.ml_path_node_3.key, "ATTTTT")]
+        expected = [UpdateData(self.ml_path_node_3.key, self.ml_path, "ATTTTT")]
         actual = denovo_locus_info.get_update_data()
 
         self.assertEqual(expected, actual)
@@ -142,9 +142,9 @@ class DenovoLocusInfoTest(TestCase):
         denovo_variant = DenovoVariant(0, "ACGTGAA", "AGGTCAT")
         denovo_locus_info = DenovoLocusInfo("sample", "locus", self.ml_path, [denovo_variant])
 
-        expected = [UpdateData(self.ml_path_node_1.key, "AGGT"),
-                    UpdateData(self.ml_path_node_2.key, "C"),
-                    UpdateData(self.ml_path_node_3.key, "AT")]
+        expected = [UpdateData(self.ml_path_node_1.key, self.ml_path, "AGGT"),
+                    UpdateData(self.ml_path_node_2.key, self.ml_path, "C"),
+                    UpdateData(self.ml_path_node_3.key, self.ml_path, "AT")]
         actual = denovo_locus_info.get_update_data()
 
         self.assertEqual(expected, actual)
@@ -153,9 +153,9 @@ class DenovoLocusInfoTest(TestCase):
         denovo_variant = DenovoVariant(3, "TGA", "CCC")
         denovo_locus_info = DenovoLocusInfo("sample", "locus", self.ml_path, [denovo_variant])
 
-        expected = [UpdateData(self.ml_path_node_1.key, "ACGC"),
-                    UpdateData(self.ml_path_node_2.key, "C"),
-                    UpdateData(self.ml_path_node_3.key, "CA")]
+        expected = [UpdateData(self.ml_path_node_1.key, self.ml_path, "ACGC"),
+                    UpdateData(self.ml_path_node_2.key, self.ml_path, "C"),
+                    UpdateData(self.ml_path_node_3.key, self.ml_path, "CA")]
         actual = denovo_locus_info.get_update_data()
 
         self.assertEqual(expected, actual)

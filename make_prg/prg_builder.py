@@ -32,7 +32,7 @@ class PrgBuilder(object):
         self.aligner: Optional["MSAAligner"] = aligner
         self.next_node_id: int = 0
         self.site_num: int = 5
-        self.leaves_index: Dict[Tuple[int, int], SingleClusterNode] = {}
+        self.prg_index: Dict[Tuple[int, int], SingleClusterNode] = {}
 
         alignment = load_alignment_file(str(msa_file), alignment_format)
         self.root: RecursiveTreeNode = SingleClusterNode(
@@ -58,23 +58,24 @@ class PrgBuilder(object):
         self.next_node_id += 1
         return self.next_node_id - 1
 
-    def update_leaves_index(self, start_index: int, end_index: int, node: SingleClusterNode):
+    def update_PRG_index(self, start_index: int, end_index: int, node: SingleClusterNode):
         interval = (start_index, end_index)
-        self.leaves_index[interval] = node
+        self.prg_index[interval] = node
+        node.add_indexed_PRG_interval(interval)
 
     def get_node_given_interval(self, interval: Tuple[int, int]) -> SingleClusterNode:
         # TODO: move this back to assert once is solved
         # TODO: should it really be an assert?
-        interval_is_indexed = interval in self.leaves_index
+        interval_is_indexed = interval in self.prg_index
         if not interval_is_indexed:
             raise LeafNotFoundException(
                 f"Queried interval {interval} does not exist in leaves index for locus {self.locus_name}"
             )
 
-        # assert interval in self.leaves_index, \
+        # assert interval in self.prg_index, \
         #     f"Fatal error: Queried interval {interval} does not exist in leaves index for locus {self.locus_name}"
 
-        return self.leaves_index[interval]
+        return self.prg_index[interval]
 
     def serialize(self, filepath: [Path, str]):
         with open(filepath, "wb") as filehandler:

@@ -29,7 +29,7 @@ class TestPrgBuilder(TestCase):
         self.assertEqual(self.aligner, self.prg_builder.aligner)
         self.assertEqual(0, self.prg_builder.next_node_id)
         self.assertEqual(5, self.prg_builder.site_num)
-        self.assertEqual({}, self.prg_builder.leaves_index)
+        self.assertEqual({}, self.prg_builder.prg_index)
         self.assertEqual("SingleClusterNode", self.prg_builder.root)
         load_alignment_file_mock.assert_called_once_with("msa_file", "fasta")
         SingleClusterNode_mock.assert_called_once_with(
@@ -73,35 +73,37 @@ class TestPrgBuilder(TestCase):
 
     @patch("make_prg.prg_builder.load_alignment_file", return_value="MSA")
     @patch("make_prg.prg_builder.SingleClusterNode", return_value="SingleClusterNode")
-    def test___update_leaves_index___single_update(self, *uninteresting_mocks):
+    def test___update_prg_index___single_update(self, *uninteresting_mocks):
         self.setup_prg_builder()
-        node_mock_1 = Mock()
-        self.prg_builder.update_leaves_index(2, 5, node_mock_1)
+        add_indexed_PRG_interval_mock = Mock()
+        node_mock_1 = Mock(add_indexed_PRG_interval=add_indexed_PRG_interval_mock)
+        self.prg_builder.update_PRG_index(2, 5, node_mock_1)
 
         expected = {(2, 5): node_mock_1}
-        actual = self.prg_builder.leaves_index
+        actual = self.prg_builder.prg_index
 
         self.assertEqual(expected, actual)
+        add_indexed_PRG_interval_mock.assert_called_once_with((2, 5))
 
     @patch("make_prg.prg_builder.load_alignment_file", return_value="MSA")
     @patch("make_prg.prg_builder.SingleClusterNode", return_value="SingleClusterNode")
-    def test___update_leaves_index___multiple_updates(self, *uninteresting_mocks):
+    def test___update_prg_index___multiple_updates(self, *uninteresting_mocks):
         self.setup_prg_builder()
         node_mock_1 = Mock()
         node_mock_2 = Mock()
         node_mock_3 = Mock()
         node_mock_4 = Mock()
-        self.prg_builder.update_leaves_index(2, 5, node_mock_1)
-        self.prg_builder.update_leaves_index(0, 10, node_mock_2)
-        self.prg_builder.update_leaves_index(100, 200, node_mock_3)
-        self.prg_builder.update_leaves_index(2, 5, node_mock_4)
+        self.prg_builder.update_PRG_index(2, 5, node_mock_1)
+        self.prg_builder.update_PRG_index(0, 10, node_mock_2)
+        self.prg_builder.update_PRG_index(100, 200, node_mock_3)
+        self.prg_builder.update_PRG_index(2, 5, node_mock_4)
 
         expected = {
             (0, 10): node_mock_2,
             (2, 5): node_mock_4,
             (100, 200): node_mock_3,
         }
-        actual = self.prg_builder.leaves_index
+        actual = self.prg_builder.prg_index
 
         self.assertEqual(expected, actual)
 
@@ -113,9 +115,9 @@ class TestPrgBuilder(TestCase):
         node_mock_1 = Mock()
         node_mock_2 = Mock()
         node_mock_3 = Mock()
-        self.prg_builder.update_leaves_index(2, 5, node_mock_1)
-        self.prg_builder.update_leaves_index(3, 8, node_mock_2)
-        self.prg_builder.update_leaves_index(5, 9, node_mock_3)
+        self.prg_builder.update_PRG_index(2, 5, node_mock_1)
+        self.prg_builder.update_PRG_index(3, 8, node_mock_2)
+        self.prg_builder.update_PRG_index(5, 9, node_mock_3)
 
         self.assertEqual(node_mock_1, self.prg_builder.get_node_given_interval((2, 5)))
         self.assertEqual(node_mock_2, self.prg_builder.get_node_given_interval((3, 8)))

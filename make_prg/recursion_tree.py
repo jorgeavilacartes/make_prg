@@ -1,4 +1,4 @@
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Tuple
 from loguru import logger
 from make_prg.from_msa import MSA
 from make_prg.from_msa.cluster_sequences import kmeans_cluster_seqs
@@ -10,6 +10,8 @@ from make_prg.utils.seq_utils import (
     get_number_of_unique_gapped_sequences
 )
 from make_prg.from_msa.interval_partition import IntervalPartitioner, Interval
+from make_prg.update.denovo_variants import UpdateData
+from make_prg.update.MLPath import MLPathError
 from abc import ABC, abstractmethod
 
 
@@ -22,7 +24,6 @@ class RecursiveTreeNode(ABC):
         self.prg_builder: "PrgBuilder" = prg_builder
         self.force_no_child = force_no_child
         self.id: int = self.prg_builder.get_next_node_id()
-        self.new_sequences: Set[str] = set()
 
         # generate recursion tree
         self._init_pre_recursion_attributes()
@@ -108,6 +109,10 @@ class MultiClusterNode(RecursiveTreeNode):
     #####################################################################################################
 
 
+class UpdateError(Exception):
+    pass
+
+
 class SingleClusterNode(RecursiveTreeNode):
     def _init_pre_recursion_attributes(self):
         self.consensus: str = get_consensus_from_MSA(self.alignment)
@@ -118,6 +123,8 @@ class SingleClusterNode(RecursiveTreeNode):
             self.non_match_intervals,
             self.all_intervals,
         ) = interval_partitioner.get_intervals()
+        self.new_sequences: Set[str] = set()
+        self.indexed_PRG_intervals: Set[Tuple[int, int]] = set()
 
     @staticmethod
     def _alignment_has_issues(alignment: MSA) -> bool:
@@ -209,7 +216,7 @@ class SingleClusterNode(RecursiveTreeNode):
                 start_index = len(prg_as_list)
                 prg_as_list.extend(seqs[0])
                 end_index = len(prg_as_list)
-                self.prg_builder.update_leaves_index(start_index, end_index, node=self)
+                self.prg_builder.update_PRG_index(start_index, end_index, node=self)
             else:
                 # Add the variant seqs to the prg
                 site_num = self.prg_builder.get_next_site_num()
@@ -221,7 +228,7 @@ class SingleClusterNode(RecursiveTreeNode):
                     start_index = len(prg_as_list)
                     prg_as_list.extend(seq)
                     end_index = len(prg_as_list)
-                    self.prg_builder.update_leaves_index(
+                    self.prg_builder.update_PRG_index(
                         start_index, end_index, node=self
                     )
                     prg_as_list.extend(
@@ -240,8 +247,30 @@ class SingleClusterNode(RecursiveTreeNode):
 
     ##################################################################################
     # update methods
-    def add_seq_to_batch_update(self, new_sequence: str):
-        self.new_sequences.add(new_sequence)
+    def add_data_to_batch_update(self, update_data: UpdateData):
+        update_data_PRG_interval = update_data.ml_path_node_key
+        update_data_PRG_interval_is_indexed = update_data_PRG_interval in self.indexed_PRG_intervals
+        if not update_data_PRG_interval_is_indexed:
+            raise UpdateError(f"PRG interval {update_data_PRG_interval} not found in indexed "
+                              f"PRG intervals for node: {self.indexed_PRG_intervals}")
+
+        seq_to_add_as_list = []
+        for PRG_interval in sorted(self.indexed_PRG_intervals):
+            ML_sequence_should_be_replaced = PRG_interval == update_data_PRG_interval
+            if ML_sequence_should_be_replaced:
+                seq_to_add_as_list.append(update_data.new_node_sequence)
+            else:
+                try:
+                    ml_path_node = update_data.ml_path.get_node_given_interval_in_PRG_space(PRG_interval)
+                    seq_to_add_as_list.append(ml_path_node.sequence)
+                except MLPathError:
+                    pass
+
+        seq_to_add = "".join(seq_to_add_as_list)
+        self.new_sequences.add(seq_to_add)
+
+    def add_indexed_PRG_interval(self, interval: Tuple[int, int]):
+        self.indexed_PRG_intervals.add(interval)
 
     def batch_update(self):
         no_update_to_be_done = len(self.new_sequences) == 0
@@ -262,9 +291,6 @@ class SingleClusterNode(RecursiveTreeNode):
             current_alignment=self.alignment,
             new_sequences=self.new_sequences
         )
-
-        # reset the new sequences
-        self.new_sequences = set()
 
         # regenerate recursion tree
         self._init_pre_recursion_attributes()

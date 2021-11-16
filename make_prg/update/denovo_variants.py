@@ -160,8 +160,9 @@ class DenovoVariant:
 
 
 class UpdateData:
-    def __init__(self, ml_path_node_key: Tuple[int, int], new_node_sequence: str):
+    def __init__(self, ml_path_node_key: Tuple[int, int], ml_path: MLPath, new_node_sequence: str):
         self.ml_path_node_key: Tuple[int, int] = ml_path_node_key
+        self.ml_path = ml_path
         self.new_node_sequence: str = new_node_sequence
 
     def __eq__(self, other):
@@ -171,7 +172,9 @@ class UpdateData:
             return False
 
     def __repr__(self):
-        return f"UpdateData(ml_path_node_key={self.ml_path_node_key}, new_node_sequence=\"{self.new_node_sequence}\")"
+        return f"UpdateData(ml_path_node_key={self.ml_path_node_key}, " \
+               f"ml_path=\"{self.ml_path}\"), " \
+               f"new_node_sequence=\"{self.new_node_sequence}\")"
 
 
 class DenovoLocusInfo:
@@ -192,7 +195,7 @@ class DenovoLocusInfo:
         if variant.is_strict_insertion_event():
             # interval/ref is empty, search for the start index
             try:
-                ml_path_node = self.ml_path.get_node_at_position(variant.start_index_in_linear_path)
+                ml_path_node = self.ml_path.get_node_given_position_in_linear_path_space(variant.start_index_in_linear_path)
             except MLPathError as ml_path_error:
                 # this might happen when the insertion is after the last base of the last node
                 is_in_the_last_insertion_position = variant.start_index_in_linear_path == self.ml_path.get_last_insertion_pos()
@@ -208,7 +211,7 @@ class DenovoLocusInfo:
             for position_in_linear_path in range(
                     variant.start_index_in_linear_path, variant.end_index_in_linear_path
             ):
-                ml_path_node = self.ml_path.get_node_at_position(position_in_linear_path)
+                ml_path_node = self.ml_path.get_node_given_position_in_linear_path_space(position_in_linear_path)
                 ml_path_nodes.append(ml_path_node)
 
         return ml_path_nodes
@@ -226,6 +229,7 @@ class DenovoLocusInfo:
             for split_variant, ml_path_node in zip(split_variants, deduplicated_ml_path_nodes):
                 update_data = UpdateData(
                     ml_path_node_key=ml_path_node.key,
+                    ml_path=self.ml_path,
                     new_node_sequence=split_variant.get_mutated_sequence(ml_path_node)
                 )
                 update_data_list.append(update_data)
