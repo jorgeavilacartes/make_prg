@@ -398,6 +398,19 @@ class TestClustering_RunKmeans(TestCase):
         result = kmeans_cluster_seqs(alignment, 4)
         self.assertEqual(len(result), MAX_CLUSTERS)
 
+    def test_GivenFewVeryDifferentSequences_NoClustering(self):
+        # We want clustering to keep looking for clusters, and stop at num_sequences, and realise there is no clustering
+        sequences = [
+            "AAAAAAAAAAAAAAAAAAAAAA",
+            "CCCCCCCCCCCCCCCCCCCCCC",
+            "GGGGGGGGGGGGGGGGGGGGGG",
+            "TTTTTTTTTTTTTTTTTTTTTT",
+        ]
+        alignment = make_alignment(sequences)
+        expected = [['s0', 's1', 's2', 's3']]
+        result = kmeans_cluster_seqs(alignment, 7)
+        self.assertEqual(expected, result)
+
     def test_GivenSequencesWithSameKmerCounts_ClusteringInterrupted(self):
         """
         Sequences below are not 'one-ref-like', yet kmer counts are identical.
