@@ -167,13 +167,14 @@ class UpdateData:
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (self.ml_path_node_key, self.new_node_sequence) == (other.ml_path_node_key, other.new_node_sequence)
+            return (self.ml_path_node_key,  self.ml_path,  self.new_node_sequence) == \
+                   (other.ml_path_node_key, other.ml_path, other.new_node_sequence)
         else:
             return False
 
     def __repr__(self):
         return f"UpdateData(ml_path_node_key={self.ml_path_node_key}, " \
-               f"ml_path=\"{self.ml_path}\"), " \
+               f"ml_path={self.ml_path}, " \
                f"new_node_sequence=\"{self.new_node_sequence}\")"
 
 
