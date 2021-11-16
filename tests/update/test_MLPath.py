@@ -1,4 +1,5 @@
 from unittest import TestCase
+from unittest.mock import Mock
 from make_prg.update.MLPath import MLPathNode, MLPath, MLPathError
 from intervaltree import IntervalTree, Interval
 
@@ -53,6 +54,27 @@ class MLPathTest(TestCase):
                                     (12, 13): self.ml_path_node_2,
                                     (20, 22): self.ml_path_node_3}
         self.assertEqual(expected_PRG_space_index, self.ml_path._ml_path_index_in_PRG_space)
+
+    def test___equality(self):
+        ml_path_2 = MLPath(self.ml_path_nodes)
+        self.assertEqual(self.ml_path, ml_path_2)
+
+    def test___inequality(self):
+        ml_path_2 = MLPath(self.ml_path_nodes)
+        ml_path_2._ml_path_nodes = Mock()
+        self.assertNotEqual(self.ml_path, ml_path_2)
+
+        ml_path_2 = MLPath(self.ml_path_nodes)
+        ml_path_2._ml_path_index_in_linear_path_space = Mock()
+        self.assertNotEqual(self.ml_path, ml_path_2)
+
+        ml_path_2 = MLPath(self.ml_path_nodes)
+        ml_path_2._ml_path_index_in_PRG_space = Mock()
+        self.assertNotEqual(self.ml_path, ml_path_2)
+
+    def test___inequality___other_type(self):
+        a_string = "a string"
+        self.assertNotEqual(self.ml_path, a_string)
 
     def test___get_last_insertion_pos(self):
         expected = 7
