@@ -113,8 +113,9 @@ def update(
                 logger.warning(f"Failed finding leaf: {exc}")
                 nb_of_variants_with_failed_update += 1
 
-        # update the changed leaves
-        for leaf in leaves_to_update:
+        # update the modified leaves
+        # Note: the sorted() is needed for determinism so that we can compare indexes and test outputs
+        for leaf in sorted(leaves_to_update, key=lambda node: node.id):
             leaf.batch_update()
         logger.debug(
             f"Updated {locus_name}: {nb_of_variants_sucessfully_updated} denovo sequences added!"
