@@ -29,6 +29,28 @@ class DenovoVariantTest(TestCase):
         self.assertEqual("AACC", self.sample_denovo_variant.ref)
         self.assertEqual("GT", self.sample_denovo_variant.alt)
 
+    def test___equality___same_variant(self):
+        denovo_variant_1 = DenovoVariant(1, "A", "C")
+        denovo_variant_2 = DenovoVariant(1, "A", "C")
+        self.assertEqual(denovo_variant_1, denovo_variant_2)
+
+    def test___equality___different_variants(self):
+        denovo_variant_1 = DenovoVariant(1, "A", "C")
+
+        denovo_variant_2 = DenovoVariant(2, "A", "C")
+        self.assertNotEqual(denovo_variant_1, denovo_variant_2)
+
+        denovo_variant_2 = DenovoVariant(1, "T", "C")
+        self.assertNotEqual(denovo_variant_1, denovo_variant_2)
+
+        denovo_variant_2 = DenovoVariant(1, "A", "G")
+        self.assertNotEqual(denovo_variant_1, denovo_variant_2)
+
+    def test___equality___comparing_variant_with_other_type(self):
+        denovo_variant_1 = DenovoVariant(1, "A", "C")
+        other = "a string"
+        self.assertNotEqual(denovo_variant_1, other)
+
     def test___get_mutated_sequence___bad_start_index_before_node_start_DenovoError_raised(self):
         ml_path_node = MLPathNode(key=(6, 9), sequence="ACG")
         ml_path_node.start_index_in_linear_path = 6
