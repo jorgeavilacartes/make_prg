@@ -7,7 +7,7 @@ from make_prg.from_msa import MSA
 from pathlib import Path
 from make_prg.from_msa.interval_partition import IntervalType, Interval
 from make_prg.utils.seq_utils import SequenceExpander
-from make_prg.update.denovo_variants import UpdateData
+from make_prg.update.denovo_variants import UpdateData, MLPathError
 
 
 @patch.object(PrgBuilder, PrgBuilder.get_next_node_id.__name__, return_value=0)
@@ -779,6 +779,50 @@ class TestSingleClusterNode(TestCase):
         self.assertEqual(expected, self.single_cluster_node.new_sequences)
         get_node_given_interval_in_PRG_space_mock.assert_any_call((0, 4))
         get_node_given_interval_in_PRG_space_mock.assert_any_call((5, 10))
+
+    def test___add_data_to_batch_update___update_data_interval_flanked___left_interval_not_in_ml_path(self, *uninteresting_mocks):
+        self.setup()
+
+        def get_node_given_interval_in_PRG_space_mock_fun(interval):
+            if interval == (20, 30):
+                return Mock(sequence="right_flank")
+            else:
+                raise MLPathError()
+
+        get_node_given_interval_in_PRG_space_mock = Mock(side_effect=get_node_given_interval_in_PRG_space_mock_fun)
+        ml_path_node_mock = Mock(get_node_given_interval_in_PRG_space = get_node_given_interval_in_PRG_space_mock)
+        update_data = UpdateData((5, 10), ml_path_node_mock, "ACGT")
+        self.single_cluster_node.indexed_PRG_intervals = {(5, 10), (20, 30), (0, 4)}
+        self.assertEqual(set(), self.single_cluster_node.new_sequences)
+
+        self.single_cluster_node.add_data_to_batch_update(update_data)
+
+        expected = {"ACGTright_flank"}
+        self.assertEqual(expected, self.single_cluster_node.new_sequences)
+        get_node_given_interval_in_PRG_space_mock.assert_any_call((0, 4))
+        get_node_given_interval_in_PRG_space_mock.assert_any_call((20, 30))
+
+    def test___add_data_to_batch_update___update_data_interval_flanked___right_interval_not_in_ml_path(self, *uninteresting_mocks):
+        self.setup()
+
+        def get_node_given_interval_in_PRG_space_mock_fun(interval):
+            if interval == (0, 4):
+                return Mock(sequence="left_flank")
+            else:
+                raise MLPathError()
+
+        get_node_given_interval_in_PRG_space_mock = Mock(side_effect=get_node_given_interval_in_PRG_space_mock_fun)
+        ml_path_node_mock = Mock(get_node_given_interval_in_PRG_space = get_node_given_interval_in_PRG_space_mock)
+        update_data = UpdateData((5, 10), ml_path_node_mock, "ACGT")
+        self.single_cluster_node.indexed_PRG_intervals = {(5, 10), (20, 30), (0, 4)}
+        self.assertEqual(set(), self.single_cluster_node.new_sequences)
+
+        self.single_cluster_node.add_data_to_batch_update(update_data)
+
+        expected = {"left_flankACGT"}
+        self.assertEqual(expected, self.single_cluster_node.new_sequences)
+        get_node_given_interval_in_PRG_space_mock.assert_any_call((0, 4))
+        get_node_given_interval_in_PRG_space_mock.assert_any_call((20, 30))
 
     def test___add_indexed_PRG_interval___single_interval(self, *uninteresting_mocks):
         self.setup()
