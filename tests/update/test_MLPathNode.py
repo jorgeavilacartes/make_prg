@@ -21,6 +21,25 @@ class MLPathNodeTest(TestCase):
         self.assertEqual(None, ml_path_node.start_index_in_linear_path)
         self.assertEqual(None, ml_path_node.end_index_in_linear_path)
 
+    def test___equality(self):
+        ml_path_node_1 = MLPathNode((5, 9), sequence="ACGT")
+        ml_path_node_2 = MLPathNode((5, 9), sequence="ACGT")
+        self.assertEqual(ml_path_node_1, ml_path_node_2)
+
+    def test___inequality(self):
+        ml_path_node_1 = MLPathNode((5, 9), sequence="ACGT")
+
+        ml_path_node_2 = MLPathNode((6, 10), sequence="ACGT")
+        self.assertNotEqual(ml_path_node_1, ml_path_node_2)
+
+        ml_path_node_2 = MLPathNode((5, 9), sequence="ACCT")
+        self.assertNotEqual(ml_path_node_1, ml_path_node_2)
+
+    def test___inequality___other_type(self):
+        ml_path_node_1 = MLPathNode((5, 9), sequence="ACGT")
+        a_string = "a string"
+        self.assertNotEqual(ml_path_node_1, a_string)
+
     def test___str(self):
         ml_path_node = MLPathNode((5, 9), sequence="ACGT")
 
