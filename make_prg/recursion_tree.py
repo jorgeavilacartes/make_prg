@@ -286,6 +286,12 @@ class SingleClusterNode(RecursiveTreeNode):
                     pass
 
         seq_to_add = "".join(seq_to_add_as_list)
+
+        there_has_been_padding = seq_to_add != update_data.new_node_sequence
+        if there_has_been_padding:
+            logger.trace(f"Sequence {update_data.new_node_sequence} padded to {seq_to_add} on "
+                         f"add_data_to_batch_update() for {self.prg_builder.locus_name}")
+
         self.new_sequences.add(seq_to_add)
 
     def add_indexed_PRG_interval(self, interval: Tuple[int, int]):
