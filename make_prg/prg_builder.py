@@ -69,8 +69,8 @@ class PrgBuilder(object):
         interval_is_indexed = interval in self.prg_index
         if not interval_is_indexed:
             raise LeafNotFoundException(
-                f"Queried interval {interval} does not exist in PRG index for locus {self.locus_name}.\n"
-                f"PRG index: {self.prg_index.keys()}"
+                f"Queried PRG interval {interval} does not exist in PRG index for locus {self.locus_name}.\n"
+                f"Indexed PRG intervals: {self.prg_index.keys()}"
             )
 
         # assert interval in self.prg_index, \
