@@ -9,6 +9,7 @@ with Path('requirements.txt').open() as requirements_txt:
         in parse_requirements(requirements_txt)
     ]
 
+# TODO: fix tests incorrectly running when installing with setup.py
 setup(
     name="make_prg",
     version="1.0.0",
