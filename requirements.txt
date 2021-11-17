@@ -24,7 +24,7 @@ py==1.11.0
 pygraphviz==1.7
 pyinstaller==4.7
 pyinstaller-hooks-contrib==2021.3
-pyparsing
+pyparsing==2.4.7
 pysam==0.17.0
 pytest==6.2.5
 python-dateutil==2.8.2
