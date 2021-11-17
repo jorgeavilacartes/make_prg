@@ -26,19 +26,20 @@ def main():
         par.add_argument(
             "-v",
             "--verbose",
-            action="store_true",
-            default=False,
-            help="Increase output verbosity",
+            action='count',
+            default=0,
+            help="Increase output verbosity (-v for debug, -vv for trace - trace is for developers only)",
         )
         par.add_argument("--log", help="Path to write log to. Default is stderr")
 
     args = parser.parse_args()
 
     if hasattr(args, "verbose") and hasattr(args, "log"):
-        log_lvl = "DEBUG" if args.verbose else "INFO"
+        log_levels = ["INFO", "DEBUG", "TRACE"]
+        log_level = log_levels[min(args.verbose, 2)]
         log_file = args.log if args.log else sys.stderr
         handlers = [
-            dict(sink=log_file, enqueue=True, level=log_lvl),
+            dict(sink=log_file, enqueue=True, level=log_level),
         ]
         logger.configure(handlers=handlers)
 

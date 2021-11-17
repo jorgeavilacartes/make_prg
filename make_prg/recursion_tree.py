@@ -29,6 +29,8 @@ class RecursiveTreeNode(ABC):
         self._init_pre_recursion_attributes()
         self._children: List["RecursiveTreeNode"] = self._get_children()
 
+        self.log_that_node_was_created()
+
     @property
     def children(self):
         return self._children
@@ -47,6 +49,20 @@ class RecursiveTreeNode(ABC):
 
     def is_leaf(self) -> bool:
         return len(self.children) == 0
+
+    def log_that_node_was_created(self):
+        logger.trace("Created node:\n" + str(self))
+
+    def __repr__(self):
+        return f"Id = {self.id}\n" \
+               f"Nesting level = {self.nesting_level}\n" \
+               f"Force no child = {self.force_no_child}\n" \
+               f"Parent = {'None' if self.parent is None else f'Id = {self.parent.id}'}\n" \
+               f"Children = [{', '.join([f'Id = {child.id}' for child in self.children])}]\n" \
+               f"Alignment:\n{format(self.alignment, 'fasta')}"
+
+    def __str__(self):
+        return repr(self)
 
 
 class MultiClusterNode(RecursiveTreeNode):
@@ -107,6 +123,9 @@ class MultiClusterNode(RecursiveTreeNode):
         sub_alignment = MSA(list_records)
         return sub_alignment
     #####################################################################################################
+
+    def __repr__(self):
+        return "MultiClusterNode:\n" + super().__repr__()
 
 
 class UpdateError(Exception):
@@ -279,9 +298,9 @@ class SingleClusterNode(RecursiveTreeNode):
         self._update_leaf()
 
     def _update_leaf(self):
-        logger.debug(
-            f"Updating MSA for {self.prg_builder.locus_name}, node {self.id}..."
-        )
+        logger.trace(f"Updating MSA for {self.prg_builder.locus_name}")
+        logger.trace(f"Node: {str(self)}")
+        logger.trace(f"Sequences added to update: {self.new_sequences}")
 
         an_aligner_was_given = self.prg_builder.aligner is not None
         # this is an assertion as it is the dev responsibility to ensure an aligner is given if updates are to be done
@@ -296,3 +315,9 @@ class SingleClusterNode(RecursiveTreeNode):
         self._init_pre_recursion_attributes()
         self._children = self._get_children()
     ##################################################################################
+
+    def __repr__(self):
+        return "SingleClusterNode:\n" + RecursiveTreeNode.__repr__(self) + \
+               f"Consensus: {self.consensus}\n" \
+               f"Match intervals: {self.match_intervals}\n" \
+               f"Non-match intervals: {self.non_match_intervals}\n"

@@ -48,21 +48,12 @@ class Test_Update_Integration_Full_Builds(TestCase):
         self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/match.nonmatch.match_update",
                                             data_dir / "output_update/match.nonmatch.match_update"))
 
-    # TODO: understand why sometimes fails and most of times is ok
     def test___update___nested_snp_backgrounds(self):
         options = self.prepare_options(test_name="nested_snps_seq_backgrounds_update",
                                        update_DS=data_dir/"truth_output/nested_snps_seq_backgrounds/nested_snps_seq_backgrounds.update_DS.zip")
         update.run(options)
         self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/nested_snps_seq_backgrounds_update",
                                             data_dir / "output_update/nested_snps_seq_backgrounds_update"))
-
-    # TODO: finish
-    # def test___update___nested_snps_under_del(self):
-    #     options = self.prepare_options("nested_snps_deletion")
-    #     options.min_match_length = 1
-    #     update.run(options)
-    #     self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/nested_snps_deletion",
-    #                                         data_dir / "output/nested_snps_deletion"))
 
     def test___update___output_files_already_exist(self):
         output_folder = data_dir / "output_update" / "match_update_simple"

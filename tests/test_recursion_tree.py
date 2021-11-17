@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, Mock, PropertyMock
 from tests.test_helpers import make_alignment, equal_msas, first_dict_contained_in_second
-from make_prg.recursion_tree import MultiClusterNode, SingleClusterNode, UpdateError
+from make_prg.recursion_tree import MultiClusterNode, SingleClusterNode, UpdateError, RecursiveTreeNode
 from make_prg.prg_builder import PrgBuilder
 from make_prg.from_msa import MSA
 from pathlib import Path
@@ -11,8 +11,9 @@ from make_prg.update.denovo_variants import UpdateData, MLPathError
 
 
 @patch.object(PrgBuilder, PrgBuilder.get_next_node_id.__name__, return_value=0)
-@patch.object(SingleClusterNode, PrgBuilder.__init__.__name__, return_value=None)
+@patch.object(SingleClusterNode, SingleClusterNode.__init__.__name__, return_value=None)
 @patch("make_prg.prg_builder.load_alignment_file")
+@patch.object(RecursiveTreeNode, RecursiveTreeNode.log_that_node_was_created.__name__)
 class TestMultiClusterNode(TestCase):
     # Note: can't apply patches to setUp(), so creating this method that is called in every test
     def setup(self) -> None:
@@ -196,9 +197,35 @@ class TestMultiClusterNode(TestCase):
             force_no_child=False
         )
 
+    def test___repr_and_str(self, *uninteresting_mocks):
+        self.setup()
+        self.multi_cluster_node._children = [Mock(id=100), Mock(id=200)]
+        expected = """MultiClusterNode:
+Id = 0
+Nesting level = 1
+Force no child = False
+Parent = None
+Children = [Id = 100, Id = 200]
+Alignment:
+>s1
+AAAT
+>s2
+C--C
+>s3
+AATT
+>s4
+GNGG
+"""
+        actual = repr(self.multi_cluster_node)
+        self.assertEqual(expected, actual)
+
+        actual = str(self.multi_cluster_node)
+        self.assertEqual(expected, actual)
+
 
 @patch.object(PrgBuilder, PrgBuilder.get_next_node_id.__name__, return_value=0)
 @patch("make_prg.prg_builder.load_alignment_file")
+@patch.object(RecursiveTreeNode, RecursiveTreeNode.log_that_node_was_created.__name__)
 class TestSingleClusterNode(TestCase):
     def subsetup(self):
         self.alignment = make_alignment(
@@ -900,3 +927,31 @@ class TestSingleClusterNode(TestCase):
             self.assertFalse(self.single_cluster_node.force_no_child)
             self.assertEqual(0, self.single_cluster_node.id)
             self.assertEqual(["updated_child_1", "updated_child_2"], self.single_cluster_node.children)
+
+    def test___repr_and_str(self, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node._children = [Mock(id=100), Mock(id=200)]
+        expected = """SingleClusterNode:
+Id = 0
+Nesting level = 1
+Force no child = False
+Parent = None
+Children = [Id = 100, Id = 200]
+Alignment:
+>s1
+AAAT
+>s2
+C--C
+>s3
+AATT
+>s4
+GNGG
+Consensus: ****
+Match intervals: []
+Non-match intervals: [[0, 3]]
+"""
+        actual = repr(self.single_cluster_node)
+        self.assertEqual(expected, actual)
+
+        actual = str(self.single_cluster_node)
+        self.assertEqual(expected, actual)

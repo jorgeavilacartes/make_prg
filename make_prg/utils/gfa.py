@@ -43,9 +43,7 @@ class GFA_Output:
         end_ids = []
         # iterate through sites present, updating gfa_string with each in turn
         while str(self.gfa_site) in prg_string:
-            logger.trace("gfa_site: {}", self.gfa_site)
             prgs = self.split_on_site(prg_string, self.gfa_site)
-            logger.trace("prgs: {}", prgs)
             assert len(prgs) == 3, "Invalid prg sequence %s for site %d and id %d" % (
                 prg_string,
                 self.gfa_site,
@@ -72,9 +70,7 @@ class GFA_Output:
                 self.gfa_site + 1,
                 self.gfa_id,
             )
-            logger.trace("vars: {}", vars)
             self.gfa_site += 2
-            logger.trace("gfa_site: {}", self.gfa_site)
             for var_string in vars:
                 if pre_var_id != None:
                     self.gfa_string += "L\t%d\t+\t%d\t+\t0M\n" % (
