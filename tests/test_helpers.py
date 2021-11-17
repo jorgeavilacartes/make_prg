@@ -5,6 +5,7 @@ from make_prg.from_msa import MSA
 import os
 import shutil
 import filecmp
+from glob import glob
 
 
 def make_alignment(seqs: List[str], ids: List[str] = None) -> MSA:
@@ -45,8 +46,8 @@ def remove_dir_if_exists(directory):
         shutil.rmtree(directory)
 
 
-# From https://stackoverflow.com/a/6681395/5264075
-def are_dir_trees_equal(dir1, dir2):
+# Adapted from https://stackoverflow.com/a/6681395/5264075
+def are_dir_trees_equal(dir1, dir2, compare_zips = True):
     """
     Compare two directories recursively. Files in each directory are
     assumed to be equal if their names and contents are equal.
@@ -58,13 +59,16 @@ def are_dir_trees_equal(dir1, dir2):
         there were no errors while accessing the directories or files,
         False otherwise.
    """
-
     dirs_cmp = filecmp.dircmp(dir1, dir2)
     if len(dirs_cmp.left_only)>0 or len(dirs_cmp.right_only)>0 or \
         len(dirs_cmp.funny_files)>0:
         return False
-    (_, mismatch, errors) =  filecmp.cmpfiles(
-        dir1, dir2, dirs_cmp.common_files, shallow=False)
+
+    if compare_zips:
+        common_files = dirs_cmp.common_files
+    else:
+        common_files = list(filter(lambda filename: not filename.endswith(".zip"), dirs_cmp.common_files))
+    (_, mismatch, errors) =  filecmp.cmpfiles(dir1, dir2, common_files, shallow=False)
     if len(mismatch)>0 or len(errors)>0:
         return False
     for common_dir in dirs_cmp.common_dirs:
