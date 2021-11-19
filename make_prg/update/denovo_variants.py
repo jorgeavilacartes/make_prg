@@ -127,6 +127,12 @@ class DenovoVariant:
         @return: List of sub-variants
         """
         each_base_is_covered_by_one_node = len(self.ref) == len(ml_path_nodes_it_goes_through)
+
+        if not each_base_is_covered_by_one_node:
+            logger.trace(f"Bug on split_variant():\n"
+                         f"DenovoVariant: {self}\n"
+                         f"ml_path_nodes_it_goes_through: {ml_path_nodes_it_goes_through}")
+
         assert each_base_is_covered_by_one_node, "We have bases uncovered by nodes in split_variant()"
 
         nb_of_distinct_ml_path_nodes = len(set(ml_path_nodes_it_goes_through))
