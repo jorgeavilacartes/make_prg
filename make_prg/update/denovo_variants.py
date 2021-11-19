@@ -257,6 +257,7 @@ class DenovoVariantsDB:
     def _read_sample(filehandler: TextIO) -> str:
         line = filehandler.readline().strip()
         sample = line.split()[1]
+        logger.trace(f"Read sample: {sample}")
         return sample
 
     @staticmethod
@@ -268,6 +269,7 @@ class DenovoVariantsDB:
     @staticmethod
     def _read_locus(filehandler: TextIO) -> str:
         locus = filehandler.readline().strip()
+        logger.trace(f"Read locus: {locus}")
         return locus
 
     @staticmethod
@@ -304,6 +306,7 @@ class DenovoVariantsDB:
                 # as it is not amenable to updates
                 pass
 
+        logger.trace(f"Read ML path: {ml_path}")
         return MLPath(ml_path)
 
     @staticmethod
@@ -325,6 +328,8 @@ class DenovoVariantsDB:
                 ref=ref,
                 alt=alt,
         )
+
+        logger.trace(f"Read variant: {denovo_variant}")
         return denovo_variant
 
     @classmethod
