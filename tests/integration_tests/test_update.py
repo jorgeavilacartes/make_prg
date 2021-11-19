@@ -66,7 +66,6 @@ class Test_Update_Integration_Full_Builds(TestCase):
         Where we will end up inserting will be:
         ACGTGTTTT AG TAACTGTG...
                   ^ insertion
-        TODO: check with pandora if pandora means to do strict insertions before or after the specified position
         """
         options = self.prepare_options(test_name="strict_insertions_and_deletions_update",
                                        update_DS=data_dir/"truth_output/match/match.update_DS.zip")
