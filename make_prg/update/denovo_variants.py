@@ -126,14 +126,16 @@ class DenovoVariant:
         of the variant goes through
         @return: List of sub-variants
         """
-        each_base_is_covered_by_one_node = len(self.ref) == len(ml_path_nodes_it_goes_through)
-
-        if not each_base_is_covered_by_one_node:
-            logger.trace(f"Bug on split_variant():\n"
-                         f"DenovoVariant: {self}\n"
-                         f"ml_path_nodes_it_goes_through: {ml_path_nodes_it_goes_through}")
-
-        assert each_base_is_covered_by_one_node, "We have bases uncovered by nodes in split_variant()"
+        if self.is_strict_insertion_event():
+            ml_path_contains_only_the_insertion_point = len(ml_path_nodes_it_goes_through) == 1
+            valid_parameters = ml_path_contains_only_the_insertion_point
+        else:
+            each_base_is_covered_by_one_node = len(self.ref) == len(ml_path_nodes_it_goes_through)
+            valid_parameters = each_base_is_covered_by_one_node
+        assert valid_parameters, f"Invalid parameters for DenovoVariant.split_variant().\n" \
+                                 f"Debug info:\n" \
+                                 f"DenovoVariant: {self}\n" \
+                                 f"ml_path_nodes_it_goes_through: {ml_path_nodes_it_goes_through}"
 
         nb_of_distinct_ml_path_nodes = len(set(ml_path_nodes_it_goes_through))
         variant_goes_through_only_one_leaf = nb_of_distinct_ml_path_nodes == 1

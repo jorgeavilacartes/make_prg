@@ -55,6 +55,25 @@ class Test_Update_Integration_Full_Builds(TestCase):
         self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/nested_snps_seq_backgrounds_update",
                                             data_dir / "output_update/nested_snps_seq_backgrounds_update"))
 
+    def test___update___strict_insertions_and_deletions(self):
+        """
+        Strict insertions happen "before" the specified position, e.g.:
+        This is the variant:
+        10		A
+        This is the sequence
+        ACGTGTTTT G TAACTGTG...
+                  ^ this is position 10 (1-based), the insertion point
+        Where we will end up inserting will be:
+        ACGTGTTTT AG TAACTGTG...
+                  ^ insertion
+        TODO: check with pandora if pandora means to do strict insertions before or after the specified position
+        """
+        options = self.prepare_options(test_name="strict_insertions_and_deletions_update",
+                                       update_DS=data_dir/"truth_output/match/match.update_DS.zip")
+        update.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/strict_insertions_and_deletions_update",
+                                            data_dir / "output_update/strict_insertions_and_deletions_update"))
+
     def test___update___output_files_already_exist(self):
         output_folder = data_dir / "output_update" / "match_update_simple"
         output_prefix = str(output_folder / "match_update_simple")

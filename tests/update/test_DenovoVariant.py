@@ -101,6 +101,19 @@ class DenovoVariantTest(TestCase):
         with self.assertRaises(AssertionError):
             self.sample_denovo_variant.split_variant(ml_path_nodes_it_goes_through)
 
+    def test___split_variant___strict_insertion___no_ml_path_nodes_going_through_it_error_out(self):
+        denovo_variant = DenovoVariant(5, "", "ACGT")
+        ml_path_nodes_it_goes_through = []
+        with self.assertRaises(AssertionError):
+            denovo_variant.split_variant(ml_path_nodes_it_goes_through)
+
+    def test___split_variant___strict_insertion___two_ml_path_nodes_going_through_it_error_out(self):
+        denovo_variant = DenovoVariant(5, "", "ACGT")
+        dummy_node = MLPathNode(key=(0, 1), sequence="A")
+        ml_path_nodes_it_goes_through = [dummy_node, dummy_node]
+        with self.assertRaises(AssertionError):
+            denovo_variant.split_variant(ml_path_nodes_it_goes_through)
+
     def test___split_variant___variant_goes_through_single_node___no_split(self):
         dummy_node = MLPathNode(key=(0, 1), sequence="A")
         # all 4 bases goes through this single node
@@ -345,6 +358,16 @@ class DenovoVariantTest(TestCase):
 
         expected = [DenovoVariant(6, "C", ""), DenovoVariant(9, "T", ""), DenovoVariant(10, "C", ""),
                     DenovoVariant(12, "T", "")]
+        actual = denovo_variant.split_variant(ml_path_nodes_it_goes_through)
+
+        self.assertEqual(expected, actual)
+
+    def test___split_variant___strict_insertion(self):
+        denovo_variant = DenovoVariant(5, "", "ACGT")
+        dummy_node = MLPathNode(key=(0, 1), sequence="A")
+        ml_path_nodes_it_goes_through = [dummy_node]
+
+        expected = [denovo_variant]
         actual = denovo_variant.split_variant(ml_path_nodes_it_goes_through)
 
         self.assertEqual(expected, actual)
