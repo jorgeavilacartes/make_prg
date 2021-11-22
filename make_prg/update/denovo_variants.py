@@ -46,7 +46,7 @@ class DenovoVariant:
         else:
             return False
 
-    def get_mutated_sequence(self, node: MLPathNode) -> str:
+    def get_mutated_sequence(self, node: MLPathNode, sample, locus) -> str:
         """
         Given a MLPathNode, we get its sequence, and apply this variant to it. The MLPathNode has to be compatible
         with this variant.
@@ -55,7 +55,7 @@ class DenovoVariant:
             node.start_index_in_linear_path <= self.start_index_in_linear_path and \
             self.end_index_in_linear_path <= node.end_index_in_linear_path
         if not node_is_compatible_with_this_variant:
-            raise DenovoError(f"Node {node} is not compatible with variant {self}")
+            raise DenovoError(f"Node {node} is not compatible with variant {self} on sample {sample} and locus {locus}")
 
         start_index_inside_node_sequence = (
             self.start_index_in_linear_path - node.start_index_in_linear_path
@@ -239,7 +239,9 @@ class DenovoLocusInfo:
                 update_data = UpdateData(
                     ml_path_node_key=ml_path_node.key,
                     ml_path=self.ml_path,
-                    new_node_sequence=split_variant.get_mutated_sequence(ml_path_node)
+                    new_node_sequence=split_variant.get_mutated_sequence(ml_path_node,
+                                                                         self.sample,
+                                                                         self.locus)
                 )
                 update_data_list.append(update_data)
 
