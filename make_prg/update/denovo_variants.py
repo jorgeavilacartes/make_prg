@@ -1,4 +1,4 @@
-from typing import List, Deque, TextIO, Dict, Tuple
+from typing import List, Deque, TextIO, Dict, Tuple, Optional
 from collections import defaultdict, deque
 import re
 from loguru import logger
@@ -20,6 +20,7 @@ class DenovoVariant:
         self.end_index_in_linear_path: int = start_index_in_linear_path + len(ref)
         self.ref: str = ref
         self.alt: str = alt
+        self.ml_path_nodes_it_goes_through: Optional[List[MLPathNode]] = None
 
     @staticmethod
     def _param_checking(start_index_in_linear_path: int, ref: str, alt: str):
@@ -40,22 +41,48 @@ class DenovoVariant:
             raise DenovoError(f"Found a non-ACGT seq ({seq}) in a denovo variant")
 
     def __eq__(self, other):
+        # Note: we explictly don't add self.ml_path_nodes_it_goes_through to this comparison
+        # Depending on the state, it might be None or not
         if isinstance(other, self.__class__):
             return (self.start_index_in_linear_path, self.end_index_in_linear_path, self.ref, self.alt) == \
                    (other.start_index_in_linear_path, other.end_index_in_linear_path, other.ref, other.alt)
         else:
             return False
 
-    def get_mutated_sequence(self, node: MLPathNode, sample, locus) -> str:
+    def set_ml_path_nodes_it_goes_through(self, ml_path_nodes_it_goes_through: List[MLPathNode]):
         """
-        Given a MLPathNode, we get its sequence, and apply this variant to it. The MLPathNode has to be compatible
-        with this variant.
+        self.ml_path_nodes_it_goes_through: a list of MLPathNode, where the i-th MLPathNode is the node the i-th base
+        of the variant goes through
         """
+        if self.is_strict_insertion_event():
+            ml_path_contains_only_the_insertion_point = len(ml_path_nodes_it_goes_through) == 1
+            valid_parameters = ml_path_contains_only_the_insertion_point
+        else:
+            each_base_is_covered_by_one_node = len(self.ref) == len(ml_path_nodes_it_goes_through)
+            valid_parameters = each_base_is_covered_by_one_node
+        assert valid_parameters, f"Invalid parameters for DenovoVariant.split_variant().\n" \
+                                 f"Debug info:\n" \
+                                 f"DenovoVariant: {self}\n" \
+                                 f"ml_path_nodes_it_goes_through: {ml_path_nodes_it_goes_through}"
+        self.ml_path_nodes_it_goes_through = ml_path_nodes_it_goes_through
+
+    def get_mutated_sequence(self) -> str:
+        """
+        We apply this variant to the single MLPathNode in self.ml_path_it_goes_through.
+        self.ml_path_it_goes_through needs to have a single node compatible with this variant
+        """
+        ml_path_nodes_it_goes_through_has_a_single_distinct_node = self.ml_path_nodes_it_goes_through is not None and \
+                                                                   len(set(self.ml_path_nodes_it_goes_through)) == 1
+        if not ml_path_nodes_it_goes_through_has_a_single_distinct_node:
+            raise DenovoError(f"Cannot apply variant {self} as it does not go through a single distinct node\n"
+                              f"ML path nodes the variant goes through: {self.ml_path_nodes_it_goes_through}")
+
+        node = self.ml_path_nodes_it_goes_through[0]
         node_is_compatible_with_this_variant = \
             node.start_index_in_linear_path <= self.start_index_in_linear_path and \
             self.end_index_in_linear_path <= node.end_index_in_linear_path
         if not node_is_compatible_with_this_variant:
-            raise DenovoError(f"Node {node} is not compatible with variant {self} on sample {sample} and locus {locus}")
+            raise DenovoError(f"Node {node} is not compatible with variant {self}")
 
         start_index_inside_node_sequence = (
             self.start_index_in_linear_path - node.start_index_in_linear_path
@@ -77,13 +104,11 @@ class DenovoVariant:
         )
         return mutated_sequence
 
-    def _split_variant_at_boundary_alignment(self, ml_path_nodes_it_goes_through: List[MLPathNode],
-                                             ref_alignment: Deque[str], alt_alignment: Deque[str]
-                                             ) -> List["DenovoVariant"]:
+    def _split_variant_at_boundary_alignment(self, ref_alignment: Deque[str], alt_alignment: Deque[str]) -> List["DenovoVariant"]:
         split_variants = []
         current_index_in_linear_path = self.start_index_in_linear_path
-        ml_path_node_to_count = Counter(ml_path_nodes_it_goes_through)
-        deduplicated_ml_path_nodes_it_goes_through = remove_duplicated_consecutive_elems_from_list(ml_path_nodes_it_goes_through)
+        ml_path_node_to_count = Counter(self.ml_path_nodes_it_goes_through)
+        deduplicated_ml_path_nodes_it_goes_through = remove_duplicated_consecutive_elems_from_list(self.ml_path_nodes_it_goes_through)
         for ml_path_node_index, ml_path_node in enumerate(deduplicated_ml_path_nodes_it_goes_through):
             sub_ref = []
             sub_alt = []
@@ -113,31 +138,22 @@ class DenovoVariant:
                 split_variant = DenovoVariant(
                     current_start_in_linear_path, sub_ref_seq, sub_alt_seq
                 )
+                ml_path_nodes_the_split_variant_goes_through = [ml_path_node] * len(sub_ref_seq)
+                split_variant.set_ml_path_nodes_it_goes_through(ml_path_nodes_the_split_variant_goes_through)
                 split_variants.append(split_variant)
 
         return split_variants
 
-    def split_variant(
-        self, ml_path_nodes_it_goes_through: List[MLPathNode]
-    ) -> List["DenovoVariant"]:
+    def split_variant(self) -> List["DenovoVariant"]:
         """
-        Split this variant into a list of sub-variants WRT how it is distributed along the ML path
-        @param: ml_path_nodes_it_goes_through: a list of MLPathNode, where the i-th MLPathNode is the node the i-th base
-        of the variant goes through
-        @return: List of sub-variants
+        Split this variant into a list of sub-variants WRT how it is distributed along self.ml_path_nodes_it_goes_through
+        @return: List of sub-variants that goes through only a single node
         """
-        if self.is_strict_insertion_event():
-            ml_path_contains_only_the_insertion_point = len(ml_path_nodes_it_goes_through) == 1
-            valid_parameters = ml_path_contains_only_the_insertion_point
-        else:
-            each_base_is_covered_by_one_node = len(self.ref) == len(ml_path_nodes_it_goes_through)
-            valid_parameters = each_base_is_covered_by_one_node
-        assert valid_parameters, f"Invalid parameters for DenovoVariant.split_variant().\n" \
-                                 f"Debug info:\n" \
-                                 f"DenovoVariant: {self}\n" \
-                                 f"ml_path_nodes_it_goes_through: {ml_path_nodes_it_goes_through}"
+        ml_path_nodes_it_goes_through_is_valid = self.ml_path_nodes_it_goes_through is not None
+        assert ml_path_nodes_it_goes_through_is_valid, f"Error on DenovoVariant.split_variant(): " \
+                                                       f"self.ml_path_it_goes_through is None"
 
-        nb_of_distinct_ml_path_nodes = len(set(ml_path_nodes_it_goes_through))
+        nb_of_distinct_ml_path_nodes = len(set(self.ml_path_nodes_it_goes_through))
         variant_goes_through_only_one_leaf = nb_of_distinct_ml_path_nodes == 1
         if variant_goes_through_only_one_leaf:
             split_variants = [self]
@@ -147,9 +163,7 @@ class DenovoVariant:
         alignment = align(self.ref, self.alt)
         ref_alignment = deque(alignment[0])
         alt_alignment = deque(alignment[1])
-        split_variants = self._split_variant_at_boundary_alignment(
-            ml_path_nodes_it_goes_through, ref_alignment, alt_alignment
-        )
+        split_variants = self._split_variant_at_boundary_alignment(ref_alignment, alt_alignment)
         return split_variants
 
     def is_strict_insertion_event(self) -> bool:
@@ -232,16 +246,14 @@ class DenovoLocusInfo:
         update_data_list = []
         for variant in self.variants:
             ml_path_nodes = self._get_ml_path_nodes_spanning_variant(variant)
-            split_variants = variant.split_variant(ml_path_nodes)
-            deduplicated_ml_path_nodes = remove_duplicated_consecutive_elems_from_list(ml_path_nodes)
+            variant.set_ml_path_nodes_it_goes_through(ml_path_nodes)
+            split_variants = variant.split_variant()
 
-            for split_variant, ml_path_node in zip(split_variants, deduplicated_ml_path_nodes):
+            for split_variant in split_variants:
                 update_data = UpdateData(
-                    ml_path_node_key=ml_path_node.key,
+                    ml_path_node_key=split_variant.ml_path_nodes_it_goes_through[0].key,
                     ml_path=self.ml_path,
-                    new_node_sequence=split_variant.get_mutated_sequence(ml_path_node,
-                                                                         self.sample,
-                                                                         self.locus)
+                    new_node_sequence=split_variant.get_mutated_sequence()
                 )
                 update_data_list.append(update_data)
 
