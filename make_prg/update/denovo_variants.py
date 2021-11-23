@@ -14,13 +14,14 @@ class DenovoError(Exception):
 
 
 class DenovoVariant:
-    def __init__(self, start_index_in_linear_path: int, ref: str, alt: str):
+    def __init__(self, start_index_in_linear_path: int, ref: str, alt: str,
+                 ml_path_nodes_it_goes_through: Optional[List[MLPathNode]] = None):
         DenovoVariant._param_checking(start_index_in_linear_path, ref, alt)
         self.start_index_in_linear_path: int = start_index_in_linear_path
         self.end_index_in_linear_path: int = start_index_in_linear_path + len(ref)
         self.ref: str = ref
         self.alt: str = alt
-        self.ml_path_nodes_it_goes_through: Optional[List[MLPathNode]] = None
+        self.set_ml_path_nodes_it_goes_through(ml_path_nodes_it_goes_through)
 
     @staticmethod
     def _param_checking(start_index_in_linear_path: int, ref: str, alt: str):
@@ -41,30 +42,32 @@ class DenovoVariant:
             raise DenovoError(f"Found a non-ACGT seq ({seq}) in a denovo variant")
 
     def __eq__(self, other):
-        # Note: we explictly don't add self.ml_path_nodes_it_goes_through to this comparison
-        # Depending on the state, it might be None or not
         if isinstance(other, self.__class__):
-            return (self.start_index_in_linear_path, self.end_index_in_linear_path, self.ref, self.alt) == \
-                   (other.start_index_in_linear_path, other.end_index_in_linear_path, other.ref, other.alt)
+            return (self.start_index_in_linear_path, self.end_index_in_linear_path,
+                    self.ref, self.alt, self.ml_path_nodes_it_goes_through) == \
+                   (other.start_index_in_linear_path, other.end_index_in_linear_path,
+                    other.ref, other.alt, other.ml_path_nodes_it_goes_through)
         else:
             return False
 
-    def set_ml_path_nodes_it_goes_through(self, ml_path_nodes_it_goes_through: List[MLPathNode]):
+    def set_ml_path_nodes_it_goes_through(self, ml_path_nodes_it_goes_through: Optional[List[MLPathNode]]):
         """
         self.ml_path_nodes_it_goes_through: a list of MLPathNode, where the i-th MLPathNode is the node the i-th base
         of the variant goes through
         """
-        if self.is_strict_insertion_event():
-            ml_path_contains_only_the_insertion_point = len(ml_path_nodes_it_goes_through) == 1
-            valid_parameters = ml_path_contains_only_the_insertion_point
-        else:
-            each_base_is_covered_by_one_node = len(self.ref) == len(ml_path_nodes_it_goes_through)
-            valid_parameters = each_base_is_covered_by_one_node
-        assert valid_parameters, f"Invalid parameters for DenovoVariant.split_variant().\n" \
-                                 f"Debug info:\n" \
-                                 f"DenovoVariant: {self}\n" \
-                                 f"ml_path_nodes_it_goes_through: {ml_path_nodes_it_goes_through}"
-        self.ml_path_nodes_it_goes_through = ml_path_nodes_it_goes_through
+        if ml_path_nodes_it_goes_through is not None:
+            if self.is_strict_insertion_event():
+                ml_path_contains_only_the_insertion_point = len(ml_path_nodes_it_goes_through) == 1
+                valid_parameters = ml_path_contains_only_the_insertion_point
+            else:
+                each_base_is_covered_by_one_node = len(self.ref) == len(ml_path_nodes_it_goes_through)
+                valid_parameters = each_base_is_covered_by_one_node
+            assert valid_parameters, f"Invalid parameters for DenovoVariant.set_ml_path_nodes_it_goes_through().\n" \
+                                     f"Debug info:\n" \
+                                     f"DenovoVariant: {self}\n" \
+                                     f"ml_path_nodes_it_goes_through: {ml_path_nodes_it_goes_through}"
+
+        self.ml_path_nodes_it_goes_through: Optional[List[MLPathNode]] = ml_path_nodes_it_goes_through
 
     def get_mutated_sequence(self) -> str:
         """
@@ -73,16 +76,15 @@ class DenovoVariant:
         """
         ml_path_nodes_it_goes_through_has_a_single_distinct_node = self.ml_path_nodes_it_goes_through is not None and \
                                                                    len(set(self.ml_path_nodes_it_goes_through)) == 1
-        if not ml_path_nodes_it_goes_through_has_a_single_distinct_node:
-            raise DenovoError(f"Cannot apply variant {self} as it does not go through a single distinct node\n"
-                              f"ML path nodes the variant goes through: {self.ml_path_nodes_it_goes_through}")
+        assert ml_path_nodes_it_goes_through_has_a_single_distinct_node, \
+            f"Cannot apply variant {self} as it does not go through a single distinct node\n" \
+            f"ML path nodes the variant goes through: {self.ml_path_nodes_it_goes_through}"
 
         node = self.ml_path_nodes_it_goes_through[0]
         node_is_compatible_with_this_variant = \
             node.start_index_in_linear_path <= self.start_index_in_linear_path and \
             self.end_index_in_linear_path <= node.end_index_in_linear_path
-        if not node_is_compatible_with_this_variant:
-            raise DenovoError(f"Node {node} is not compatible with variant {self}")
+        assert node_is_compatible_with_this_variant,  f"Node {node} is not compatible with variant {self}"
 
         start_index_inside_node_sequence = (
             self.start_index_in_linear_path - node.start_index_in_linear_path
@@ -94,8 +96,7 @@ class DenovoVariant:
             start_index_inside_node_sequence:end_index_inside_node_sequence
         ]
         ref_is_consistent = self.ref == ref_wrt_indexes
-        if not ref_is_consistent:
-            raise DenovoError(f"Ref is not consistent for {self}. Node = {node}. ref_wrt_indexes = {ref_wrt_indexes}")
+        assert ref_is_consistent, f"Ref is not consistent for {self}. Node = {node}. ref_wrt_indexes = {ref_wrt_indexes}"
 
         mutated_sequence = (
             node.sequence[:start_index_inside_node_sequence]
@@ -151,7 +152,7 @@ class DenovoVariant:
         """
         ml_path_nodes_it_goes_through_is_valid = self.ml_path_nodes_it_goes_through is not None
         assert ml_path_nodes_it_goes_through_is_valid, f"Error on DenovoVariant.split_variant(): " \
-                                                       f"self.ml_path_it_goes_through is None"
+                                                       f"self.ml_path_nodes_it_goes_through is None"
 
         nb_of_distinct_ml_path_nodes = len(set(self.ml_path_nodes_it_goes_through))
         variant_goes_through_only_one_leaf = nb_of_distinct_ml_path_nodes == 1
