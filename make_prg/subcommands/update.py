@@ -1,4 +1,3 @@
-from typing import List
 import multiprocessing
 import os
 from pathlib import Path
@@ -78,16 +77,20 @@ def register_parser(subparsers):
     return subparser_update_prg
 
 
-def update(
-    locus_name: str,
-    update_data_list: List[UpdateData],
-    msa_aligner: MSAAligner,
-):
+class UpdateSharedData:
+    def __init__(self, denovo_variants_db, aligner):
+        self.denovo_variants_db = denovo_variants_db
+        self.aligner = aligner
+
+
+def update(locus_name: str):
     prg_builder_zip_db = PrgBuilderZipDatabase(options.update_DS)
     prg_builder_zip_db.load()
     prg_builder_for_locus = prg_builder_zip_db.get_PrgBuilder(locus_name)
-    prg_builder_for_locus.aligner = msa_aligner
 
+    global update_shared_data
+    prg_builder_for_locus.aligner = update_shared_data.aligner
+    update_data_list = update_shared_data.denovo_variants_db.locus_name_to_update_data.get(locus_name, [])
     nb_of_variants_sucessfully_updated = 0
     nb_of_variants_with_failed_update = 0
 
@@ -141,6 +144,7 @@ def update(
 def run(cl_options):
     global options
     options = cl_options
+    global update_shared_data
 
     if io_utils.output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
@@ -159,26 +163,16 @@ def run(cl_options):
         prg_builder_zip_db.load()
         logger.info(f"Reading {options.denovo_paths}...")
         denovo_variants_db = DenovoVariantsDB(options.denovo_paths)
+        update_shared_data = UpdateSharedData(denovo_variants_db, mafft_aligner)
 
         output_dir = Path(options.output_prefix).parent
         os.makedirs(output_dir, exist_ok=True)
 
         # update all PRGs with denovo sequences
         logger.info(f"Using {options.threads} threads to update PRGs...")
-        multithreaded_input = []
-        for locus_name in prg_builder_zip_db.get_loci_names():
-            # we do for all PRGs as those that don't have denovo variants will be generated also
-            update_data = denovo_variants_db.locus_name_to_update_data.get(locus_name, [])
-            multithreaded_input.append(
-                (
-                    locus_name,
-                    update_data,
-                    mafft_aligner,
-                )
-            )
-
+        multithreaded_input = prg_builder_zip_db.get_loci_names()
         with multiprocessing.Pool(options.threads) as pool:
-            pool.starmap(update, multithreaded_input, chunksize=1)
+            pool.map(update, multithreaded_input, chunksize=1)
         logger.success(f"All PRGs updated!")
 
         is_a_single_MSA = prg_builder_zip_db.get_number_of_loci() == 1
