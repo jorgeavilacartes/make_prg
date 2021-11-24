@@ -165,16 +165,13 @@ def run(cl_options):
         denovo_variants_db = DenovoVariantsDB(options.denovo_paths)
         update_shared_data = UpdateSharedData(denovo_variants_db, mafft_aligner)
 
-        import sys
-        sys.exit(0)
-
         output_dir = Path(options.output_prefix).parent
         os.makedirs(output_dir, exist_ok=True)
 
         # update all PRGs with denovo sequences
         logger.info(f"Using {options.threads} threads to update PRGs...")
         multithreaded_input = prg_builder_zip_db.get_loci_names()
-        with multiprocessing.Pool(options.threads) as pool:
+        with multiprocessing.Pool(options.threads, maxtasksperchild=1) as pool:
             pool.map(update, multithreaded_input, chunksize=1)
         logger.success(f"All PRGs updated!")
 

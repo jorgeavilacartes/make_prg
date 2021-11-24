@@ -157,7 +157,7 @@ def run(cl_options):
     options.temp_dir = temp_dir
 
     logger.info(f"Using {options.threads} threads to generate PRGs...")
-    with multiprocessing.Pool(options.threads) as pool:
+    with multiprocessing.Pool(options.threads, maxtasksperchild=1) as pool:
         pool.map(process_MSA, input_files, chunksize=1)
     logger.success(f"All PRGs generated!")
 
