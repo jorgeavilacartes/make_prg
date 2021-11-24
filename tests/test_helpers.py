@@ -47,7 +47,8 @@ def remove_dir_if_exists(directory):
 
 
 # Adapted from https://stackoverflow.com/a/6681395/5264075
-def are_dir_trees_equal(dir1, dir2, compare_zips = True):
+# TODO: change compare_zips to True, but then need to not save PRGBuilder.aligner
+def are_dir_trees_equal(dir1, dir2, compare_zips = False):
     """
     Compare two directories recursively. Files in each directory are
     assumed to be equal if their names and contents are equal.

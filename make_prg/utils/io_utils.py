@@ -3,6 +3,8 @@ import gzip
 import fileinput
 import multiprocessing
 import shutil
+import uuid
+
 from Bio import AlignIO
 import os
 from loguru import logger
@@ -65,6 +67,12 @@ def output_files_already_exist(output_prefix: str):
         or Path(output_prefix + ".prg.gfa").exists()
         or Path(output_prefix + ".prg.gfa.zip").exists()
     )
+
+
+def create_temp_dir(output_prefix: str) -> Path:
+    temp_dir = Path(output_prefix + "_" + str(uuid.uuid4()))
+    temp_dir.mkdir(parents=True, exist_ok=False)
+    return temp_dir
 
 
 def get_temp_dir_for_multiprocess(root_temp_dir: Path):
@@ -173,11 +181,11 @@ from make_prg import prg_builder
 
 
 # Note: not unit tested
-def create_final_files(output_prefix: str, is_a_single_MSA: bool, output_stats: bool = False):
+def create_final_files(temp_dir: Path, output_prefix: str, is_a_single_MSA: bool, output_stats: bool = False):
     logger.info("Concatenating files from several threads into single final files...")
 
     logger.info("Creating FASTA file of PRGs...")
-    locus_to_set_of_output_files = SetOutputFiles.get_locus_to_set_of_output_files(Path(output_prefix) / "mp_temp")
+    locus_to_set_of_output_files = SetOutputFiles.get_locus_to_set_of_output_files(temp_dir / "mp_temp")
 
     prg_files = [output_files.PRG for output_files in locus_to_set_of_output_files.values()]
     concatenate_text_files(prg_files, output_prefix + ".prg.fa")
@@ -225,4 +233,4 @@ def create_final_files(output_prefix: str, is_a_single_MSA: bool, output_stats: 
     # cleanup
     for output_files in locus_to_set_of_output_files.values():
         output_files.delete_files()
-    remove_empty_folders(output_prefix)
+    remove_empty_folders(str(temp_dir))

@@ -106,7 +106,7 @@ def process_MSA(msa_filepath: Path):
     msa_name = msa_filepath.name
     locus_name = msa_filepath.with_suffix("").name
 
-    temp_dir = io_utils.get_temp_dir_for_multiprocess(Path(options.output_prefix))
+    temp_dir = io_utils.get_temp_dir_for_multiprocess(options.temp_dir)
     prefix = str(temp_dir / msa_name)
 
     try:
@@ -153,10 +153,13 @@ def run(cl_options):
     if io_utils.output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
+    temp_dir = io_utils.create_temp_dir(options.output_prefix)
+    options.temp_dir = temp_dir
+
     logger.info(f"Using {options.threads} threads to generate PRGs...")
     with multiprocessing.Pool(options.threads) as pool:
         pool.map(process_MSA, input_files, chunksize=1)
     logger.success(f"All PRGs generated!")
 
-    io_utils.create_final_files(options.output_prefix, is_a_single_MSA=is_a_single_file)
+    io_utils.create_final_files(temp_dir, options.output_prefix, is_a_single_MSA=is_a_single_file)
     logger.success("All done!")

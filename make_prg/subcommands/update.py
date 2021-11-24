@@ -80,13 +80,10 @@ def register_parser(subparsers):
 
 def update(
     locus_name: str,
-    update_DS_filepath: Path,
     update_data_list: List[UpdateData],
     msa_aligner: MSAAligner,
-    output_prefix: str,
-    output_graphs: bool
 ):
-    prg_builder_zip_db = PrgBuilderZipDatabase(update_DS_filepath)
+    prg_builder_zip_db = PrgBuilderZipDatabase(options.update_DS)
     prg_builder_zip_db.load()
     prg_builder_for_locus = prg_builder_zip_db.get_PrgBuilder(locus_name)
     prg_builder_for_locus.aligner = msa_aligner
@@ -124,7 +121,7 @@ def update(
         logger.debug(f"{locus_name} has no new variants, no update needed")
 
     # regenerate PRG
-    temp_dir = io_utils.get_temp_dir_for_multiprocess(Path(output_prefix))
+    temp_dir = io_utils.get_temp_dir_for_multiprocess(options.temp_dir)
     locus_prefix = temp_dir / locus_name
 
     logger.info(f"Writing output files of locus {locus_name}")
@@ -137,17 +134,22 @@ def update(
             f"{locus_name} {nb_of_variants_sucessfully_updated} {nb_of_variants_with_failed_update}",
             file=stats_filehandler,
         )
-    if output_graphs:
-        prg_builder_for_locus.output_debug_graphs(Path(output_prefix + "_debug_graphs"))
+    if options.output_graphs:
+        prg_builder_for_locus.output_debug_graphs(Path(options.output_prefix + "_debug_graphs"))
 
 
-def run(options):
+def run(cl_options):
+    global options
+    options = cl_options
+
     if io_utils.output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
     # read input data
     logger.info("Checking Multiple Sequence Aligner...")
-    msa_temp_path = Path(options.output_prefix) / "msa_temp"
+    temp_dir = io_utils.create_temp_dir(options.output_prefix)
+    options.temp_dir = temp_dir
+    msa_temp_path = temp_dir / "msa_temp"
     mafft_aligner = MAFFT(executable=options.mafft, tmpdir=msa_temp_path)
 
     prg_builder_zip_db = None
@@ -170,11 +172,8 @@ def run(options):
             multithreaded_input.append(
                 (
                     locus_name,
-                    options.update_DS,
                     update_data,
                     mafft_aligner,
-                    options.output_prefix,
-                    options.output_graphs
                 )
             )
 
@@ -183,7 +182,7 @@ def run(options):
         logger.success(f"All PRGs updated!")
 
         is_a_single_MSA = prg_builder_zip_db.get_number_of_loci() == 1
-        io_utils.create_final_files(options.output_prefix, is_a_single_MSA=is_a_single_MSA, output_stats=True)
+        io_utils.create_final_files(temp_dir, options.output_prefix, is_a_single_MSA=is_a_single_MSA, output_stats=True)
         logger.success("All done!")
     finally:
         if prg_builder_zip_db is not None:
