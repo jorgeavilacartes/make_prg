@@ -41,11 +41,8 @@ class Test_get_temp_dir_for_multiprocess(TestCase):
     def test___get_temp_dir_for_multiprocess(self, makedirs_mock):
         root_temp_dir = Path("root_temp_dir")
 
-        current_process_mock = Mock()
-        current_process_mock.name = "mocked_process"
-        with patch("multiprocessing.current_process", return_value=current_process_mock):
-            expected = root_temp_dir / "mp_temp" / "mocked_process"
-            actual = get_temp_dir_for_multiprocess(root_temp_dir)
+        expected = root_temp_dir / "mp_temp"
+        actual = get_temp_dir_for_multiprocess(root_temp_dir)
 
         self.assertEqual(expected, actual)
         makedirs_mock.assert_called_once_with(expected, exist_ok=True)
