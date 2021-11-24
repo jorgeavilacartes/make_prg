@@ -165,6 +165,9 @@ def run(cl_options):
         denovo_variants_db = DenovoVariantsDB(options.denovo_paths)
         update_shared_data = UpdateSharedData(denovo_variants_db, mafft_aligner)
 
+        import sys
+        sys.exit(0)
+
         output_dir = Path(options.output_prefix).parent
         os.makedirs(output_dir, exist_ok=True)
 
