@@ -66,6 +66,8 @@ class PrgBuilder(object):
     def get_node_given_interval(self, interval: Tuple[int, int]) -> SingleClusterNode:
         # TODO: move this back to assert once is solved
         # TODO: should it really be an assert?
+        # TODO: in the pandora paper data, out of 486k update operations, 12 failed with this error
+        # TODO: so, there is an edge-case bug here to be solved in next minor versions
         interval_is_indexed = interval in self.prg_index
         if not interval_is_indexed:
             raise LeafNotFoundException(

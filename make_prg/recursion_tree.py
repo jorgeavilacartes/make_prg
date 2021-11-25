@@ -157,6 +157,8 @@ class SingleClusterNode(RecursiveTreeNode):
         alignment_has_ambiguity = num_unique_nongapped_seqs < num_unique_gapped_seqs
         if alignment_has_ambiguity:
             # TODO: fix alignment by deduplicating nongapped seqs and realigning them
+            # TODO: the annoying thing is that this deduplicated nongapped alignment will differ from the input alignment
+            # TODO: but I think it can be an ok solution
             return True
 
         return False
