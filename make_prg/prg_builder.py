@@ -42,6 +42,16 @@ class PrgBuilder(object):
             prg_builder=self
         )
 
+    def __getstate__(self):
+        """
+        This method is defined so that we don't pickle self.aligner.
+        If we pickle self.aligner, then two PRGs built even with the same aligner, but different temp paths won't be
+        comparable, and we don't actually care about the aligner/temp path that was used, if the rest is the same.
+        """
+        state = self.__dict__.copy()
+        state['aligner'] = None  # force aligner to None
+        return state
+
     def build_prg(self) -> str:
         self.site_num = 5
         prg_as_list = []

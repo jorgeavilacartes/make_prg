@@ -170,6 +170,17 @@ class TestPrgBuilder(TestCase):
             RecursiveTreeDrawer_mock.assert_called_once_with(self.prg_builder.root)
             output_graph_mock.assert_called_with(debug_graphs_dir / "locus.recursion_tree.png")
 
+    @patch("make_prg.prg_builder.load_alignment_file", return_value="MSA")
+    @patch("make_prg.prg_builder.SingleClusterNode", return_value="SingleClusterNode")
+    def test___get_state___aligner_is_not_pickled(self, *uninteresting_mocks):
+        self.setup_prg_builder()
+
+        expected = self.prg_builder.__dict__
+        expected['aligner'] = None
+        actual = self.prg_builder.__getstate__()
+
+        self.assertEqual(expected, actual)
+
 
 class TestPrgBuilderZipDatabase(TestCase):
     def setUp(self) -> None:
@@ -235,3 +246,4 @@ class TestPrgBuilderZipDatabase(TestCase):
 
         zipfile_read_mock.assert_called_once_with("locus")
         deserialize_from_bytes_mock.assert_called_once_with("read_mock")
+
