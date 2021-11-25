@@ -102,6 +102,7 @@ def get_all_input_files(input_path: str) -> List[Path]:
 
 
 def process_MSA(msa_filepath: Path):
+    global options
     logger.info(f"Generating PRG for {msa_filepath}...")
     msa_name = msa_filepath.name
     locus_name = msa_filepath.with_suffix("").name

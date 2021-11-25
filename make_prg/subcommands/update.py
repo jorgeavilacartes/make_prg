@@ -3,9 +3,9 @@ import os
 from pathlib import Path
 from loguru import logger
 from make_prg.utils import io_utils, gfa
-from make_prg.update.denovo_variants import DenovoVariantsDB, UpdateData
+from make_prg.update.denovo_variants import DenovoVariantsDB
 from make_prg.prg_builder import PrgBuilderZipDatabase, LeafNotFoundException
-from make_prg.utils.msa_aligner import MAFFT, MSAAligner
+from make_prg.utils.msa_aligner import MAFFT
 
 
 def register_parser(subparsers):
@@ -84,6 +84,7 @@ class UpdateSharedData:
 
 
 def update(locus_name: str):
+    global options
     prg_builder_zip_db = PrgBuilderZipDatabase(options.update_DS)
     prg_builder_zip_db.load()
     prg_builder_for_locus = prg_builder_zip_db.get_PrgBuilder(locus_name)
