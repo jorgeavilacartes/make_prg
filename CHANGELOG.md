@@ -29,7 +29,7 @@ internal data, allowing the serialization and deserialization of the recursion t
 be done avoiding any recomputation by firstly saving the state of the recursion tree to disk, and then loading this
 recursion tree, adding denovo sequences to some specific nodes, and triggering recomputation of the modified nodes.
 Any preorder traversal of the recursion tree yields the same order of recursive calls of the previous algorithm,
-thus allowing us to translate the algorithms in the previous version as preorder travels with custom visit
+thus allowing us to translate the algorithms in the previous version as preorder traversals with custom visit
 operations.
 
 ### Fixed
@@ -92,8 +92,9 @@ operations.
   source project CHANGELOG.
 
 
-[Unreleased]: https://github.com/iqbal-lab-org/make_prg/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/iqbal-lab-org/make_prg/compare/v0.1.0...HEAD
 
+[1.0.0]: https://github.com/iqbal-lab-org/make_prg/releases/tag/0.1.0
 [0.2.0]: https://github.com/iqbal-lab-org/make_prg/releases/tag/0.2.0
 [0.1.1]: https://github.com/iqbal-lab-org/make_prg/releases/tag/0.1.1
 [0.1.0]: https://github.com/iqbal-lab-org/make_prg/releases/tag/0.1.0
