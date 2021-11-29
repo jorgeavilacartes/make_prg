@@ -2,16 +2,22 @@
 set -eu
 
 # configs
-make_prg_URL="https://github.com/leoisl/make_prg/releases/download/v0.3.0/make_prg_0.3.0"
-make_prg_executable="./make_prg_0.3.0"
+version="1.0.0"
+make_prg_URL="docker://leandroishilima/make_prg:${version}"
 
-wget "${make_prg_URL}" -O "${make_prg_executable}"
-chmod +x "${make_prg_executable}"
+if [ ! -f "make_prg.sif" ]; then
+  echo "make_prg image not found, pulling it..."
+  singularity pull --name make_prg.sif "${make_prg_URL}"
+fi
 
 echo "Building PRGs from MSAs..."
-"${make_prg_executable}" from_msa --input msas/ --output_prefix msas_output/sample
+from_msa_command_line="singularity exec make_prg.sif make_prg from_msa --input msas/ --output_prefix msas_output/sample"
+echo "Running ${from_msa_command_line}"
+${from_msa_command_line}
 
 echo "Updating PRGs with denovo paths..."
-"${make_prg_executable}" update --update_DS msas_output/sample.update_DS --denovo_paths denovo_paths/denovo_paths.txt --output_prefix msas_updated/updated_sample
+update_command_line="singularity exec make_prg.sif make_prg update --update_DS msas_output/sample.update_DS.zip --denovo_paths denovo_paths/denovo_paths.txt --output_prefix msas_updated/updated_sample"
+echo "Running ${update_command_line}"
+${update_command_line}
 
 echo "All done!"
