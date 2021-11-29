@@ -16,7 +16,7 @@ denovo_paths/denovo_paths.txt : contains some denovo paths on these 2 genes. Thi
 
 * `singularity 3.0+`;
 
-** Note: There is no need to have `make_prg` installed. We will run it through `singularity`; **
+**Note: There is no need to have `make_prg` installed. We will run it through `singularity`;**
 
 ## Running
 
