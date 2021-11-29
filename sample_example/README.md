@@ -8,14 +8,15 @@ We run:
 ## Input data description
 
 ```
-msas/ : contains the MSAs of 4 genes we are using as toy example here;
-denovo_paths/denovo_paths.txt : contains some denovo paths on 3 of these 4 genes. This file is produced by pandora;
+msas/ : contains the MSAs of 2 genes we are using as toy example here;
+denovo_paths/denovo_paths.txt : contains some denovo paths on these 2 genes. This file is produced by pandora;
 ```
 
 ## Dependencies
 
 * `singularity 3.0+`;
-** Note: There is no need to have `make_prg` installed. We will run it through `singularity`;
+
+** Note: There is no need to have `make_prg` installed. We will run it through `singularity`; **
 
 ## Running
 
@@ -35,6 +36,8 @@ denovo_paths/denovo_paths.txt : contains some denovo paths on 3 of these 4 genes
 
 The output files from `make_prg update` are identical to `make_prg from_msa`, except that the PRGs are updated with
 respect to the variants described in `denovo_paths/denovo_paths.txt`
+
+### Checking the denovo variants added to the graph
 
 Diffing `msas_output/sample.prg.fa` and `msas_updated/updated_sample.prg.fa`, we can see that the updated PRGs have more sites/alleles:
 
