@@ -10,7 +10,6 @@ from typing import Dict, Optional, List, Tuple
 from collections import defaultdict
 from pathlib import Path
 from zipfile import ZipFile
-import datetime
 
 
 def load_alignment_file(msa_file: [str, Path], alignment_format: str) -> MSA:
@@ -84,12 +83,6 @@ def zip_set_of_files(zip_filepath: Path, filename_to_filepath: Dict[str, Path]):
     assert is_a_zip_file, "zip_set_of_files() was not given a .zip filepath"
     with ZipFile(zip_filepath, "w") as zip_file:
         for filename, filepath in filename_to_filepath.items():
-            # we change the original file access and modified timestamp so that zip files are comparable even if created
-            # in different dates
-            # Note: this is a really bad point of Zip file format, you necessarily need metadata...
-            # TODO: switch away from Zip?
-            random_date = datetime.datetime(2000, 1, 1)
-            os.utime(filepath, (random_date.timestamp(), random_date.timestamp()))
             zip_file.write(filepath, filename)
 
 

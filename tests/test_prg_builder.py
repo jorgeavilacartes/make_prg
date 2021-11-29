@@ -2,7 +2,7 @@ from unittest import TestCase
 from unittest.mock import patch, Mock, mock_open
 from make_prg.prg_builder import PrgBuilder, LeafNotFoundException, PrgBuilderZipDatabase
 from pathlib import Path
-from tests.test_helpers import sample_prg
+from tests.test_helpers import sample_prg, are_zip_files_equal
 import filecmp
 from zipfile import ZipFile
 
@@ -195,7 +195,7 @@ class TestPrgBuilderZipDatabase(TestCase):
             PrgBuilderZipDatabase(Path("file.txt"))
 
     def test___constructor(self):
-        self.assertEqual(self.zip_filepath, self.prg_builder_zip_db._zip_filepath)
+        self.assertTrue(are_zip_files_equal(self.zip_filepath, self.prg_builder_zip_db._zip_filepath))
 
     @patch("make_prg.prg_builder.zip_set_of_files")
     def test___save(self, zip_set_of_files_mock):

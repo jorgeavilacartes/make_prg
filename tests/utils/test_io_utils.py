@@ -2,7 +2,7 @@ from unittest import TestCase
 from unittest.mock import patch, Mock
 from make_prg.utils.io_utils import *
 from pathlib import Path
-from tests.test_helpers import make_alignment, equal_msas
+from tests.test_helpers import make_alignment, equal_msas, are_zip_files_equal
 import filecmp
 
 workdir = Path("tests/data/utils/io_utils/")
@@ -60,5 +60,5 @@ class Test_zip_set_of_files(TestCase):
             "file3": workdir / f"concatenate_text_files/file3.txt"
         })
 
-        self.assertTrue(filecmp.cmp(workdir / "zip_set_of_files/files.zip", workdir / "zip_set_of_files/files.truth.zip"))
-
+        self.assertTrue(are_zip_files_equal(workdir / "zip_set_of_files/files.zip",
+                                            workdir / "zip_set_of_files/files.truth.zip"))
