@@ -106,23 +106,22 @@ class SequenceExpander:
             assert sequence_is_composed_of_ACGT_only, f"Sequence ({sequence}) should be composed only of ACTG only."
 
     @classmethod
-    def get_expanded_sequences(cls, alignment: MSA) -> Sequences:
+    def get_expanded_sequences(cls, sequences: List[str]) -> Sequences:
         """
-        Expand sequences in the given alignment, following the translation table in SequenceExpander.iupac.
+        Expand sequences in the given list of sequences, following the translation table in SequenceExpander.iupac.
         It does the following steps:
             1. Check that we don't have disallowed bases;
-            2. Remove gaps (-);
-            3. Remove sequences with N;
-            4. Duplicate sequences containing RYKMSW, replacing with AGCT alternatives;
+            2. Remove sequences with N;
+            3. Duplicate sequences containing RYKMSW, replacing with AGCT alternatives;
         Note 1: The sequences are deliberately returned in the order they are received.
         Note 2: Returned sequences are composed of ACGT only
         """
-        gapless_seqs = list(map(ungap, get_alignment_seqs(alignment)))
-        cls.check_if_there_is_sequence_with_disallowed_bases(gapless_seqs)
+
+        cls.check_if_there_is_sequence_with_disallowed_bases(sequences)
 
         expanded_seqs = []
         expanded_set = set()
-        deduplicated_gapless_seqs = remove_duplicates(gapless_seqs)
+        deduplicated_gapless_seqs = remove_duplicates(sequences)
         for seq in deduplicated_gapless_seqs:
             if "N" in seq:
                 continue
@@ -138,12 +137,16 @@ class SequenceExpander:
         if all_sequences_contained_N:
             raise SequenceCurationError(
                 "All sequences in this slice contained N. Redo sequence curation.\n"
-                f"Alignment:\n"
-                f"{format(alignment, 'fasta')}"
+                f"Sequences: {sequences}"
             )
 
         cls.check_all_sequences_are_composed_of_ACGT(expanded_seqs)
         return expanded_seqs
+
+    @classmethod
+    def get_expanded_sequences_from_MSA(cls, alignment: MSA) -> Sequences:
+        gapless_seqs = list(map(ungap, get_alignment_seqs(alignment)))
+        return cls.get_expanded_sequences(gapless_seqs)
 
 
 def align(seq1: str, seq2: str,

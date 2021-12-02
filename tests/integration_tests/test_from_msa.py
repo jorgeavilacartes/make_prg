@@ -131,6 +131,13 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
         self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/nested_snps_seq_backgrounds",
                                             data_dir / "output/nested_snps_seq_backgrounds"))
 
+    def test___nested_snp_backgrounds_more_seqs(self):
+        options = self.prepare_options("nested_snps_seq_backgrounds_more_seqs")
+        options.min_match_length = 3
+        from_msa.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/nested_snps_seq_backgrounds_more_seqs",
+                                            data_dir / "output/nested_snps_seq_backgrounds_more_seqs"))
+
     def test___nested_snps_under_del(self):
         options = self.prepare_options("nested_snps_deletion")
         options.min_match_length = 1

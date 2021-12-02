@@ -211,23 +211,23 @@ class TestEmptySeq(TestCase):
 
 
 class TestSequenceExpander(TestCase):
-    def test___get_expanded_sequences___ambiguous_bases_one_seq(self):
+    def test___get_expanded_sequences_from_MSA___ambiguous_bases_one_seq(self):
         msa = make_alignment(["RWAAT"])
 
         expected = {"GAAAT", "AAAAT", "GTAAT", "ATAAT"}
-        actual = SequenceExpander.get_expanded_sequences(msa)
+        actual = SequenceExpander.get_expanded_sequences_from_MSA(msa)
 
         self.assertEqual(expected, set(actual))
 
-    def test___get_expanded_sequences___ambiguous_bases_one_seq_with_repeated_base(self):
+    def test___get_expanded_sequences_from_MSA___ambiguous_bases_one_seq_with_repeated_base(self):
         msa = make_alignment(["RRAAT"])
 
         expected = {"GAAAT", "AAAAT", "GGAAT", "AGAAT"}
-        actual = SequenceExpander.get_expanded_sequences(msa)
+        actual = SequenceExpander.get_expanded_sequences_from_MSA(msa)
 
         self.assertEqual(expected, set(actual))
 
-    def test___get_expanded_sequences___ambiguous_bases_several_seqs_with_gaps___all_wildcards(self):
+    def test___get_expanded_sequences_from_MSA___ambiguous_bases_several_seqs_with_gaps___all_wildcards(self):
         msa = make_alignment([
             "--RYAA",
             "KMTT--",
@@ -246,11 +246,11 @@ class TestSequenceExpander(TestCase):
             "CGAG", "CGTG", "CCAG", "CCTG",
             "AAAA"
             }
-        actual = SequenceExpander.get_expanded_sequences(msa)
+        actual = SequenceExpander.get_expanded_sequences_from_MSA(msa)
 
         self.assertEqual(expected, set(actual))
 
-    def test___get_expanded_sequences___ambiguous_bases_several_seqs_with_gaps_and_Ns___all_wildcards(self):
+    def test___get_expanded_sequences_from_MSA___ambiguous_bases_several_seqs_with_gaps_and_Ns___all_wildcards(self):
         msa = make_alignment([
             "-NRYAA",
             "KMTT--",
@@ -261,11 +261,11 @@ class TestSequenceExpander(TestCase):
         expected = {
             "GATT", "GCTT", "TATT", "TCTT", "AAAA"
             }
-        actual = SequenceExpander.get_expanded_sequences(msa)
+        actual = SequenceExpander.get_expanded_sequences_from_MSA(msa)
 
         self.assertEqual(expected, set(actual))
 
-    def test___get_expanded_sequences___ambiguous_bases_all_seqs_with_Ns___raises_SequenceCurationError(self):
+    def test___get_expanded_sequences_from_MSA___ambiguous_bases_all_seqs_with_Ns___raises_SequenceCurationError(self):
         msa = make_alignment([
             "-NRYAA",
             "KMNT--",
@@ -274,21 +274,21 @@ class TestSequenceExpander(TestCase):
         ])
 
         with self.assertRaises(SequenceCurationError) as error:
-            SequenceExpander.get_expanded_sequences(msa)
+            SequenceExpander.get_expanded_sequences_from_MSA(msa)
 
 
-    def test___get_expanded_sequences___first_sequence_in_is_first_sequence_out(self):
+    def test___get_expanded_sequences_from_MSA___first_sequence_in_is_first_sequence_out(self):
         msa = make_alignment(["TTTT", "AAAA", "CC-C"])
 
         expected = ["TTTT", "AAAA", "CCC"]
-        actual = SequenceExpander.get_expanded_sequences(msa)
+        actual = SequenceExpander.get_expanded_sequences_from_MSA(msa)
 
         self.assertEqual(expected, actual)
 
-    def test___get_expanded_sequences___sequence_with_disallowed_char(self):
+    def test___get_expanded_sequences_from_MSA___sequence_with_disallowed_char(self):
         msa = make_alignment(["TTTTN", "AAAAN", "CC-C-", "GGGGN", "AAAAB"])
         with self.assertRaises(SequenceCurationError):
-            SequenceExpander.get_expanded_sequences(msa)
+            SequenceExpander.get_expanded_sequences_from_MSA(msa)
 
 
 class TestAlign(TestCase):

@@ -50,6 +50,9 @@ class RecursiveTreeNode(ABC):
     def is_leaf(self) -> bool:
         return len(self.children) == 0
 
+    def is_root(self) -> bool:
+        return self.parent is None
+
     def log_that_node_was_created(self):
         logger.trace("Created node:\n" + str(self))
 
@@ -109,12 +112,12 @@ class MultiClusterNode(RecursiveTreeNode):
     #####################################################################################################
     #  clustering methods
     def _get_subalignments_by_clustering(self) -> List[MSA]:
-        clustered_ids = kmeans_cluster_seqs(
+        clustering_result = kmeans_cluster_seqs(
             self.alignment,
             self.prg_builder.min_match_length
         )
         list_sub_alignments = [
-            self._get_sub_alignment_by_list_id(clustered_id) for clustered_id in clustered_ids
+            self._get_sub_alignment_by_list_id(clustered_id) for clustered_id in clustering_result.clustered_ids
         ]
         return list_sub_alignments
 
@@ -142,6 +145,17 @@ class SingleClusterNode(RecursiveTreeNode):
             self.non_match_intervals,
             self.all_intervals,
         ) = interval_partitioner.get_intervals()
+
+        # TODO: this could be computationally optimised (time performance) by receiving the clustering result by
+        # TODO: parameter in the constructor, and not recomputing it here. But I think we lose code readability,
+        # TODO: maintenability and introduce an annoying dependence... But something to think about if we want to push
+        # TODO: performance
+        no_clustering_was_previously_done_for_this_alignment = self.is_root()
+        if no_clustering_was_previously_done_for_this_alignment:
+            self.clustering_result = None
+        else:
+            self.clustering_result = kmeans_cluster_seqs(self.alignment, self.prg_builder.min_match_length)
+
         self.new_sequences: Set[str] = set()
         self.indexed_PRG_intervals: Set[Tuple[int, int]] = set()
 
@@ -181,6 +195,10 @@ class SingleClusterNode(RecursiveTreeNode):
         if small_variant_site:
             return True
 
+        # TODO: this could be computationally optimised (time performance) by receiving this bool variable by
+        # TODO: parameter in the constructor, and not recomputing it here. But I think we lose code readability,
+        # TODO: maintenability and introduce an annoying dependence... But something to think about if we want to push
+        # TODO: performance
         alignment_has_issues = self._alignment_has_issues(self.alignment)
         if alignment_has_issues:
             return True
@@ -196,8 +214,8 @@ class SingleClusterNode(RecursiveTreeNode):
         if alignment_has_issues:
             return True
 
-        clustered_ids = kmeans_cluster_seqs(alignment, self.prg_builder.min_match_length)
-        single_cluster_found = len(clustered_ids) == 1
+        clustering_result = kmeans_cluster_seqs(alignment, self.prg_builder.min_match_length)
+        single_cluster_found = clustering_result.no_clustering
         if single_cluster_found:
             return True
 
@@ -228,23 +246,30 @@ class SingleClusterNode(RecursiveTreeNode):
         return children
 
     def _get_prg(self, prg_as_list: List[str], delim_char: str = " "):
-        for interval in self.all_intervals:
-            sub_alignment = self.alignment[:, interval.start:interval.stop + 1]
-            seqs = SequenceExpander.get_expanded_sequences(sub_alignment)
+        sequences_of_each_interval = []
+        sequences_are_already_precomputed = self.clustering_result is not None and self.clustering_result.no_clustering
+        if sequences_are_already_precomputed:
+            sequences_of_each_interval.append(self.clustering_result.sequences)
+        else:
+            for interval in self.all_intervals:
+                sub_alignment = self.alignment[:, interval.start:interval.stop + 1]
+                seqs = SequenceExpander.get_expanded_sequences_from_MSA(sub_alignment)
+                sequences_of_each_interval.append(seqs)
 
-            single_seq = len(seqs) == 1
+        for sequences_of_this_interval in sequences_of_each_interval:
+            single_seq = len(sequences_of_this_interval) == 1
             if single_seq:
                 start_index = len(prg_as_list)
-                prg_as_list.extend(seqs[0])
+                prg_as_list.extend(sequences_of_this_interval[0])
                 end_index = len(prg_as_list)
                 self.prg_builder.update_PRG_index(start_index, end_index, node=self)
             else:
                 # Add the variant seqs to the prg
                 site_num = self.prg_builder.get_next_site_num()
                 prg_as_list.extend(f"{delim_char}{site_num}{delim_char}")
-                for seq_index, seq in enumerate(seqs):
+                for seq_index, seq in enumerate(sequences_of_this_interval):
                     site_num_for_this_seq = (
-                        (site_num + 1) if (seq_index < len(seqs) - 1) else site_num
+                        (site_num + 1) if (seq_index < len(sequences_of_this_interval) - 1) else site_num
                     )
                     start_index = len(prg_as_list)
                     prg_as_list.extend(seq)

@@ -8,6 +8,7 @@ from pathlib import Path
 from make_prg.from_msa.interval_partition import IntervalType, Interval
 from make_prg.utils.seq_utils import SequenceExpander
 from make_prg.update.denovo_variants import UpdateData, MLPathError
+from make_prg.from_msa.cluster_sequences import ClusteringResult
 
 
 @patch.object(PrgBuilder, PrgBuilder.get_next_node_id.__name__, return_value=0)
@@ -15,12 +16,15 @@ from make_prg.update.denovo_variants import UpdateData, MLPathError
 @patch("make_prg.prg_builder.load_alignment_file")
 @patch.object(RecursiveTreeNode, RecursiveTreeNode.log_that_node_was_created.__name__)
 class TestMultiClusterNode(TestCase):
-    # Note: can't apply patches to setUp(), so creating this method that is called in every test
-    def setup(self) -> None:
+    def partial_setup(self) -> None:
         self.alignment = make_alignment(
             ["AAAT", "C--C", "AATT", "GNGG"], ["s1", "s2", "s3", "s4"]
         )
         self.prg_builder = PrgBuilder("locus", Path("msa"), "fasta", 5, 7)
+
+    # Note: can't apply patches to setUp(), so creating this method that is called in every test
+    def setup(self) -> None:
+        self.partial_setup()
         self.multi_cluster_node = MultiClusterNode(1, self.alignment, None, self.prg_builder, False)
 
     @patch.object(MultiClusterNode, MultiClusterNode._get_children.__name__, return_value=["child_1", "child_2"])
@@ -76,7 +80,7 @@ class TestMultiClusterNode(TestCase):
 
     @patch.object(PrgBuilder, PrgBuilder.get_next_site_num.__name__, return_value=32)
     def test___preorder_traversal_to_build_prg___multiple_children(self, *mocks):
-        self.setup()
+        self.partial_setup()
         node = MultiClusterNode(1, self.alignment, None, self.prg_builder, False)
 
         # get the original method
@@ -98,7 +102,8 @@ class TestMultiClusterNode(TestCase):
 
 
 
-    @patch("make_prg.recursion_tree.kmeans_cluster_seqs", return_value=[["s5", "s0", "s1", "s6"], ["s3"], ["s2", "s4"]])
+    @patch("make_prg.recursion_tree.kmeans_cluster_seqs", return_value=ClusteringResult(
+        [["s5", "s0", "s1", "s6"], ["s3"], ["s2", "s4"]]))
     def test___get_subalignments_by_clustering(self, *uninteresting_mocks):
         alignment = make_alignment(
             ["AAAT", "C--C", "AATT", "GNGG", "CCCC", "TTTT", "AAAA"], ["s0", "s1", "s2", "s3", "s4", "s5", "s6"]
@@ -121,12 +126,14 @@ class TestMultiClusterNode(TestCase):
         for i in range(3):
             self.assertTrue(equal_msas(expected[i], actual[i]))
 
+    @patch.object(MultiClusterNode, MultiClusterNode._get_children.__name__, return_value=["child_1", "child_2"])
     def test___get_sub_alignment_by_list_id___GivenOrderedIds_SubalignmentInSequenceOrder(self, *uninteresting_mocks):
         self.setup()
         expected = MSA([self.alignment[0], self.alignment[2]])
         actual = self.multi_cluster_node._get_sub_alignment_by_list_id(["s1", "s3"])
         self.assertTrue(equal_msas(expected, actual))
 
+    @patch.object(MultiClusterNode, MultiClusterNode._get_children.__name__, return_value=["child_1", "child_2"])
     def test___get_sub_alignment_by_list_id___GivenUnorderedIds_SubalignmentStillInSequenceOrder(self, *uninteresting_mocks):
         """
         Sequences given rearranged are still output in input order
@@ -238,10 +245,12 @@ class TestSingleClusterNode(TestCase):
     def setup(self) -> None:
         self.subsetup()
         self.single_cluster_node = SingleClusterNode(1, self.alignment, None, self.prg_builder, False)
+        self.single_cluster_node.clustering_result = None
 
     @patch.object(SingleClusterNode, SingleClusterNode._get_children.__name__, return_value=["child_1", "child_2"])
     @patch("make_prg.recursion_tree.remove_columns_full_of_gaps_from_MSA",
            return_value="remove_columns_full_of_gaps_from_MSA_mock")
+    @patch("make_prg.recursion_tree.kmeans_cluster_seqs", return_value="clustered_sequences")
     @patch("make_prg.recursion_tree.get_consensus_from_MSA", return_value="consensus_from_MSA")
     @patch("make_prg.recursion_tree.IntervalPartitioner")
     def test___constructor(self, IntervalPartitioner_mock, get_consensus_from_MSA_mock, *uninteresting_mocks):
@@ -273,6 +282,7 @@ class TestSingleClusterNode(TestCase):
         self.assertEqual("all_intervals", node.all_intervals)
         get_consensus_from_MSA_mock.assert_called_once_with("remove_columns_full_of_gaps_from_MSA_mock")
         IntervalPartitioner_mock.assert_called_once_with("consensus_from_MSA", 7, "remove_columns_full_of_gaps_from_MSA_mock")
+        self.assertEqual("clustered_sequences", node.clustering_result)
         self.assertEqual(set(), node.new_sequences)
         self.assertEqual(set(), node.indexed_PRG_intervals)
 
@@ -426,7 +436,8 @@ class TestSingleClusterNode(TestCase):
         self.assertTrue(self.single_cluster_node._infer_if_should_not_cluster(interval, self.single_cluster_node.alignment))
         alignment_has_issues_mock.assert_called_once_with(self.single_cluster_node.alignment)
 
-    @patch("make_prg.recursion_tree.kmeans_cluster_seqs", return_value=[["s1", "s2", "s3", "s4"]])
+    @patch("make_prg.recursion_tree.kmeans_cluster_seqs", return_value=ClusteringResult(
+        [["s1", "s2", "s3", "s4"]]))
     @patch.object(SingleClusterNode, SingleClusterNode._alignment_has_issues.__name__, return_value=False)
     def test___infer_if_should_not_cluster___single_cluster(self,
            alignment_has_issues_mock, kmeans_cluster_seqs_mock, *uninteresting_mocks):
@@ -439,7 +450,8 @@ class TestSingleClusterNode(TestCase):
         alignment_has_issues_mock.assert_called_once_with(self.single_cluster_node.alignment)
         kmeans_cluster_seqs_mock.assert_called_once_with(self.single_cluster_node.alignment, self.prg_builder.min_match_length)
 
-    @patch("make_prg.recursion_tree.kmeans_cluster_seqs", return_value=[["s1", "s2"], ["s3", "s4"]])
+    @patch("make_prg.recursion_tree.kmeans_cluster_seqs", return_value=ClusteringResult(
+        [["s1", "s2"], ["s3", "s4"]]))
     @patch.object(SingleClusterNode, SingleClusterNode._alignment_has_issues.__name__, return_value=False)
     def test___infer_if_should_not_cluster___two_clusters___no_issues_can_cluster(self,
                                                             alignment_has_issues_mock, kmeans_cluster_seqs_mock,
@@ -544,7 +556,7 @@ class TestSingleClusterNode(TestCase):
             actual = node._get_children()
             self.assertEqual(expected, actual)
 
-    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, return_value = ["ACGT"])
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences_from_MSA.__name__, return_value = ["ACGT"])
     @patch.object(PrgBuilder, PrgBuilder.update_PRG_index.__name__)
     def test___get_prg___single_interval_and_single_seq(self, update_prg_index_mock, *uninteresting_mocks):
         self.setup()
@@ -557,7 +569,7 @@ class TestSingleClusterNode(TestCase):
         self.assertEqual(expected_prg_as_list, actual_prg_as_list)
         update_prg_index_mock.assert_called_once_with(0, 4, node=self.single_cluster_node)
 
-    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, return_value=[
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences_from_MSA.__name__, return_value=[
         "AA", "C", "GGGG"])
     @patch.object(PrgBuilder, PrgBuilder.get_next_site_num.__name__, return_value=42)
     @patch.object(PrgBuilder, PrgBuilder.update_PRG_index.__name__)
@@ -575,7 +587,7 @@ class TestSingleClusterNode(TestCase):
         update_prg_index_mock.assert_any_call(10, 11, node=self.single_cluster_node)
         update_prg_index_mock.assert_any_call(15, 19, node=self.single_cluster_node)
 
-    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, side_effect=[
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences_from_MSA.__name__, side_effect=[
         ["ACGT"],
         ["AA", "C", "GGGG"],
         ["TTTT"],
@@ -609,7 +621,7 @@ class TestSingleClusterNode(TestCase):
         update_prg_index_mock.assert_any_call(40, 41, node=self.single_cluster_node)
 
 
-    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, side_effect=[
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences_from_MSA.__name__, side_effect=[
         ["AA"],
         ["CCCC"],
         ["G"]
@@ -638,7 +650,7 @@ class TestSingleClusterNode(TestCase):
         update_prg_index_mock.assert_any_call(2, 6, node=self.single_cluster_node)
         update_prg_index_mock.assert_any_call(6, 7, node=self.single_cluster_node)
 
-    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences.__name__, side_effect=[
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences_from_MSA.__name__, side_effect=[
         ["AA", "C", "GGGG"],
         ["G", "T"],
         ["A", "C"],
