@@ -564,7 +564,7 @@ class TestMergeSequences(TestCase):
         self.first_seq = self.long_seqs[0]
 
     def test_GivenFirstSeqNotInList_Fails(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AssertionError):
             merge_sequences(self.short_seqs, self.long_seqs, first_seq="TTTTT")
 
     def test_GivenShortFirst_FirstSeqIsFirstSeqOut(self):
@@ -582,8 +582,8 @@ class TestMergeSequences(TestCase):
         self.assertEqual(expected, actual)
 
     def test_GivenSeqsWithAmbiguousBases_ExpansionIsDone_Duplicates_are_removed(self):
-        expected = ["AATAA", "AACAA", "TTGAA", "TTAAA", "GA", "TA", "TC"]
+        expected = ["GA", "TA", "AATAA", "AACAA", "TTGAA", "TTAAA", "TC"]
         actual = merge_sequences(
-            ["AAYAA", "TTRAA"], ["KA", "TM"], first_seq="AAYAA"
+            ["AAYAA", "TTRAA"], ["KA", "TM"], first_seq="KA"
         )
         self.assertEqual(expected, actual)

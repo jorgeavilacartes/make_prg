@@ -1,10 +1,9 @@
 from collections import Counter, defaultdict
 from typing import List, Dict, Iterator, Union, Optional
 from itertools import starmap, repeat, chain
-
+from loguru import logger
 import numpy as np
 from sklearn.cluster import KMeans
-
 from make_prg.from_msa import MSA
 from make_prg.utils.misc import flatten_list
 from make_prg.utils.seq_utils import ungap, Sequence, Sequences, SequenceExpander
@@ -172,13 +171,20 @@ def merge_sequences(*seqlists: Sequences, first_seq: str) -> Sequences:
                 first_seq_found = True
             else:
                 result.append(sequence)
-    if not first_seq_found:
-        raise ValueError(
-            "Provided sequence argument not found in provided list of sequences"
-        )
+
+    # Note: this is an assert as is it the dev's responsibility to pass the correct first_seq argument (i.e. the user
+    # can't cause this error by erroneous input)
+    assert first_seq_found, f"Provided first sequence argument ({first_seq}) not found in provided list of sequences " \
+                            f"({seqlists})"
 
     merged_unexpanded_sequences = [first_seq] + result
     merged_expanded_sequences = SequenceExpander.get_expanded_sequences(merged_unexpanded_sequences)
+
+    first_merged_expanded_sequence = merged_expanded_sequences[0]
+    first_seq_has_ambiguous_char = first_seq != first_merged_expanded_sequence
+    if first_seq_has_ambiguous_char:
+        logger.warning(f"Provided first sequence argument ({first_seq}) has an ambiguous base, and thus does not match "
+                       f"expanded first sequence ({first_merged_expanded_sequence})")
 
     return merged_expanded_sequences
 
