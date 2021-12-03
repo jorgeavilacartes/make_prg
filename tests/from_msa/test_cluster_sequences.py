@@ -587,3 +587,10 @@ class TestMergeSequences(TestCase):
             ["AAYAA", "TTRAA"], ["KA", "TM"], first_seq="KA"
         )
         self.assertEqual(expected, actual)
+
+    def test_GivenFirstSeqWithN_FirstSeqIsRemoved(self):
+        expected = ["AATAA", "TTAAA", "AA", "TT"]
+        actual = merge_sequences(
+            ["ANA"] + self.long_seqs, self.short_seqs, first_seq="ANA"
+        )
+        self.assertEqual(expected, actual)
