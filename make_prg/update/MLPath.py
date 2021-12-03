@@ -63,8 +63,7 @@ class MLPath:
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (self._ml_path_nodes, self._ml_path_index_in_linear_path_space, self._ml_path_index_in_PRG_space) == \
-                   (other._ml_path_nodes, other._ml_path_index_in_linear_path_space, other._ml_path_index_in_PRG_space)
+            return self.__dict__ == other.__dict__
         else:
             return False
 

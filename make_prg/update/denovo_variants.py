@@ -43,10 +43,7 @@ class DenovoVariant:
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (self.start_index_in_linear_path, self.end_index_in_linear_path,
-                    self.ref, self.alt, self.ml_path_nodes_it_goes_through) == \
-                   (other.start_index_in_linear_path, other.end_index_in_linear_path,
-                    other.ref, other.alt, other.ml_path_nodes_it_goes_through)
+            return self.__dict__ == other.__dict__
         else:
             return False
 
@@ -190,8 +187,7 @@ class UpdateData:
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (self.ml_path_node_key,  self.ml_path,  self.new_node_sequence) == \
-                   (other.ml_path_node_key, other.ml_path, other.new_node_sequence)
+            return self.__dict__ == other.__dict__
         else:
             return False
 
