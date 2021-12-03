@@ -20,9 +20,72 @@ from make_prg.from_msa.cluster_sequences import (
     extract_clusters,
     merge_clusters,
     kmeans_cluster_seqs,
-    ClusteringResult
+    ClusteringResult,
+    merge_sequences
 )
 from tests.test_helpers import make_alignment, MSA
+
+class TestClusteringResult(TestCase):
+    def setUp(self) -> None:
+        self.clustered_ids = [["s0"], ["s1"]]
+        self.sequences = ["AATA", "AAAA"]
+        self.clustering_result = ClusteringResult(self.clustered_ids, self.sequences)
+
+    def test___constructor___no_sequences(self):
+        clustering_result = ClusteringResult(self.clustered_ids)
+
+        self.assertEqual(self.clustered_ids, clustering_result.clustered_ids)
+        self.assertIsNone(clustering_result.sequences)
+
+    def test___constructor___with_sequences(self):
+        self.assertEqual(self.clustered_ids, self.clustering_result.clustered_ids)
+        self.assertEqual(self.sequences, self.clustering_result.sequences)
+
+    def test___eq___equality(self):
+        clustering_result_copy = ClusteringResult(self.clustered_ids, self.sequences)
+        self.assertEqual(clustering_result_copy, self.clustering_result)
+
+    def test___eq___inequality(self):
+        other = ClusteringResult([["s0"]], ["A"])
+        self.assertNotEqual(other, self.clustering_result)
+
+        other = ClusteringResult([["s0"], ["s1"]], ["A"])
+        self.assertNotEqual(other, self.clustering_result)
+
+        other = ClusteringResult([["s0"]], ["AATA", "AAAA"])
+        self.assertNotEqual(other, self.clustering_result)
+
+        other = "other_type"
+        self.assertNotEqual(other, self.clustering_result)
+
+    def test___no_clustering___single_cluster_with_single_seq(self):
+        clustering_result = ClusteringResult([["s0"]])
+        self.assertTrue(clustering_result.no_clustering)
+
+    def test___no_clustering___single_cluster_with_several_seqs(self):
+        clustering_result = ClusteringResult([["s0", "s1", "s2", "s3", "s4", "s5"]])
+        self.assertTrue(clustering_result.no_clustering)
+
+    def test___no_clustering___three_small_clusters(self):
+        clustering_result = ClusteringResult([["s0"], ["s1"], ["s2"]])
+        self.assertFalse(clustering_result.no_clustering)
+
+    def test___have_precomputed_sequences___no_precomputed_sequences(self):
+        clustering_result = ClusteringResult(self.clustered_ids)
+        self.assertFalse(clustering_result.have_precomputed_sequences)
+
+    def test___have_precomputed_sequences___has_precomputed_sequences(self):
+        self.assertTrue(self.clustering_result.have_precomputed_sequences)
+
+    def test___repr(self):
+        expected = "ClusteringResult(clustered_ids=[['s0'], ['s1']], sequences=['AATA', 'AAAA'])"
+        actual = repr(self.clustering_result)
+        self.assertEqual(expected, actual)
+
+    def test___str(self):
+        expected = "ClusteringResult(clustered_ids=[['s0'], ['s1']], sequences=['AATA', 'AAAA'])"
+        actual = str(self.clustering_result)
+        self.assertEqual(expected, actual)
 
 
 class TestCountKmers(TestCase):
@@ -492,3 +555,35 @@ class TestKMeansOrdering(TestCase):
         expected_order_2 = ClusteringResult(clustered_ids=[['s3'], ['s2', 's1']])
         order_2 = kmeans_cluster_seqs(alignment[::-1], 5)
         self.assertEqual(expected_order_2, order_2)
+
+
+class TestMergeSequences(TestCase):
+    def setUp(self):
+        self.long_seqs = ["AATAA", "TTAAA"]
+        self.short_seqs = ["AA", "TT"]
+        self.first_seq = self.long_seqs[0]
+
+    def test_GivenFirstSeqNotInList_Fails(self):
+        with self.assertRaises(ValueError):
+            merge_sequences(self.short_seqs, self.long_seqs, first_seq="TTTTT")
+
+    def test_GivenShortFirst_FirstSeqIsFirstSeqOut(self):
+        expected = ["AATAA", "AA", "TT", "TTAAA"]
+        actual = merge_sequences(
+            self.short_seqs, self.long_seqs, first_seq=self.first_seq
+        )
+        self.assertEqual(expected, actual)
+
+    def test_GivenLongFirst_FirstSeqIsFirstSeqOut(self):
+        expected = ["AATAA", "TTAAA", "AA", "TT"]
+        actual = merge_sequences(
+            self.long_seqs, self.short_seqs, first_seq=self.first_seq
+        )
+        self.assertEqual(expected, actual)
+
+    def test_GivenSeqsWithAmbiguousBases_ExpansionIsDone_Duplicates_are_removed(self):
+        expected = ["AATAA", "AACAA", "TTGAA", "TTAAA", "GA", "TA", "TC"]
+        actual = merge_sequences(
+            ["AAYAA", "TTRAA"], ["KA", "TM"], first_seq="AAYAA"
+        )
+        self.assertEqual(expected, actual)

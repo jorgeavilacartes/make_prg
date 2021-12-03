@@ -162,6 +162,7 @@ class ClusteringResult(object):
     def __str__(self):
         return self.__repr__()
 
+
 def merge_sequences(*seqlists: Sequences, first_seq: str) -> Sequences:
     first_seq_found = False
     result = list()
