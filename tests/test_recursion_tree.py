@@ -282,7 +282,6 @@ class TestSingleClusterNode(TestCase):
         self.assertEqual("all_intervals", node.all_intervals)
         get_consensus_from_MSA_mock.assert_called_once_with("remove_columns_full_of_gaps_from_MSA_mock")
         IntervalPartitioner_mock.assert_called_once_with("consensus_from_MSA", 7, "remove_columns_full_of_gaps_from_MSA_mock")
-        self.assertEqual("clustered_sequences", node.clustering_result)
         self.assertEqual(set(), node.new_sequences)
         self.assertEqual(set(), node.indexed_PRG_intervals)
 
@@ -311,11 +310,32 @@ class TestSingleClusterNode(TestCase):
         IntervalPartitioner_mock.assert_called_once_with("consensus_from_MSA", 7, single_cluster_mock.alignment)
 
     @patch.object(SingleClusterNode, SingleClusterNode._get_children.__name__, return_value=[])
-    def test___is_leaf(self, *uninteresting_mocks):
+    def test___is_leaf___is_indeed_leaf(self, *uninteresting_mocks):
         self.setup()
         node = SingleClusterNode(1, self.alignment, None, self.prg_builder, False)
 
         self.assertTrue(node.is_leaf())
+
+    @patch.object(SingleClusterNode, SingleClusterNode._get_children.__name__, return_value=[Mock()])
+    def test___is_leaf___is_not_leaf(self, *uninteresting_mocks):
+        self.setup()
+        node = SingleClusterNode(1, self.alignment, None, self.prg_builder, False)
+
+        self.assertFalse(node.is_leaf())
+
+    @patch.object(SingleClusterNode, SingleClusterNode._get_children.__name__)
+    def test___is_root___is_indeed_root(self, *uninteresting_mocks):
+        self.setup()
+        node = SingleClusterNode(1, self.alignment, None, self.prg_builder, False)
+
+        self.assertTrue(node.is_root())
+
+    @patch.object(SingleClusterNode, SingleClusterNode._get_children.__name__)
+    def test___is_root___is_not_root(self, *uninteresting_mocks):
+        self.setup()
+        node = SingleClusterNode(1, self.alignment, Mock(), self.prg_builder, False)
+
+        self.assertFalse(node.is_root())
 
     @patch("make_prg.recursion_tree.get_number_of_unique_ungapped_sequences", return_value=1)
     def test___alignment_has_issues___num_unique_nongapped_seqs_1(self,
@@ -569,6 +589,38 @@ class TestSingleClusterNode(TestCase):
         self.assertEqual(expected_prg_as_list, actual_prg_as_list)
         update_prg_index_mock.assert_called_once_with(0, 4, node=self.single_cluster_node)
 
+    @patch.object(SingleClusterNode, SingleClusterNode.is_root.__name__, return_value=False)
+    @patch("make_prg.recursion_tree.kmeans_cluster_seqs", return_value=Mock(have_precomputed_sequences=False))
+    @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences_from_MSA.__name__, return_value = ["ACGT"])
+    @patch.object(PrgBuilder, PrgBuilder.update_PRG_index.__name__)
+    def test___get_prg___single_interval_and_single_seq___not_root_and_have_no_precomputed_sequences(self, update_prg_index_mock, *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.all_intervals = [Interval(IntervalType.Match, 0, 0)]
+
+        expected_prg_as_list = list("ACGT")
+        actual_prg_as_list = []
+        self.single_cluster_node._get_prg(actual_prg_as_list, delim_char="*")
+
+        self.assertEqual(expected_prg_as_list, actual_prg_as_list)
+        update_prg_index_mock.assert_called_once_with(0, 4, node=self.single_cluster_node)
+
+    @patch.object(SingleClusterNode, SingleClusterNode.is_root.__name__, return_value=False)
+    @patch("make_prg.recursion_tree.kmeans_cluster_seqs", return_value=Mock(have_precomputed_sequences=True,
+                                                                            sequences=["TGCA"]))
+    @patch.object(PrgBuilder, PrgBuilder.update_PRG_index.__name__)
+    def test___get_prg___single_interval_and_single_seq___not_root_and_have_precomputed_sequences(self,
+                                                                                                     update_prg_index_mock,
+                                                                                                     *uninteresting_mocks):
+        self.setup()
+        self.single_cluster_node.all_intervals = [Interval(IntervalType.Match, 0, 0)]
+
+        expected_prg_as_list = list("TGCA")
+        actual_prg_as_list = []
+        self.single_cluster_node._get_prg(actual_prg_as_list, delim_char="*")
+
+        self.assertEqual(expected_prg_as_list, actual_prg_as_list)
+        update_prg_index_mock.assert_called_once_with(0, 4, node=self.single_cluster_node)
+
     @patch.object(SequenceExpander, SequenceExpander.get_expanded_sequences_from_MSA.__name__, return_value=[
         "AA", "C", "GGGG"])
     @patch.object(PrgBuilder, PrgBuilder.get_next_site_num.__name__, return_value=42)
@@ -681,6 +733,8 @@ class TestSingleClusterNode(TestCase):
         update_prg_index_mock.assert_any_call(32, 33, node=self.single_cluster_node)
         update_prg_index_mock.assert_any_call(41, 42, node=self.single_cluster_node)
         update_prg_index_mock.assert_any_call(46, 47, node=self.single_cluster_node)
+
+
 
     @patch.object(SingleClusterNode, SingleClusterNode._get_prg.__name__)
     def test___preorder_traversal_to_build_prg___no_children___compute_PRG(self, get_prg_mock, *uninteresting_mocks):

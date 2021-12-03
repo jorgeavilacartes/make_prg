@@ -145,17 +145,6 @@ class SingleClusterNode(RecursiveTreeNode):
             self.non_match_intervals,
             self.all_intervals,
         ) = interval_partitioner.get_intervals()
-
-        # TODO: this could be computationally optimised (time performance) by receiving the clustering result by
-        # TODO: parameter in the constructor, and not recomputing it here. But I think we lose code readability,
-        # TODO: maintenability and introduce an annoying dependence... But something to think about if we want to push
-        # TODO: performance
-        no_clustering_was_previously_done_for_this_alignment = self.is_root()
-        if no_clustering_was_previously_done_for_this_alignment:
-            self.clustering_result = None
-        else:
-            self.clustering_result = kmeans_cluster_seqs(self.alignment, self.prg_builder.min_match_length)
-
         self.new_sequences: Set[str] = set()
         self.indexed_PRG_intervals: Set[Tuple[int, int]] = set()
 
@@ -215,8 +204,7 @@ class SingleClusterNode(RecursiveTreeNode):
             return True
 
         clustering_result = kmeans_cluster_seqs(alignment, self.prg_builder.min_match_length)
-        single_cluster_found = clustering_result.no_clustering
-        if single_cluster_found:
+        if clustering_result.no_clustering:
             return True
 
         return False
@@ -246,10 +234,14 @@ class SingleClusterNode(RecursiveTreeNode):
         return children
 
     def _get_prg(self, prg_as_list: List[str], delim_char: str = " "):
+        sequences_can_be_obtained_directly_from_clustering = False
+        if not self.is_root():
+            clustering_result = kmeans_cluster_seqs(self.alignment, self.prg_builder.min_match_length)
+            sequences_can_be_obtained_directly_from_clustering = clustering_result.have_precomputed_sequences
+
         sequences_of_each_interval = []
-        sequences_are_already_precomputed = self.clustering_result is not None and self.clustering_result.no_clustering
-        if sequences_are_already_precomputed:
-            sequences_of_each_interval.append(self.clustering_result.sequences)
+        if sequences_can_be_obtained_directly_from_clustering:
+            sequences_of_each_interval.append(clustering_result.sequences)
         else:
             for interval in self.all_intervals:
                 sub_alignment = self.alignment[:, interval.start:interval.stop + 1]
