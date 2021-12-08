@@ -328,7 +328,6 @@ class SingleClusterNode(RecursiveTreeNode):
         logger.trace(f"Sequences added to update: {self.new_sequences}")
 
         an_aligner_was_given = self.prg_builder.aligner is not None
-        # this is an assertion as it is the dev responsibility to ensure an aligner is given if updates are to be done
         assert an_aligner_was_given, "Cannot make updates without a Multiple Sequence Aligner."
 
         self.alignment = self.prg_builder.aligner.get_updated_alignment(

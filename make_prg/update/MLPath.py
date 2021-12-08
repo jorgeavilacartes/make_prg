@@ -99,7 +99,6 @@ class MLPath:
                                                             f"this ML path ({self}) probably has an indexing bug."
         no_nodes_overlap_this_position = len(nodes) == 0
         if no_nodes_overlap_this_position:
-            # this is an exception, as this can be an input error (e.g. a badly formed denovo_paths.txt file)
             raise MLPathError(f"No nodes overlap this ML path ({self}) at position {position}, "
                               f"is the denovo_paths.txt given as input correct?")
 
