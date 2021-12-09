@@ -13,4 +13,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag make_prg:$(GITHUB_SHA)
+      run: docker build . --file Dockerfile --tag make_prg:1.0.0
