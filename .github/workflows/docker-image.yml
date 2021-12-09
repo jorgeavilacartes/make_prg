@@ -3,6 +3,8 @@ name: Make PRG Docker Image CI
 on:
   push:
     branches: [ update ]
+    paths:
+      - Dockerfile  # just run the workflow when we modify Dockerfile, so that it is not run everytime
 
 jobs:
   docker:
