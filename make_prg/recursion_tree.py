@@ -156,7 +156,10 @@ class SingleClusterNode(RecursiveTreeNode):
             return True
 
         num_unique_gapped_seqs = get_number_of_unique_gapped_sequences(alignment)
+
+        # this is an assert as if it happens, something very wrong with the two previous functions is happening
         assert num_unique_nongapped_seqs <= num_unique_gapped_seqs
+
         alignment_has_ambiguity = num_unique_nongapped_seqs < num_unique_gapped_seqs
         if alignment_has_ambiguity:
             # TODO: fix alignment by deduplicating nongapped seqs and realigning them
