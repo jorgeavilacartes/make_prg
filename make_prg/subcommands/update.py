@@ -152,7 +152,9 @@ def run(cl_options):
 
     # read input data
     logger.info("Checking Multiple Sequence Aligner...")
-    temp_dir = io_utils.create_temp_dir(options.output_prefix)
+    output_dir = Path(options.output_prefix).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    temp_dir = io_utils.create_temp_dir(output_dir)
     options.temp_dir = temp_dir
     msa_temp_path = temp_dir / "msa_temp"
     mafft_aligner = MAFFT(executable=options.mafft, tmpdir=msa_temp_path)

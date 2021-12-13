@@ -154,7 +154,9 @@ def run(cl_options):
     if io_utils.output_files_already_exist(options.output_prefix):
         raise RuntimeError("One or more output files already exists, aborting run...")
 
-    temp_dir = io_utils.create_temp_dir(options.output_prefix)
+    output_dir = Path(options.output_prefix).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    temp_dir = io_utils.create_temp_dir(output_dir)
     options.temp_dir = temp_dir
 
     logger.info(f"Using {options.threads} threads to generate PRGs...")
