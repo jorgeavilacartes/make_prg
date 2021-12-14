@@ -55,6 +55,6 @@ class TestUpdateData(TestCase):
         new_node_sequence = "new_node_sequence"
         update_data_1 = UpdateData(ml_path_node_key, ml_path, new_node_sequence)
 
-        expected = "UpdateData(ml_path_node_key=ml_path_node_key, ml_path=ml_path, new_node_sequence=\"new_node_sequence\")"
+        expected = "UpdateData(ml_path_node_key='ml_path_node_key', ml_path='ml_path', new_node_sequence='new_node_sequence')"
         actual = repr(update_data_1)
         self.assertEqual(expected, actual)
