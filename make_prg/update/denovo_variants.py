@@ -7,6 +7,7 @@ from make_prg.utils.seq_utils import align, GAP
 from make_prg.update.MLPath import MLPathNode, MLPath, EmptyMLPathSequence, MLPathError
 from pathlib import Path
 from make_prg.utils.misc import remove_duplicated_consecutive_elems_from_list
+from dataclasses import dataclass
 
 
 class DenovoError(Exception):
@@ -179,32 +180,19 @@ class DenovoVariant:
                f"alt=\"{self.alt}\")"
 
 
+@dataclass
 class UpdateData:
-    def __init__(self, ml_path_node_key: Tuple[int, int], ml_path: MLPath, new_node_sequence: str):
-        self.ml_path_node_key: Tuple[int, int] = ml_path_node_key
-        self.ml_path = ml_path
-        self.new_node_sequence: str = new_node_sequence
-
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            return self.__dict__ == other.__dict__
-        else:
-            return False
-
-    def __repr__(self):
-        return f"UpdateData(ml_path_node_key={self.ml_path_node_key}, " \
-               f"ml_path={self.ml_path}, " \
-               f"new_node_sequence=\"{self.new_node_sequence}\")"
+    ml_path_node_key: Tuple[int, int]
+    ml_path: MLPath
+    new_node_sequence: str
 
 
+@dataclass
 class DenovoLocusInfo:
-    def __init__(
-        self, sample: str, locus: str, ml_path: MLPath, variants: List[DenovoVariant]
-    ):
-        self.sample: str = sample
-        self.locus: str = locus
-        self.ml_path: MLPath = ml_path
-        self.variants: List[DenovoVariant] = variants
+    sample: str
+    locus: str
+    ml_path: MLPath
+    variants: List[DenovoVariant]
 
     def _get_ml_path_nodes_spanning_variant(self, variant: DenovoVariant) -> List[MLPathNode]:
         """

@@ -5,7 +5,8 @@ from loguru import logger
 from make_prg.utils import io_utils, gfa
 from make_prg.update.denovo_variants import DenovoVariantsDB
 from make_prg.prg_builder import PrgBuilderZipDatabase, LeafNotFoundException
-from make_prg.utils.msa_aligner import MAFFT
+from make_prg.utils.msa_aligner import MAFFT, MSAAligner
+from dataclasses import dataclass
 
 
 def register_parser(subparsers):
@@ -77,10 +78,10 @@ def register_parser(subparsers):
     return subparser_update_prg
 
 
+@dataclass
 class UpdateSharedData:
-    def __init__(self, denovo_variants_db, aligner):
-        self.denovo_variants_db = denovo_variants_db
-        self.aligner = aligner
+    denovo_variants_db: DenovoVariantsDB
+    aligner: MSAAligner
 
 
 def update(locus_name: str):
