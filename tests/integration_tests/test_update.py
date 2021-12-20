@@ -1,6 +1,6 @@
 from unittest import TestCase
 from pathlib import Path
-from make_prg.subcommands import update
+from make_prg.subcommands import update, output_type
 from argparse import Namespace
 from tests.test_helpers import remove_dir_if_exists, are_dir_trees_equal
 
@@ -21,6 +21,7 @@ class Test_Update_Integration_Full_Builds(TestCase):
             output_prefix=output_prefix,
             mafft='mafft',
             log=None,
+            output_type=output_type.OutputType("a"),
             output_graphs=False,
             threads=1,
             verbose=False)
@@ -89,3 +90,27 @@ class Test_Update_Integration_Full_Builds(TestCase):
 
         with self.assertRaises(RuntimeError):
             update.run(options)
+
+    def test___update___match_update_simple___produce_only_PRGs(self):
+        options = self.prepare_options(test_name="match_update_simple_prg_only",
+                                       update_DS=data_dir/"truth_output/match/match.update_DS.zip")
+        options.output_type = output_type.OutputType("p")
+        update.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/match_update_simple_prg_only",
+                                            data_dir / "output_update/match_update_simple_prg_only"))
+
+    def test___update___match_update_simple___produce_only_GFAs(self):
+        options = self.prepare_options(test_name="match_update_simple_gfa_only",
+                                       update_DS=data_dir/"truth_output/match/match.update_DS.zip")
+        options.output_type = output_type.OutputType("g")
+        update.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/match_update_simple_gfa_only",
+                                            data_dir / "output_update/match_update_simple_gfa_only"))
+
+    def test___update___match_update_simple___produce_only_binary_PRGs(self):
+        options = self.prepare_options(test_name="match_update_simple_bin_only",
+                                       update_DS=data_dir/"truth_output/match/match.update_DS.zip")
+        options.output_type = output_type.OutputType("b")
+        update.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/match_update_simple_bin_only",
+                                            data_dir / "output_update/match_update_simple_bin_only"))

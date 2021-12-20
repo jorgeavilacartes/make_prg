@@ -1,7 +1,7 @@
 import os
 from unittest import TestCase
 from pathlib import Path
-from make_prg.subcommands import from_msa
+from make_prg.subcommands import from_msa, output_type
 from argparse import Namespace
 from tests.test_helpers import remove_dir_if_exists, are_dir_trees_equal
 from make_prg.utils.seq_utils import SequenceCurationError
@@ -24,6 +24,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
             log=None,
             max_nesting=5,
             min_match_length=7,
+            output_type=output_type.OutputType("a"),
             output_graphs=False,
             threads=1,
             verbose=False)
@@ -165,6 +166,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
             max_nesting=5,
             min_match_length=7,
             output_graphs=False,
+            output_type=output_type.OutputType("a"),
             threads=1,
             verbose=False)
 
@@ -215,3 +217,24 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         with self.assertRaises(RuntimeError):
             from_msa.run(options)
+
+    def test___match___produce_only_PRGs(self):
+        options = self.prepare_options("match_prg_only")
+        options.output_type = output_type.OutputType("p")
+        from_msa.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/match_prg_only",
+                                            data_dir / "output/match_prg_only"))
+
+    def test___match___produce_only_GFAs(self):
+        options = self.prepare_options("match_gfa_only")
+        options.output_type = output_type.OutputType("g")
+        from_msa.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/match_gfa_only",
+                                            data_dir / "output/match_gfa_only"))
+
+    def test___match___produce_only_binary_PRGs(self):
+        options = self.prepare_options("match_bin_only")
+        options.output_type = output_type.OutputType("b")
+        from_msa.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/match_bin_only",
+                                            data_dir / "output/match_bin_only"))
