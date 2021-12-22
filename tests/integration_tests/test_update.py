@@ -22,6 +22,7 @@ class Test_Update_Integration_Full_Builds(TestCase):
             mafft='mafft',
             log=None,
             output_type=output_type.OutputType("a"),
+            force=False,
             output_graphs=False,
             threads=1,
             verbose=False)
@@ -84,12 +85,36 @@ class Test_Update_Integration_Full_Builds(TestCase):
             output_prefix=output_prefix,
             mafft='mafft',
             log=None,
+            output_type=output_type.OutputType("a"),
+            force=False,
             output_graphs=False,
             threads=1,
             verbose=False)
 
         with self.assertRaises(RuntimeError):
             update.run(options)
+
+    def test___update___output_files_already_exist___force_overwrite(self):
+        output_folder = data_dir / "output_update" / "match_update_simple"
+        assert output_folder.exists(), f"Error, {output_folder} should exist already when running this test"
+        output_prefix = str(output_folder / "match_update_simple")
+
+        options = Namespace(
+            denovo_paths=str(data_dir / "match_update_simple" / 'denovo_paths.txt'),
+            update_DS=data_dir / "truth_output/match/match.update_DS.zip",
+            output_prefix=output_prefix,
+            mafft='mafft',
+            log=None,
+            output_type=output_type.OutputType("a"),
+            force=True,
+            output_graphs=False,
+            threads=1,
+            verbose=False)
+
+        update.run(options)
+
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/match_update_simple",
+                                            data_dir / "output_update/match_update_simple"))
 
     def test___update___match_update_simple___produce_only_PRGs(self):
         options = self.prepare_options(test_name="match_update_simple_prg_only",
