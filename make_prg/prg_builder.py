@@ -104,7 +104,7 @@ class PrgBuilder(object):
         Writes the prg to outfile.
         Writes it as a human readable string, and also as an integer vector
         """
-        sample = Path(output_prefix).with_suffix("").name
+        sample = Path(output_prefix).name
         prg_filename = Path(output_prefix + ".prg.fa")
         with prg_filename.open("w") as prg:
             print(f">{sample}\n{prg_string}", file=prg)
