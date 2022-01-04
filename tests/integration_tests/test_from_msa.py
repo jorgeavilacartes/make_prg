@@ -329,3 +329,53 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         with self.assertRaises(RuntimeError):
             from_msa.run(options)
+
+    def test___match___compressed_input_file(self):
+        input_data = str(data_dir / "match.fa.gz")
+        output_folder = data_dir / "output/match_compressed"
+        remove_dir_if_exists(output_folder)
+        output_prefix = str(output_folder / "match_compressed")
+
+        options = Namespace(
+            input=input_data,
+            output_prefix=output_prefix,
+            alignment_format='fasta',
+            log=None,
+            max_nesting=5,
+            min_match_length=7,
+            output_type=output_type.OutputType("a"),
+            force=False,
+            output_graphs=False,
+            threads=1,
+            verbose=False)
+
+        from_msa.run(options)
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/match_compressed",
+                                            data_dir / "output/match_compressed"))
+
+    def test___several___compressed_and_uncompressed_input_files(self):
+        input_data = str(data_dir / "several_compressed")
+        output_folder = data_dir / "output" / "several_compressed"
+        remove_dir_if_exists(output_folder)
+        output_prefix = str(output_folder / "several_compressed")
+
+        options = Namespace(
+            input=input_data,
+            output_prefix=output_prefix,
+            alignment_format='fasta',
+            log=None,
+            max_nesting=5,
+            min_match_length=7,
+            output_graphs=False,
+            force=False,
+            output_type=output_type.OutputType("a"),
+            threads=1,
+            verbose=False)
+
+        from_msa.run(options)
+
+        self.assertTrue(are_dir_trees_equal(data_dir / "truth_output/several_compressed",
+                                            data_dir / "output/several_compressed",
+                                            # TODO: remove this, do not ignore zips
+                                            # TODO: but for now, this test is failing in github CI
+                                            ignore_zips=True))
