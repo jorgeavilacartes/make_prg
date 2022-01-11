@@ -11,12 +11,12 @@ if [ ! -f "make_prg.sif" ]; then
 fi
 
 echo "Building PRGs from MSAs..."
-from_msa_command_line="singularity exec make_prg.sif make_prg from_msa --input msas/ --output_prefix msas_output/sample"
+from_msa_command_line="singularity exec make_prg.sif make_prg from_msa --input msas/ --output-prefix msas_output/sample --force"
 echo "Running ${from_msa_command_line}"
 ${from_msa_command_line}
 
 echo "Updating PRGs with denovo paths..."
-update_command_line="singularity exec make_prg.sif make_prg update --update_DS msas_output/sample.update_DS.zip --denovo_paths denovo_paths/denovo_paths.txt --output_prefix msas_updated/updated_sample"
+update_command_line="singularity exec make_prg.sif make_prg update --update-DS msas_output/sample.update_DS.zip --denovo-paths denovo_paths/denovo_paths.txt --output-prefix msas_updated/updated_sample --force"
 echo "Running ${update_command_line}"
 ${update_command_line}
 
