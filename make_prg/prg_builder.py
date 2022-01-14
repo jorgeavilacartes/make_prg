@@ -99,16 +99,14 @@ class PrgBuilder(object):
         return pickle.loads(array_of_bytes)
 
     @staticmethod
-    def write_prg(output_prefix: str, prg_string: str):
-        """
-        Writes the prg to outfile.
-        Writes it as a human readable string, and also as an integer vector
-        """
+    def write_prg_as_text(output_prefix: str, prg_string: str):
         sample = Path(output_prefix).name
         prg_filename = Path(output_prefix + ".prg.fa")
         with prg_filename.open("w") as prg:
             print(f">{sample}\n{prg_string}", file=prg)
 
+    @staticmethod
+    def write_prg_as_binary(output_prefix: str, prg_string: str):
         prg_ints_fpath = Path(output_prefix + ".bin")
         prg_encoder = PrgEncoder()
         prg_ints: PRG_Ints = prg_encoder.encode(prg_string)

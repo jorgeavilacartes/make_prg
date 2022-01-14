@@ -149,9 +149,12 @@ class TestPrgBuilder(TestCase):
         PrgBuilder.deserialize_from_bytes(array_of_bytes)
         loads_mock.assert_called_once_with(array_of_bytes)
 
-    def test___write_prg(self):
-        PrgBuilder.write_prg(f"{workdir}/sample", sample_prg)
+    def test___write_prg_as_text(self):
+        PrgBuilder.write_prg_as_text(f"{workdir}/sample", sample_prg)
         self.assertTrue(filecmp.cmp(workdir / "sample.prg.fa", workdir / "sample.truth.prg.fa"))
+
+    def test___write_prg_as_binary(self):
+        PrgBuilder.write_prg_as_binary(f"{workdir}/sample", sample_prg)
         self.assertTrue(filecmp.cmp(workdir / "sample.bin", workdir / "sample.truth.bin"))
 
     @patch("make_prg.prg_builder.load_alignment_file", return_value="MSA")
