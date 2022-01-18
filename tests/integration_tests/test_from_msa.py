@@ -5,6 +5,7 @@ from make_prg.subcommands import from_msa, output_type
 from argparse import Namespace
 from tests.test_helpers import remove_dir_if_exists, are_dir_trees_equal
 from make_prg.utils.seq_utils import SequenceCurationError
+from make_prg.subcommands.from_msa import EmptyMSAError
 
 
 data_dir = Path("tests/integration_tests/data")
@@ -179,6 +180,29 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
                                             # TODO: remove this, do not ignore zips
                                             # TODO: but for now, this test is failing in github CI
                                             ignore_zips=True))
+
+    def test___several_alignments___one_empty_MSA___raises_EmptyMSAError(self):
+        input_data = str(data_dir / "several_empty")
+        output_folder = data_dir / "output" / "several_empty"
+        remove_dir_if_exists(output_folder)
+        output_prefix = str(output_folder / "several_empty")
+
+        options = Namespace(
+            input=input_data,
+            output_prefix=output_prefix,
+            alignment_format='fasta',
+            log=None,
+            max_nesting=5,
+            min_match_length=7,
+            output_graphs=False,
+            force=False,
+            output_type=output_type.OutputType("a"),
+            threads=1,
+            verbose=False)
+
+        with self.assertRaises(EmptyMSAError):
+            from_msa.run(options)
+
 
     def test___input_dir_has_no_files___raises_FileNotFoundError(self):
         unexistent_folder = data_dir / "unexistent_folder"
