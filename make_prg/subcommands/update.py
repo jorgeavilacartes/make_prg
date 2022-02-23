@@ -64,7 +64,7 @@ def register_parser(subparsers):
         default=10,
         help=(
             "Ignores long deletions of the given size or longer. If long deletions should not be ignored, "
-            "put a large value."
+            "put a large value. Default: %(default)d"
         ),
     )
     subparser_update_prg.add_argument(
