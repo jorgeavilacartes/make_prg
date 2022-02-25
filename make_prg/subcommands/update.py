@@ -57,13 +57,13 @@ def register_parser(subparsers):
         ),
     )
     subparser_update_prg.add_argument(
-        "--long-indel-threshold",
-        dest="long_indel_threshold",
+        "--long-deletion-threshold",
+        dest="long_deletion_threshold",
         action="store",
         type=int,
-        default=3,
+        default=10,
         help=(
-            "Ignores long indels of the given size or longer. If long indels should not be ignored, "
+            "Ignores long deletions of the given size or longer. If long deletions should not be ignored, "
             "put a large value. Default: %(default)d"
         ),
     )
@@ -174,7 +174,7 @@ def run(cl_options):
         prg_builder_zip_db = PrgBuilderZipDatabase(options.update_DS)
         prg_builder_zip_db.load()
         logger.info(f"Reading {options.denovo_paths}...")
-        denovo_variants_db = DenovoVariantsDB(options.denovo_paths, options.long_indel_threshold)
+        denovo_variants_db = DenovoVariantsDB(options.denovo_paths, options.long_deletion_threshold)
         update_shared_data = UpdateSharedData(denovo_variants_db, mafft_aligner)
 
         output_dir = Path(options.output_prefix).parent

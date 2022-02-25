@@ -1,6 +1,6 @@
 from unittest import TestCase
 from unittest.mock import Mock
-from make_prg.update.denovo_variants import DenovoVariant, DenovoError, TooLongIndel
+from make_prg.update.denovo_variants import DenovoVariant, DenovoError, TooLongDeletion
 from make_prg.update.MLPath import MLPathNode
 
 class DenovoVariantTest(TestCase):
@@ -25,22 +25,22 @@ class DenovoVariantTest(TestCase):
             DenovoVariant(-1, "A", "C")
 
     def test___too_long_deletion_delta_10___TooLongDeletion_raised(self):
-        with self.assertRaises(TooLongIndel):
-            DenovoVariant(0, "AAAAAAAAAAAAAAA", "AAAAA", long_indel_threshold=10)
+        with self.assertRaises(TooLongDeletion):
+            DenovoVariant(0, "AAAAAAAAAAAAAAA", "AAAAA", long_deletion_threshold=10)
 
     def test___too_long_deletion_delta_11___TooLongDeletion_raised(self):
-        with self.assertRaises(TooLongIndel):
-            DenovoVariant(0, "AAAAAAAAAAAAAAAA", "AAAAA", long_indel_threshold=10)
+        with self.assertRaises(TooLongDeletion):
+            DenovoVariant(0, "AAAAAAAAAAAAAAAA", "AAAAA", long_deletion_threshold=10)
 
     def test___constructor___variant_correctly_built(self):
         ml_path_nodes_it_goes_through = [Mock(), Mock(), Mock(), Mock()]
-        denovo_variant = DenovoVariant(5, "AACC", "GT", ml_path_nodes_it_goes_through, long_indel_threshold=3)
+        denovo_variant = DenovoVariant(5, "AACC", "GT", ml_path_nodes_it_goes_through, long_deletion_threshold=3)
         self.assertEqual(5, denovo_variant.start_index_in_linear_path)
         self.assertEqual(9, denovo_variant.end_index_in_linear_path)
         self.assertEqual("AACC", denovo_variant.ref)
         self.assertEqual("GT", denovo_variant.alt)
         self.assertEqual(ml_path_nodes_it_goes_through, denovo_variant.ml_path_nodes_it_goes_through)
-        self.assertEqual(3, denovo_variant.long_indel_threshold)
+        self.assertEqual(3, denovo_variant.long_deletion_threshold)
 
     def test___equality___same_variant(self):
         ml_path_nodes_it_goes_through = [Mock()]
@@ -248,14 +248,14 @@ class DenovoVariantTest(TestCase):
 
         self.assertEqual(expected, actual)
 
-    def test___split_variant___deletion_var_goes_through_two_nodes_split_in_end___long_indel_threshold_removes_one(self):
+    def test___split_variant___deletion_var_goes_through_two_nodes_split_in_end___long_deletion_threshold_removes_one(self):
         denovo_variant = DenovoVariant(5, "ACGT", "CCT")
         dummy_node_1 = MLPathNode(key=(0, 1), sequence="A")
         dummy_node_2 = MLPathNode(key=(1, 2), sequence="C")
         denovo_variant.ml_path_nodes_it_goes_through = [dummy_node_1, dummy_node_1, dummy_node_2, dummy_node_2]
 
         expected = [DenovoVariant(7, "GT", "CT", [dummy_node_2, dummy_node_2], 1)]
-        denovo_variant.long_indel_threshold = 1
+        denovo_variant.long_deletion_threshold = 1
         actual = denovo_variant.split_variant()
 
         self.assertEqual(expected, actual)
