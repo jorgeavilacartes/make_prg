@@ -19,7 +19,7 @@ class Test_Update_Integration_Full_Builds(TestCase):
             denovo_paths=str(data_dir / test_name / 'denovo_paths.txt'),
             update_DS=update_DS,
             output_prefix=output_prefix,
-            long_deletion_threshold=1000000,
+            long_indel_threshold=1000000,
             mafft='mafft',
             log=None,
             output_type=output_type.OutputType("a"),
@@ -40,7 +40,7 @@ class Test_Update_Integration_Full_Builds(TestCase):
     def test___update___match_update_simple_with_long_deletion(self):
         options = self.prepare_options(test_name="match_update_simple_with_long_deletion",
                                        update_DS=data_dir/"truth_output/match/match.update_DS.zip")
-        options.long_deletion_threshold = 10
+        options.long_indel_threshold = 10
         update.run(options)
         self.assertTrue(are_dir_trees_equal(data_dir / "truth_output_update/match_update_simple_with_long_deletion",
                                             data_dir / "output_update/match_update_simple_with_long_deletion"))
@@ -112,7 +112,7 @@ class Test_Update_Integration_Full_Builds(TestCase):
             denovo_paths=str(data_dir / "match_update_simple" / 'denovo_paths.txt'),
             update_DS=data_dir / "truth_output/match/match.update_DS.zip",
             output_prefix=output_prefix,
-            long_deletion_threshold=1000000,
+            long_indel_threshold=1000000,
             mafft='mafft',
             log=None,
             output_type=output_type.OutputType("a"),

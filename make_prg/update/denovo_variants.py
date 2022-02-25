@@ -15,24 +15,24 @@ class DenovoError(Exception):
     pass
 
 
-class TooLongDeletion(Exception):
+class TooLongIndel(Exception):
     pass
 
 
 class DenovoVariant:
     def __init__(self, start_index_in_linear_path: int, ref: str, alt: str,
                  ml_path_nodes_it_goes_through: Optional[List[MLPathNode]] = None,
-                 long_deletion_threshold: int = sys.maxsize):
-        DenovoVariant._param_checking(start_index_in_linear_path, ref, alt, long_deletion_threshold)
+                 long_indel_threshold: int = sys.maxsize):
+        DenovoVariant._param_checking(start_index_in_linear_path, ref, alt, long_indel_threshold)
         self.start_index_in_linear_path: int = start_index_in_linear_path
         self.end_index_in_linear_path: int = start_index_in_linear_path + len(ref)
         self.ref: str = ref
         self.alt: str = alt
         self.set_ml_path_nodes_it_goes_through(ml_path_nodes_it_goes_through)
-        self.long_deletion_threshold = long_deletion_threshold
+        self.long_indel_threshold = long_indel_threshold
 
     @staticmethod
-    def _param_checking(start_index_in_linear_path: int, ref: str, alt: str, long_deletion_threshold: int):
+    def _param_checking(start_index_in_linear_path: int, ref: str, alt: str, long_indel_threshold: int):
         DenovoVariant._check_sequence_is_composed_of_ACGT_only(ref)
         DenovoVariant._check_sequence_is_composed_of_ACGT_only(alt)
         not_a_variant = ref == alt
@@ -43,10 +43,10 @@ class DenovoVariant:
         if negative_index_for_variant_pos:
             raise DenovoError(f"Found a negative index for variant pos ({start_index_in_linear_path})")
 
-        deletion_size = len(ref) - len(alt)
-        is_a_too_long_deletion = deletion_size >= long_deletion_threshold
-        if is_a_too_long_deletion:
-            raise TooLongDeletion(f"Variant has a too long deletion (delta = {deletion_size}) that should be ignored")
+        indel_size = abs(len(ref) - len(alt))
+        is_a_too_long_indel = indel_size >= long_indel_threshold
+        if is_a_too_long_indel:
+            raise TooLongIndel(f"Variant has a too long indel (delta = {indel_size}) that should be ignored")
 
     @staticmethod
     def _check_sequence_is_composed_of_ACGT_only(seq: str):
@@ -149,13 +149,13 @@ class DenovoVariant:
                 try:
                     split_variant = DenovoVariant(
                         current_start_in_linear_path, sub_ref_seq, sub_alt_seq,
-                        long_deletion_threshold=self.long_deletion_threshold
+                        long_indel_threshold=self.long_indel_threshold
                     )
                     ml_path_nodes_the_split_variant_goes_through = [ml_path_node] * len(sub_ref_seq)
                     split_variant.set_ml_path_nodes_it_goes_through(ml_path_nodes_the_split_variant_goes_through)
                     split_variants.append(split_variant)
                     logger.info(f"Split variant to be applied: {split_variant}")
-                except TooLongDeletion as error:
+                except TooLongIndel as error:
                     logger.info(f"Ignoring split variant: {error}")
 
         return split_variants
@@ -332,7 +332,7 @@ class DenovoVariantsDB:
         return nb_of_variants
 
     @staticmethod
-    def _read_DenovoVariant(filehandler: TextIO, long_deletion_threshold: int = sys.maxsize) -> DenovoVariant:
+    def _read_DenovoVariant(filehandler: TextIO, long_indel_threshold: int = sys.maxsize) -> DenovoVariant:
         line = filehandler.readline().strip("\n")
         line_split = line.split("\t")
 
@@ -343,21 +343,21 @@ class DenovoVariantsDB:
                 start_index_in_linear_path=start_index_in_linear_path,
                 ref=ref,
                 alt=alt,
-                long_deletion_threshold=long_deletion_threshold
+                long_indel_threshold=long_indel_threshold
         )
 
         logger.info(f"Read variant: {denovo_variant}")
         return denovo_variant
 
     @classmethod
-    def _read_variants(cls, filehandler: TextIO, long_deletion_threshold: int = sys.maxsize) -> List[DenovoVariant]:
+    def _read_variants(cls, filehandler: TextIO, long_indel_threshold: int = sys.maxsize) -> List[DenovoVariant]:
         nb_of_variants = cls._read_nb_of_variants(filehandler)
         variants = []
         for _ in range(nb_of_variants):
             try:
-                denovo_variant = cls._read_DenovoVariant(filehandler, long_deletion_threshold)
+                denovo_variant = cls._read_DenovoVariant(filehandler, long_indel_threshold)
                 variants.append(denovo_variant)
-            except TooLongDeletion as error:
+            except TooLongIndel as error:
                 logger.info(f"Ignoring variant: {error}")
         return variants
 
@@ -377,7 +377,7 @@ class DenovoVariantsDB:
             for locus_index in range(nb_of_loci_in_sample):
                 locus = self._read_locus(filehandler)
                 ml_path = self._read_ml_path(filehandler)
-                variants = self._read_variants(filehandler, self.long_deletion_threshold)
+                variants = self._read_variants(filehandler, self.long_indel_threshold)
                 denovo_locus = DenovoLocusInfo(sample, locus, ml_path, variants)
                 locus_name_to_denovo_loci[locus].append(denovo_locus)
 
@@ -398,9 +398,9 @@ class DenovoVariantsDB:
                 locus_name_to_update_data[locus_name].extend(update_data)
         return locus_name_to_update_data
 
-    def __init__(self, filepath: str, long_deletion_threshold: int = sys.maxsize):
+    def __init__(self, filepath: str, long_indel_threshold: int = sys.maxsize):
         self.filepath: Path = Path(filepath)
-        self.long_deletion_threshold = long_deletion_threshold
+        self.long_indel_threshold = long_indel_threshold
         locus_name_to_denovo_loci = self._get_locus_name_to_denovo_loci()
         self.locus_name_to_update_data = self._get_locus_name_to_update_data(
             locus_name_to_denovo_loci
