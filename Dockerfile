@@ -21,3 +21,4 @@ ENV PATH=/venv/bin:$PATH
 RUN apt clean
 
 CMD ["make_prg"]
+
