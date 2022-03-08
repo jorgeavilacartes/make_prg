@@ -47,6 +47,9 @@ class PrgBuilder(object):
         state['aligner'] = None  # force aligner to None
         return state
 
+    def replace_root(self, new_root: RecursiveTreeNode):
+        self.root = new_root
+
     def build_prg(self) -> str:
         self.site_num = 5
         prg_as_list = []
@@ -66,6 +69,14 @@ class PrgBuilder(object):
     def update_PRG_index(self, start_index: int, end_index: int, node: LeafNode):
         interval = (start_index, end_index)
         self.prg_index[interval] = node
+        node.add_indexed_PRG_interval(interval)
+
+    def clear_PRG_index(self):
+        # first clear the index of all nodes
+        for node in self.prg_index.values():
+            node.clear_PRG_interval_index()
+
+        self.prg_index.clear()
 
     def get_node_given_interval(self, interval: Tuple[int, int]) -> LeafNode:
         # TODO: move this back to assert once is solved

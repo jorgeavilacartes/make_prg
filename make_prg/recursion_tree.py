@@ -132,12 +132,10 @@ class LeafNode(RecursiveTreeNode):
         super().__init__(nesting_level, alignment, parent, prg_builder, [])
         assert self.is_leaf(), f"Leaf node ({self}) is not a leaf"
         self.new_sequences: Set[str] = set()
-
-    @property
-    def indexed_PRG_intervals(self) -> Set[Tuple[int, int]]:
-        return self.prg_builder.prg_index.keys()
+        self.indexed_PRG_intervals: Set[Tuple[int, int]] = set()
 
     def preorder_traversal_to_build_prg(self, prg_as_list: List[str], delim_char: str = " ", do_indexing=True):
+        # Note: here we could have several intervals, not anymore
         expanded_sequences = SequenceExpander.get_expanded_sequences_from_MSA(self.alignment)
 
         single_seq = len(expanded_sequences) == 1
@@ -176,8 +174,6 @@ class LeafNode(RecursiveTreeNode):
                               f"PRG intervals for node: {self.indexed_PRG_intervals}")
 
         seq_to_add_as_list = []
-
-        # TODO: this is super wrong, we should iterate on the indexed_PRG_intervals for the node only, not all indexed_PRG_intervals
         for PRG_interval in sorted(self.indexed_PRG_intervals):
             ML_sequence_should_be_replaced = PRG_interval == update_data_PRG_interval
             if ML_sequence_should_be_replaced:
@@ -188,7 +184,6 @@ class LeafNode(RecursiveTreeNode):
                     seq_to_add_as_list.append(ml_path_node.sequence)
                 except MLPathError:
                     pass
-
         seq_to_add = "".join(seq_to_add_as_list)
 
         there_has_been_padding = seq_to_add != update_data.new_node_sequence
@@ -198,6 +193,9 @@ class LeafNode(RecursiveTreeNode):
 
         self.new_sequences.add(seq_to_add)
 
+    def add_indexed_PRG_interval(self, interval: Tuple[int, int]):
+        self.indexed_PRG_intervals.add(interval)
+
     def batch_update(self):
         no_update_to_be_done = len(self.new_sequences) == 0
         if no_update_to_be_done:
@@ -205,7 +203,7 @@ class LeafNode(RecursiveTreeNode):
         self._update_leaf()
 
     def _update_leaf(self):
-        logger.trace(f"Updating MSA for {self.prg_builder.locus_name}")
+        logger.trace(f"Updating subMSA for {self.prg_builder.locus_name}")
         logger.trace(f"Node: {str(self)}")
         logger.trace(f"Sequences added to update: {self.new_sequences}")
 
@@ -223,9 +221,17 @@ class LeafNode(RecursiveTreeNode):
         # in some cases, we might have just a single node, which is both the root and a leaf
         need_to_replace_the_root = self.is_root()
         if need_to_replace_the_root:
-            self.prg_builder.root = updated_child
+            self.prg_builder.replace_root(updated_child)
         else:
             self.parent.replace_child(self, updated_child)
+
+        # whenever we do an update in a node, we will mess up the prg builder index for the sites to the right of the
+        # updated site in the PRG string. Just to be safe, we clear the prg index, as it will be regenerated again
+        # when rebuilding the PRG
+        self.prg_builder.clear_PRG_index()
+
+    def clear_PRG_interval_index(self):
+        self.indexed_PRG_intervals.clear()
     ##################################################################################
 
 
@@ -297,12 +303,12 @@ class NodeFactory:
         return False
 
     @staticmethod
-    def _get_nesting_level(parent_node: RecursiveTreeNode) -> int:
+    def _get_nesting_level(parent_node: Optional[RecursiveTreeNode]) -> int:
         is_root = parent_node is None
         if is_root:
             nesting_level = 1
         else:
-            need_to_go_down_one_level = parent_node is MultiClusterNode
+            need_to_go_down_one_level = isinstance(parent_node, MultiClusterNode)
             if need_to_go_down_one_level:
                 nesting_level = parent_node.nesting_level + 1
             else:
@@ -332,8 +338,6 @@ class NodeFactory:
         if alignment_has_issues:
             return True
 
-        # TODO: what if is a single non-match interval in non-root? Should we check?
-
         return False
 
     @staticmethod
@@ -353,11 +357,11 @@ class NodeFactory:
     #  clustering methods
     @staticmethod
     def _infer_if_we_should_cluster_further(alignment: MSA, clustering_result: ClusteringResult) -> bool:
-        alignment_has_issues = NodeFactory._alignment_has_issues(alignment)
-        if alignment_has_issues:
+        if clustering_result.no_clustering:
             return False
 
-        if clustering_result.no_clustering:
+        alignment_has_issues = NodeFactory._alignment_has_issues(alignment)
+        if alignment_has_issues:
             return False
 
         return True
