@@ -1,6 +1,6 @@
 from unittest import TestCase
-from unittest.mock import patch, Mock, PropertyMock
-from tests.test_helpers import make_alignment, equal_msas, first_dict_contained_in_second
+from unittest.mock import patch, Mock
+from tests.test_helpers import make_alignment, equal_msas
 from make_prg.recursion_tree import RecursiveTreeNode, MultiIntervalNode, MultiClusterNode, LeafNode, NodeFactory, UpdateError
 from make_prg.prg_builder import PrgBuilder
 from make_prg.from_msa import MSA
@@ -711,7 +711,7 @@ class TestNodeFactory(TestCase):
 
         # mock MultiIntervalNode.__init__
         def __init__(node_self, nesting_level, alignment, parent, prg_builder, interval_subalignments):
-            self.assertEqual(1, nesting_level)
+            self.assertEqual(0, nesting_level)
             self.assertEqual(self.alignment, alignment)
             self.assertEqual(None, parent)
             self.assertEqual(self.prg_builder, prg_builder)
@@ -731,7 +731,7 @@ class TestNodeFactory(TestCase):
 
         # mock MultiClusterNode.__init__
         def __init__(node_self, nesting_level, alignment, parent, prg_builder, interval_subalignments):
-            self.assertEqual(1, nesting_level)
+            self.assertEqual(0, nesting_level)
             self.assertEqual(self.alignment, alignment)
             self.assertEqual(None, parent)
             self.assertEqual(self.prg_builder, prg_builder)
@@ -750,7 +750,7 @@ class TestNodeFactory(TestCase):
 
         # mock Leaf.__init__
         def __init__(node_self, nesting_level, alignment, parent, prg_builder):
-            self.assertEqual(1, nesting_level)
+            self.assertEqual(0, nesting_level)
             self.assertEqual(self.alignment, alignment)
             self.assertEqual(None, parent)
             self.assertEqual(self.prg_builder, prg_builder)
@@ -912,7 +912,7 @@ class TestNodeFactory(TestCase):
 
     def test___get_nesting_level___no_parent(self, *uninteresting_mocks):
         self.setup()
-        expected = 1
+        expected = 0
         actual = NodeFactory._get_nesting_level(None)
 
         self.assertEqual(expected, actual)

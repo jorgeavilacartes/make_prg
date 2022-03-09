@@ -310,7 +310,7 @@ class NodeFactory:
     def _get_nesting_level(parent_node: Optional[RecursiveTreeNode]) -> int:
         is_root = parent_node is None
         if is_root:
-            nesting_level = 1
+            nesting_level = 0
         else:
             need_to_go_down_one_level = isinstance(parent_node, MultiClusterNode)
             if need_to_go_down_one_level:
