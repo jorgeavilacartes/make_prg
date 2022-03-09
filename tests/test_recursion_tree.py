@@ -954,15 +954,6 @@ class TestNodeFactory(TestCase):
         self.assertTrue(NodeFactory._infer_if_has_single_interval([], [], 4, 5, alignment_mock, 7))
         alignment_mock.get_alignment_length.assert_called_once_with()
 
-    @patch.object(NodeFactory, NodeFactory._alignment_has_issues.__name__, return_value=True)
-    def test___infer_if_has_single_interval___alignment_has_issues(self,
-            alignment_has_issues_mock, *uninteresting_mocks):
-        alignment_mock = Mock()
-        alignment_mock.get_alignment_length = Mock(return_value=7)
-        self.assertTrue(NodeFactory._infer_if_has_single_interval([], [], 4, 5, alignment_mock, 7))
-        alignment_has_issues_mock.assert_called_once_with(alignment_mock)
-
-    @patch.object(NodeFactory, NodeFactory._alignment_has_issues.__name__, return_value=False)
     def test___infer_if_has_single_interval___has_multiple_intervals(self,
             alignment_has_issues_mock, *uninteresting_mocks):
         alignment_mock = Mock()

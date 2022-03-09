@@ -338,10 +338,6 @@ class NodeFactory:
         if small_variant_site:
             return True
 
-        alignment_has_issues = NodeFactory._alignment_has_issues(alignment)
-        if alignment_has_issues:
-            return True
-
         return False
 
     @staticmethod
