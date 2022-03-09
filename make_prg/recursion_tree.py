@@ -66,6 +66,7 @@ class RecursiveTreeNode(ABC):
         old_child_index = self.children.index(old_child)
         self.children[old_child_index] = new_child
 
+    # Note: trivial method, untested
     def log_that_node_was_created(self):
         logger.trace("Created node:\n" + str(self))
 
@@ -246,23 +247,26 @@ class NodeFactory:
         Note that the root has a None parent. For the root also, we need to first try to build a MultiIntervalNode and
         then a MulticlusterNode,as we first want to split its intervals, and then cluster.
         """
+        parent_node_is_leaf = isinstance(parent_node, LeafNode)
+        assert not parent_node_is_leaf, "Error on building a Recursive Tree node: parent node should never be a leaf"
+
         min_match_length = prg_builder.min_match_length
         nesting_level = NodeFactory._get_nesting_level(parent_node)
 
         # if parent is multi interval, children should not be
         skip_building_multi_interval_node = isinstance(parent_node, MultiIntervalNode)
         if not skip_building_multi_interval_node:
-            consensus, match_intervals, non_match_intervals, all_intervals = \
-                NodeFactory._get_intervals(alignment, min_match_length)
+            all_intervals, match_intervals = NodeFactory._get_all_and_match_intervals(alignment, min_match_length)
 
-            is_leaf = NodeFactory._infer_if_should_be_leaf(all_intervals=all_intervals, match_intervals=match_intervals,
-                                                           nesting_level=nesting_level,
-                                                           max_nesting=prg_builder.max_nesting,
-                                                           alignment=alignment,
-                                                           min_match_length=min_match_length)
+            has_a_single_interval = NodeFactory._infer_if_has_single_interval(all_intervals=all_intervals, match_intervals=match_intervals,
+                                                                nesting_level=nesting_level,
+                                                                max_nesting=prg_builder.max_nesting,
+                                                                alignment=alignment,
+                                                                min_match_length=min_match_length)
 
-            if not is_leaf:
-                interval_subalignments = [alignment[:, interval.start: interval.stop + 1] for interval in all_intervals]
+            if not has_a_single_interval:
+                interval_subalignments = NodeFactory._partition_alignment_into_interval_subalignments(alignment,
+                                                                                                      all_intervals)
                 return MultiIntervalNode(nesting_level, alignment, parent_node, prg_builder, interval_subalignments)
 
         # if parent is multi cluster, children should not be
@@ -319,9 +323,9 @@ class NodeFactory:
     #####################################################################################################
     #  interval methods
     @staticmethod
-    def _infer_if_should_be_leaf(all_intervals: Intervals, match_intervals: Intervals,
-                                 nesting_level: int, max_nesting: int,
-                                 alignment: MSA, min_match_length: int) -> bool:
+    def _infer_if_has_single_interval(all_intervals: Intervals, match_intervals: Intervals,
+                                      nesting_level: int, max_nesting: int,
+                                      alignment: MSA, min_match_length: int) -> bool:
         single_match_interval = (len(all_intervals) == 1) and (all_intervals[0] in match_intervals)
         if single_match_interval:
             return True
@@ -341,7 +345,7 @@ class NodeFactory:
         return False
 
     @staticmethod
-    def _get_intervals(alignment: MSA, min_match_length: int) -> Tuple[str, Intervals, Intervals, Intervals]:
+    def _get_all_and_match_intervals(alignment: MSA, min_match_length: int) -> Tuple[Intervals, Intervals]:
         consensus = get_consensus_from_MSA(alignment)
         interval_partitioner = IntervalPartitioner(consensus, min_match_length, alignment)
         (
@@ -349,8 +353,11 @@ class NodeFactory:
             non_match_intervals,
             all_intervals,
         ) = interval_partitioner.get_intervals()
-        return consensus, match_intervals, non_match_intervals, all_intervals
+        return all_intervals, match_intervals
 
+    @staticmethod
+    def _partition_alignment_into_interval_subalignments(alignment: MSA, all_intervals: Intervals) -> List[MSA]:
+        return [alignment[:, interval.start: interval.stop + 1] for interval in all_intervals]
     #####################################################################################################
 
     #####################################################################################################
