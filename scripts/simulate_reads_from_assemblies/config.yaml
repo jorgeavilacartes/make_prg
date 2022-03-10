@@ -1,0 +1,4 @@
+assemblies_dir: sample_example
+output_dir: output
+coverage: 10
+art_container:  docker://quay.io/biocontainers/art:2016.06.05--h874f42a_8

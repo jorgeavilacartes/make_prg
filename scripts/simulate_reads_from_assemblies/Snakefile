@@ -1,0 +1,30 @@
+configfile: "config.yaml"
+
+def get_all_assemblies():
+    from pathlib import Path
+    assemblies = []
+    for file in Path(config["assemblies_dir"]).iterdir():
+        assemblies.append(file.with_suffix("").name)
+    return assemblies
+
+rule all:
+    input: [f"{config['output_dir']}/simulated_reads/{assembly}.reads.{config['coverage']}x.fa" for assembly in get_all_assemblies()]
+
+rule run_art:
+    input:
+        fasta = f"{config['assemblies_dir']}/{{assembly}}.fna"
+    output:
+        reads = f"{config['output_dir']}/simulated_reads/{{assembly}}.reads.{config['coverage']}x.fa"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt * 2000
+    container: config["art_container"]
+    log:
+        "logs/run_art/{assembly}.log"
+    params:
+        coverage = config['coverage']
+    shadow: "shallow"
+    shell:"""
+        art_illumina -ss HS25 -sam -i {input.fasta} -l 150 -f 10 -ef -o {wildcards.assembly} && grep -v "^@" {wildcards.assembly}_errFree.sam | awk 'BEGIN{{FS="\\t"; OFS=""}}{{print ">",$1,"\\n",$10}}' > {output.reads}
+    """
+

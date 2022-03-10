@@ -122,3 +122,6 @@ sample_example/make_prg_*
 /scripts/mmseqs2_clusters_to_MSAs/.snakemake/
 /scripts/mmseqs2_clusters_to_MSAs/logs/
 /scripts/mmseqs2_clusters_to_MSAs/output/
+/scripts/simulate_reads_from_assemblies/.snakemake/
+/scripts/simulate_reads_from_assemblies/logs/
+/scripts/simulate_reads_from_assemblies/output/
