@@ -22,9 +22,12 @@ rule run_art:
     log:
         "logs/run_art/{assembly}.log"
     params:
-        coverage = config['coverage']
+        coverage = config['coverage'],
+        read_length = config['read_length']
     shadow: "shallow"
     shell:"""
-        art_illumina -ss HS25 -sam -i {input.fasta} -l 150 -f 10 -ef -o {wildcards.assembly} && grep -v "^@" {wildcards.assembly}_errFree.sam | awk 'BEGIN{{FS="\\t"; OFS=""}}{{print ">",$1,"\\n",$10}}' > {output.reads}
+        art_illumina -ss HS25 -sam -i {input.fasta} -l {params.read_length} -f {params.coverage} -ef -o {wildcards.assembly} && \
+        grep -v "^@" {wildcards.assembly}_errFree.sam | \
+        awk 'BEGIN{{FS="\\t"; OFS=""}}{{print ">",$1,"\\n",$10}}' > {output.reads}
     """
 
