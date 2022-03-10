@@ -17,7 +17,7 @@ rule run_art:
         reads = f"{config['output_dir']}/simulated_reads/{{assembly}}.reads.{config['coverage']}x.fa"
     threads: 1
     resources:
-        mem_mb=lambda wildcards, attempt: attempt * 4000
+        mem_mb=lambda wildcards, attempt: attempt * 100
     container: config["art_container"]
     log:
         "logs/run_art/{assembly}.log"
