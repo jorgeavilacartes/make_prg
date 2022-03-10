@@ -13,8 +13,6 @@ bsub -R "select[mem>$MEMORY] rusage[mem=$MEMORY] span[hosts=1]" \
     -o "$LOG_DIR"/"$JOB_NAME".o \
     -e "$LOG_DIR"/"$JOB_NAME".e \
     -J "$JOB_NAME" \
-    --groups run_art=group_1 \
-    --group-components group_1=1000 \
-      snakemake --profile "$PROFILE" "$@"
+      snakemake --profile "$PROFILE" --groups run_art=group_1 --group-components group_1=1000 "$@"
 
 exit 0
