@@ -1,0 +1,3 @@
+mmseqs2_output: sample_example/output_all_seqs.fasta
+output_dir: output
+mafft_container:  docker://quay.io/biocontainers/mafft:7.490--hec16e2b_1

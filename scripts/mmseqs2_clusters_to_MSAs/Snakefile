@@ -1,0 +1,76 @@
+configfile: "config.yaml"
+
+def get_cluster_id(line):
+    return line[1:].strip().split()[0]
+
+def get_all_cluster_names():
+    cluster_names = []
+
+    with open(config["mmseqs2_output"]) as mmseqs2_fasta_fh:
+        previous_line = "-"
+        for line in mmseqs2_fasta_fh:
+            this_line_is_a_header = line[0] == ">"
+            previous_line_was_a_header = previous_line[0] == ">"
+            start_of_a_new_cluster_reached = previous_line_was_a_header and this_line_is_a_header
+            if start_of_a_new_cluster_reached:
+                cluster_id = get_cluster_id(previous_line)
+                cluster_names.append(cluster_id)
+            previous_line = line
+
+    return cluster_names
+
+
+rule all:
+    input: [f"{config['output_dir']}/msas/{cluster}.msa.fa" for cluster in get_all_cluster_names()]
+
+rule split_mmseqs2_clusters_into_fasta_dir:
+    input:
+        mmseqs2_fasta = config["mmseqs2_output"]
+    output:
+        fastas = [f"{config['output_dir']}/fastas/{cluster}.fa" for cluster in get_all_cluster_names()]
+    threads: 1
+    resources:
+        mem_mb=200
+    log:
+        "logs/split_mmseqs2_clusters_into_fasta_dir.log"
+    params:
+        fasta_dir = f"{config['output_dir']}/fastas"
+    run:
+        import os
+        os.makedirs(params.fasta_dir, exist_ok=True)
+
+        def output_cluster(buffer, start_of_a_new_cluster_reached):
+            there_is_a_cluster_to_output = len(buffer) > 2
+            if there_is_a_cluster_to_output:
+                cluster_id = get_cluster_id(buffer[0])
+                cluster_lines = buffer[1:-2] if start_of_a_new_cluster_reached else buffer[1:]
+                with open(f"{params.fasta_dir}/{cluster_id}.fa","w") as cluster_fh:
+                    cluster_fh.write("".join(cluster_lines))
+                buffer = buffer[-2:] if start_of_a_new_cluster_reached else []
+            return buffer
+
+        with open(input.mmseqs2_fasta) as mmseqs2_fasta_fh:
+            previous_line_was_a_header = False
+            buffer = []
+            for line in mmseqs2_fasta_fh:
+                buffer.append(line)
+                this_line_is_a_header = line[0] == ">"
+                start_of_a_new_cluster_reached = previous_line_was_a_header and this_line_is_a_header
+                if start_of_a_new_cluster_reached:
+                    buffer = output_cluster(buffer, True)
+                previous_line_was_a_header = this_line_is_a_header
+            buffer = output_cluster(buffer, False)
+
+
+rule build_MSAs:
+    input:
+        fasta = f"{config['output_dir']}/fastas/{{locus}}.fa"
+    output:
+        msa = f"{config['output_dir']}/msas/{{locus}}.msa.fa"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: {1: 4000, 2: 8000, 3: 16000}.get(attempt,32000)
+    container: config["mafft_container"]
+    log:
+        "logs/build_MSAs/{locus}.log"
+    shell: "mafft --auto --quiet --thread 1 {input.fasta} > {output.msa}"
