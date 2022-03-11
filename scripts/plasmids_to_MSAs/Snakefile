@@ -65,11 +65,11 @@ rule mmseqs2:
         seq_id = 0.9,
         cov_mode = 0,
         c = 0.8,
-        output_dir = "mmseqs",
+        output_prefix = f"{config['output_dir']}/mmseqs",
         tmp_dir = f"{config['output_dir']}/tmp"
     container: config['mmseqs2_container']
     shell:
-        "mmseqs easy-cluster {input.fasta} {params.output_dir} {params.tmp_dir} --min-seq-id {params.seq_id} \
+        "mmseqs easy-cluster {input.fasta} {params.output_prefix} {params.tmp_dir} --min-seq-id {params.seq_id} \
         --cov-mode {params.cov_mode} -c {params.c} --threads {threads}"
 
 
