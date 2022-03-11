@@ -1,23 +1,15 @@
+from pathlib import Path
+
 configfile: "config.yaml"
 
-def get_cluster_id(line):
-    return line[1:].strip().split()[0]
+fastas = Path(f"{config['output_dir']}/fastas")
 
 def get_all_cluster_names():
-    cluster_names = []
-
-    with open(config["mmseqs2_output"]) as mmseqs2_fasta_fh:
-        previous_line = "-"
-        for line in mmseqs2_fasta_fh:
-            this_line_is_a_header = line[0] == ">"
-            previous_line_was_a_header = previous_line[0] == ">"
-            start_of_a_new_cluster_reached = previous_line_was_a_header and this_line_is_a_header
-            if start_of_a_new_cluster_reached:
-                cluster_id = get_cluster_id(previous_line)
-                cluster_names.append(cluster_id)
-            previous_line = line
-
-    return cluster_names
+    all_msas = []
+    for file in fastas.iterdir():
+        if file.name.endswith(".fa"):
+            all_msas.append(file.with_suffix("").name)
+    return all_msas
 
 
 rule all:
