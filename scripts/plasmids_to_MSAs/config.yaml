@@ -1,0 +1,5 @@
+assemblies_dir: sample_example/assemblies
+plasmid_list: sample_example/plasmids.txt
+output_dir: output
+mafft_container:  docker://quay.io/biocontainers/mafft:7.490--hec16e2b_1
+mmseqs2_container: docker://quay.io/biocontainers/mmseqs2:13.45111--pl5321hf1761c0_2

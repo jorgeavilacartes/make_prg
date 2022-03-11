@@ -1,0 +1,160 @@
+configfile: "config.yaml"
+
+rule all:
+    input: f"{config['output_dir']}/all_msas_done"
+
+rule concat_assemblies_into_single_fasta:
+    output:
+        all_plasmids_fasta = f"{config['output_dir']}/all.fasta"
+    threads: 1
+    resources: mem_mb=200
+    log: "logs/concat_assemblies_into_single_fasta.log"
+    run:
+        with open(config['plasmid_list']) as plasmid_list_fh, \
+             open(output.all_plasmids_fasta, "w") as all_plasmids_fasta_fh:
+            for line in plasmid_list_fh:
+                plasmid = line.strip()
+                plasmid_file = f"{config['assemblies_dir']}/{plasmid}.ffn"
+                with open(plasmid_file) as plasmid_file_fh:
+                    all_plasmids_fasta_fh.write(plasmid_file_fh.read())
+
+rule remove_redundancy:
+    input:
+        fasta = rules.concat_assemblies_into_single_fasta.output.all_plasmids_fasta
+    output:
+        unique = f"{config['output_dir']}/all.fasta.unique.fa",
+        repeated_fw = f"{config['output_dir']}/all.fasta.repeated.fw.fa",
+        repeated_rc = f"{config['output_dir']}/all.fasta.repeated.rc.fa"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: 8000 * attempt
+    log:
+        "logs/remove_redundancy.log"
+    run:
+        from Bio import SeqIO
+
+        sequences_already_output = set()
+        with open(output.unique,"w") as unique_sequences_fh, \
+                open(output.repeated_fw,"w") as repeated_sequences_fw_fh, \
+                open(output.repeated_rc,"w") as repeated_sequences_rc_fh:
+            for record in SeqIO.parse(input.fasta,"fasta"):
+                seq = record.seq
+                rc_seq = record.reverse_complement().seq
+
+                if seq in sequences_already_output:
+                    SeqIO.write(record,repeated_sequences_fw_fh,"fasta")
+                elif rc_seq in sequences_already_output:
+                    SeqIO.write(record,repeated_sequences_rc_fh,"fasta")
+                else:
+                    SeqIO.write(record,unique_sequences_fh,"fasta")
+                    sequences_already_output.add(record.seq)
+
+rule mmseqs2:
+    input:
+        fasta = rules.remove_redundancy.output.unique
+    output:
+        all_seqs = f"{config['output_dir']}/mmseqs_all_seqs.fasta",
+        cluster = f"{config['output_dir']}/mmseqs_cluster.tsv",
+        rep_seq = f"{config['output_dir']}/mmseqs_rep_seq.fasta"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: 16000 * attempt
+    log:
+        "logs/mmseqs2.log"
+    params:
+        seq_id = 0.9,
+        cov_mode = 0,
+        c = 0.8,
+        output_dir = "mmseqs",
+        tmp_dir = f"{config['output_dir']}/tmp"
+    container: config['mmseqs2_container']
+    shell:
+        "mmseqs easy-cluster {input.fasta} {params.output_dir} {params.tmp_dir} --min-seq-id {params.seq_id} \
+        --cov-mode {params.cov_mode} -c {params.c}"
+
+
+def get_cluster_id(line):
+    return line[1:].strip().split()[0]
+
+def get_all_cluster_names():
+    cluster_names = []
+
+    with open(config["mmseqs2_output"]) as mmseqs2_fasta_fh:
+        previous_line = "-"
+        for line in mmseqs2_fasta_fh:
+            this_line_is_a_header = line[0] == ">"
+            previous_line_was_a_header = previous_line[0] == ">"
+            start_of_a_new_cluster_reached = previous_line_was_a_header and this_line_is_a_header
+            if start_of_a_new_cluster_reached:
+                cluster_id = get_cluster_id(previous_line)
+                cluster_names.append(cluster_id)
+            previous_line = line
+
+    return cluster_names
+
+checkpoint split_mmseqs2_clusters_into_fasta_dir:
+    input:
+        mmseqs2_fasta = rules.mmseqs2.output.all_seqs
+    output:
+        fastas = directory(f"{config['output_dir']}/fastas")
+    threads: 1
+    resources:
+        mem_mb=200
+    log:
+        "logs/split_mmseqs2_clusters_into_fasta_dir.log"
+    run:
+        import os
+        os.makedirs(output.fastas)
+
+        def output_cluster(buffer, start_of_a_new_cluster_reached):
+            there_is_a_cluster_to_output = len(buffer) > 2
+            if there_is_a_cluster_to_output:
+                cluster_id = get_cluster_id(buffer[0])
+                cluster_lines = buffer[1:-2] if start_of_a_new_cluster_reached else buffer[1:]
+                with open(f"{output.fastas}/{cluster_id}.fa","w") as cluster_fh:
+                    cluster_fh.write("".join(cluster_lines))
+                buffer = buffer[-2:] if start_of_a_new_cluster_reached else []
+            return buffer
+
+        with open(input.mmseqs2_fasta) as mmseqs2_fasta_fh:
+            previous_line_was_a_header = False
+            buffer = []
+            for line in mmseqs2_fasta_fh:
+                buffer.append(line)
+                this_line_is_a_header = line[0] == ">"
+                start_of_a_new_cluster_reached = previous_line_was_a_header and this_line_is_a_header
+                if start_of_a_new_cluster_reached:
+                    buffer = output_cluster(buffer, True)
+                previous_line_was_a_header = this_line_is_a_header
+            buffer = output_cluster(buffer, False)
+
+
+rule build_MSAs:
+    input:
+        fasta = f"{config['output_dir']}/fastas/{{locus}}.fa"
+    output:
+        msa = f"{config['output_dir']}/msas/{{locus}}.msa.fa"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: {1: 4000, 2: 8000, 3: 16000}.get(attempt,32000)
+    container: config["mafft_container"]
+    log:
+        "logs/build_MSAs/{locus}.log"
+    shell: "mafft --auto --quiet --thread 1 {input.fasta} > {output.msa}"
+
+
+def aggregate_input(wildcards):
+    import glob
+    msas_dir = checkpoints.split_mmseqs2_clusters_into_fasta_dir.get(**wildcards).output.fastas
+    print(msas_dir)
+    all_msas = glob.glob(f"{config['output_dir']}/msas/*.msa.fa")
+    print(all_msas)
+    return all_msas
+
+rule aggregate_build_MSAs:
+    input:
+        aggregate_input
+    output:
+        f"{config['output_dir']}/all_msas_done"
+    shell:
+        "touch {output}"
