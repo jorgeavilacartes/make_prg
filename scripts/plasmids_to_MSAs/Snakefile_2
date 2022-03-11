@@ -1,0 +1,38 @@
+configfile: "config.yaml"
+
+def get_cluster_id(line):
+    return line[1:].strip().split()[0]
+
+def get_all_cluster_names():
+    cluster_names = []
+
+    with open(config["mmseqs2_output"]) as mmseqs2_fasta_fh:
+        previous_line = "-"
+        for line in mmseqs2_fasta_fh:
+            this_line_is_a_header = line[0] == ">"
+            previous_line_was_a_header = previous_line[0] == ">"
+            start_of_a_new_cluster_reached = previous_line_was_a_header and this_line_is_a_header
+            if start_of_a_new_cluster_reached:
+                cluster_id = get_cluster_id(previous_line)
+                cluster_names.append(cluster_id)
+            previous_line = line
+
+    return cluster_names
+
+
+rule all:
+    input: [f"{config['output_dir']}/msas/{cluster}.msa.fa" for cluster in get_all_cluster_names()]
+
+
+rule build_MSAs:
+    input:
+        fasta = f"{config['output_dir']}/fastas/{{locus}}.fa"
+    output:
+        msa = f"{config['output_dir']}/msas/{{locus}}.msa.fa"
+    threads: 1
+    resources:
+        mem_mb=lambda wildcards, attempt: {1: 4000, 2: 8000, 3: 16000}.get(attempt,32000)
+    container: config["mafft_container"]
+    log:
+        "logs/build_MSAs/{locus}.log"
+    shell: "mafft --auto --quiet --thread 1 {input.fasta} > {output.msa}"
