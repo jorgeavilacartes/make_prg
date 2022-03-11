@@ -56,7 +56,7 @@ rule mmseqs2:
         all_seqs = f"{config['output_dir']}/mmseqs_all_seqs.fasta",
         cluster = f"{config['output_dir']}/mmseqs_cluster.tsv",
         rep_seq = f"{config['output_dir']}/mmseqs_rep_seq.fasta"
-    threads: 1
+    threads: 16
     resources:
         mem_mb=lambda wildcards, attempt: 16000 * attempt
     log:
@@ -70,7 +70,7 @@ rule mmseqs2:
     container: config['mmseqs2_container']
     shell:
         "mmseqs easy-cluster {input.fasta} {params.output_dir} {params.tmp_dir} --min-seq-id {params.seq_id} \
-        --cov-mode {params.cov_mode} -c {params.c}"
+        --cov-mode {params.cov_mode} -c {params.c} --threads {threads}"
 
 
 def get_cluster_id(line):
