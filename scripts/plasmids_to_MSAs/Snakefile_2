@@ -24,7 +24,14 @@ rule build_MSAs:
     threads: 1
     resources:
         mem_mb=lambda wildcards, attempt: {1: 4000, 2: 8000, 3: 16000}.get(attempt,32000)
-    container: config["mafft_container"]
     log:
         "logs/build_MSAs/{locus}.log"
-    shell: "mafft --auto --quiet --thread 1 {input.fasta} > {output.msa}"
+    shell: """
+        nb_of_seqs=`grep "^>" {input.fasta} | wc -l`
+        if [ "$nb_of_seqs" -eq 1 ]
+        then
+            cp {input.fasta} {output.msa}
+        else
+            mafft --auto --quiet --thread 1 {input.fasta} > {output.msa}
+        fi
+        """
