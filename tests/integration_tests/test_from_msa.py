@@ -20,6 +20,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -162,6 +163,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -189,6 +191,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -214,6 +217,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -232,6 +236,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -260,6 +265,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -288,6 +294,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -314,6 +321,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -340,6 +348,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -362,6 +371,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
@@ -385,6 +395,7 @@ class Test_From_MSA_Integration_Full_Builds(TestCase):
 
         options = Namespace(
             input=input_data,
+            suffix="",
             output_prefix=output_prefix,
             alignment_format='fasta',
             log=None,
