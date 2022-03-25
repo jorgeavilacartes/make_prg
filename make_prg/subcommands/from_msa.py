@@ -91,11 +91,11 @@ def get_all_input_files(input_path: str, suffix: str) -> List[Path]:
     if not input_path.exists():
         raise FileNotFoundError(f"{input_path} does not exist")
 
-    if input_path.is_file() and input_path.name.endswith(suffix):
+    if input_path.is_file():
         all_files = [input_path]
     else:
         all_files = [
-            path.resolve() for path in input_path.iterdir() if path.is_file()
+            path.resolve() for path in input_path.iterdir() if path.is_file() and path.name.endswith(suffix)
         ]
     return all_files
 
