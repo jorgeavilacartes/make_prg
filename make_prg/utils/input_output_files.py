@@ -40,6 +40,7 @@ class InputOutputFiles(ABC):
             return self.gfa.exists()
         if self.output_type.binary:
             return self.bin.exists()
+        return False
 
     @staticmethod
     def get_successfull_runs(list_of_InputOutputFiles: List["InputOutputFiles"]) -> List["InputOutputFiles"]:

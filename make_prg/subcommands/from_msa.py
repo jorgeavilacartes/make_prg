@@ -167,12 +167,12 @@ def run(cl_options):
         pool.map(process_MSA, input_and_output_files, chunksize=1)
     logger.success(f"All PRGs generated!")
 
-    successfull_runs = InputOutputFilesFromMSA.get_successfull_runs(input_and_output_files)
-    all_runs_failed = len(successfull_runs) == 0
+    successful_input_and_output_files = InputOutputFilesFromMSA.get_successfull_runs(input_and_output_files)
+    all_runs_failed = len(successful_input_and_output_files) == 0
     if all_runs_failed:
         logger.error("No PRGs were built, please check errors")
     else:
-        InputOutputFilesFromMSA.create_final_files(input_and_output_files, options.output_prefix)
+        InputOutputFilesFromMSA.create_final_files(successful_input_and_output_files, options.output_prefix)
 
     io_utils.remove_empty_folders(str(root_temp_dir))
     logger.success("All done!")
