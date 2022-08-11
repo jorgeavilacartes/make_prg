@@ -3,7 +3,8 @@ from typing import List, Dict, Iterator, Union, Optional
 from itertools import starmap, repeat, chain
 from loguru import logger
 import numpy as np
-from sklearn.cluster import KMeans
+# from sklearn.cluster import KMeans
+from make_prg.from_msa.kmeans_ot import KmeansOT as KMeans
 from make_prg.from_msa import MSA
 from make_prg.utils.misc import flatten_list
 from make_prg.utils.seq_utils import ungap, Sequence, Sequences, SequenceExpander
@@ -240,7 +241,14 @@ def kmeans_cluster_seqs(
             break
         if num_clusters == num_sequences:
             break
-        kmeans = KMeans(n_clusters=num_clusters, random_state=2).fit(count_matrix)
+        # kmeans = KMeans(n_clusters=num_clusters, random_state=2).fit(count_matrix)
+        kmeans = KMeans(n_clusters=num_clusters, random_state=2)
+
+        # normalize count_matrix by row -> probability distribution
+        M = count_matrix.copy()
+        count_matrix_prob =  (M.T / M.sum(axis=1)).T
+        kmeans.fit( count_matrix_prob )
+
         prev_cluster_assignment = cluster_assignment
         cluster_assignment = list(kmeans.predict(count_matrix))
         num_fitted_clusters = len(set(cluster_assignment))
