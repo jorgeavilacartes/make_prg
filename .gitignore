@@ -1,3 +1,12 @@
+# vscode
+.vscode/
+
+# make_pgr outputs
+*.bin
+*.gfa
+*.prg
+*.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
